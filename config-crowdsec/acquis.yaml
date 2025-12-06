@@ -1,0 +1,19 @@
+# --- Docker Containers Surveillance (stdout) ---
+# Block 1: Traefik
+source: docker
+container_name:
+ - traefik
+labels:
+  type: traefik
+
+---
+
+# --- SFTP Container Surveillance (stdout) ---
+# Block 2: SFTP (Sidecar)
+source: docker
+container_name:
+ - sftp-access
+labels:
+  type: syslog
+
+## NOTE: THE SEPARATOR --- IS REQUIRED BETWEEN THE TWO BLOCKS

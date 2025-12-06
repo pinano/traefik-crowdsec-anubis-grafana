@@ -1,0 +1,19 @@
+apiVersion: 1
+
+datasources:
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    isDefault: true
+    version: 1
+    editable: true
+    jsonData:
+      # SECURITY LIMIT:
+      # If you request 30 days of logs, Grafana will try to render millions of lines 
+      # and your browser will die. This caps it at 2000 lines per query.
+      # If you want to see more, use pagination.
+      maxLines: 2000
+
+      # Timeout so it doesn't hang forever if Loki is compacting
+      timeout: 60

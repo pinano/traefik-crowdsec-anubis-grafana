@@ -1,0 +1,46 @@
+services:
+
+  # ===========================
+  # ANUBIS (base)
+  # ===========================
+  anubis-base:
+    image: ghcr.io/techarohq/anubis:v1.23.1
+    restart: unless-stopped
+    networks:
+      - traefik
+    read_only: true # <--- (prevents writes to container layer)
+    tmpfs:
+      - /tmp
+    deploy:
+      resources:
+        limits:
+          # Set up defaults ${VAR:-default} in case we forget these in the .env
+          cpus: '${ANUBIS_CPU_LIMIT:-0.10}'
+          memory: '${ANUBIS_MEM_LIMIT:-32M}'
+        reservations:
+          memory: 16M
+    environment:
+      - TZ=${TZ}
+      - BIND=:8080
+      - DIFFICULTY=${ANUBIS_DIFFICULTY}
+      - POLICY_FNAME=/botPolicy.yaml
+      - 'TARGET= '
+      - COOKIE_DYNAMIC_DOMAIN=true
+      - ED25519_PRIVATE_KEY_HEX=${ANUBIS_REDIS_PRIVATE_KEY}
+      - COOKIE_PREFIX=bogo
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - ./config-anubis/botPolicy-generated.yaml:/botPolicy.yaml:ro
+    healthcheck:
+      disable: true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "1"
+
+networks:
+  traefik:
+    name: traefik
+    external: true

@@ -1,0 +1,107 @@
+api:
+  insecure: false
+
+entryPoints:
+
+  web:
+    address: ":80"
+    forwardedHeaders:
+      insecure: true
+      trustedIPs:
+        - "0.0.0.0/0"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+    # prevent Slowloris type attacks
+    transport:
+      respondingTimeouts:
+        readTimeout: "10s"
+        writeTimeout: "10s"
+        idleTimeout: "30s"
+
+  websecure:
+    address: ":443"
+    http3: {}
+    forwardedHeaders:
+      insecure: true
+      trustedIPs:
+        - "0.0.0.0/0"
+    # prevent Slowloris type attacks
+    transport:
+      respondingTimeouts:
+        readTimeout: "10s"
+        writeTimeout: "10s"
+        idleTimeout: "30s"
+
+  mariadb:
+    address: ":3306"
+
+certificatesResolvers:
+  le:
+    acme:
+      tlsChallenge: {}
+      #email: "" # <-- injected with env variable in docker-compose
+      storage: "/acme.json"
+
+tls:
+  options:
+    default:
+      minVersion: VersionTLS12
+      cipherSuites:
+        - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305
+
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: "traefik"
+
+  file:
+    directory: "/dynamic-config"
+    watch: true
+
+log:
+  level: INFO
+
+accessLog:
+  format: json
+  # Memory buffer so as not to hammer the disk with each line (batch writing)
+  bufferingSize: 1000
+
+  filters:
+    # 1. Code Filter:
+    # We are interested in successes (2xx) and errors (4xx, 5xx).
+    # Optional: You could remove 200-299 if you only wanted to see attacks,
+    # but CrowdSec sometimes needs to see legitimate traffic for its heuristics.
+    statusCodes:
+      - "200-299"
+      - "400-599"
+
+    # 2. THE "NOISE-CANCELLING" FILTER
+    # If Traefik serves something in less than 10ms, it is a static (img, css) or cache.
+    # It adds no security value -> Not logged.
+    # If it takes longer, it is your backend processing or a slow attack -> Logged.
+    # NOTE: Errors (4xx/5xx) are ALWAYS logged, ignore this duration.
+    minDuration: "10ms"
+
+    # 3. Retries:
+    # If Traefik fails to connect to a backend but retries and succeeds,
+    # true = log the intermediate failure (useful for detecting unstable backends).
+    retryAttempts: true
+
+  fields:
+    defaultMode: keep
+    names:
+      # We keep UserAgent and Referer, vital for CrowdSec to detect bots.
+      UserAgent: keep
+      Referer: keep
+
+experimental:
+  plugins:
+    crowdsec:
+      moduleName: "github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin"
+      version: "v1.4.6"

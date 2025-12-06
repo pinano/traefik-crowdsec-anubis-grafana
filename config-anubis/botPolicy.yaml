@@ -1,0 +1,31 @@
+bots:
+  - name: cloudflare-workers
+    headers_regex:
+      CF-Worker: .*
+    action: DENY
+  - name: well-known
+    path_regex: ^/.well-known/.*$
+    action: ALLOW
+  - name: favicon
+    path_regex: ^/favicon.ico$
+    action: ALLOW
+  - name: robots-txt
+    path_regex: ^/robots.txt$
+    action: ALLOW
+  - name: good-bots # --- SEO FRIENDLY ---
+    user_agent_regex: "(Googlebot|Bingbot|Slurp|DuckDuckBot|Baiduspider|YandexBot)"
+    action: ALLOW
+  #- name: "everyone"
+  #  user_agent_regex: "."
+  #  action: "CHALLENGE"
+  - name: generic-browser
+    user_agent_regex: Mozilla
+    action: CHALLENGE
+
+store:
+  # Use valkey backend (Redis compatible)
+  backend: valkey
+  parameters:
+    # Point to the 'redis' service defined in docker-compose
+    # Port 6379 and database 0
+    url: "redis://redis:6379/0"
