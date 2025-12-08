@@ -108,9 +108,6 @@ prompt_val "GLOBAL_RATE_BURST" "Traefik default burst limit"
 prompt_val "GLOBAL_CONCURRENCY" "Traefik global concurrency"
 prompt_val "HSTS_MAX_AGE" "HSTS max age (seconds)"
 
-prompt_val "GF_ADMIN_USER" "Grafana admin user"
-prompt_val "GF_ADMIN_PASSWORD" "Grafana admin password"
-
 # --- AUTOMATED GENERATION ---
 
 echo ""
@@ -124,21 +121,29 @@ if [[ "$gen_anubis" == "y" || "$gen_anubis" == "Y" || -z "$gen_anubis" ]]; then
     echo "   ✅ Generated ANUBIS_REDIS_PRIVATE_KEY"
 fi
 
-# 2. TRAEFIK_DASHBOARD_AUTH (valid for both Traefik and Dozzle dashboards)
+# 2. ADMINISTRATIVE CREDENTIALS (Grafana + Traefik/Dozzle)
 echo ""
-read -p "👉 Generate Traefik and Dozzle dashboard auth hash? (Y/n): " gen_auth
+read -p "👉 Configure unified Admin Credentials (Grafana + Traefik/Dozzle)? (Y/n): " gen_auth
 if [[ "$gen_auth" == "y" || "$gen_auth" == "Y" || -z "$gen_auth" ]]; then
-    read -p "   Username: " t_user
-    echo -n "   Password: "
-    read -s t_pass
+    printf "   Username: "
+    read -r admin_user
+    printf "   Password: "
+    read -r -s admin_pass
     echo ""
     echo ""
+
+    # Action 1: Update Grafana (Plaintext)
+    replace_val "GF_ADMIN_USER" "$admin_user"
+    replace_val "GF_ADMIN_PASSWORD" "$admin_pass"
+    echo "   ✅ Updated Grafana credentials"
+
+    # Action 2: Update Traefik/Dozzle (Hashed)
     echo "   ⏳ Hashing compatible with htpasswd..."
     # Run docker to generate hash consistently
-    HASH=$(docker run --rm httpd:alpine htpasswd -Bbn "$t_user" "$t_pass")
+    HASH=$(docker run --rm httpd:alpine htpasswd -Bbn "$admin_user" "$admin_pass")
     # Wrap in single quotes to handle special chars in hash
     replace_val "TRAEFIK_DASHBOARD_AUTH" "'$HASH'"
-    echo "   ✅ Updated TRAEFIK_DASHBOARD_AUTH"
+    echo "   ✅ Updated TRAEFIK_DASHBOARD_AUTH hash"
 fi
 
 # 3. CROWDSEC_API_KEY
