@@ -10,7 +10,7 @@ ENV_FILE=".env"
 
 # ASCII Art / Header
 echo "========================================================"
-echo "      🤖 TRAEFIK + CROWDSEC + ANUBIS SETUP 🤖"
+echo "      🤖 TRAEFIK + CROWDSEC + ANUBIS SETUP 🤖            "
 echo "========================================================"
 
 # 1. File Setup
@@ -60,7 +60,7 @@ prompt_val() {
         fi
         echo "   ✅ Set to: $input_val"
     else
-        echo "   ⏭️  Keeping default: $display_val"
+        echo "   ⏭️ Keeping default: $display_val"
     fi
 }
 
@@ -79,14 +79,15 @@ echo ""
 echo "🔧 CONFIGURING VARIABLES..."
 
 # --- INTERACTIVE PROMPTS ---
-prompt_val "DOMAIN" "Core Domain (e.g. example.com)"
-prompt_val "TZ" "Timezone (e.g. Europe/Madrid)"
-prompt_val "ACME_EMAIL" "Let's Encrypt Email"
 
-prompt_val "ANUBIS_DIFFICULTY" "Anubis Challenge Difficulty (1-5)"
-prompt_val "ANUBIS_LOGO_URL" "URL for Custom Logo"
-prompt_val "ANUBIS_CPU_LIMIT" "Anubis CPU Limit"
-prompt_val "ANUBIS_MEM_LIMIT" "Anubis Memory Limit"
+prompt_val "DOMAIN" "Core domain (e.g. example.com)"
+prompt_val "TZ" "Timezone (e.g. Europe/Madrid)"
+prompt_val "ACME_EMAIL" "Let's Encrypt email"
+
+prompt_val "ANUBIS_DIFFICULTY" "Anubis challenge difficulty (1-5)"
+prompt_val "ANUBIS_LOGO_URL" "URL for custom Anubis logo"
+prompt_val "ANUBIS_CPU_LIMIT" "Anubis CPU limit per instance"
+prompt_val "ANUBIS_MEM_LIMIT" "Anubis memory limit per instance"
 
 # REDIS_PASSWORD: Offer random generation
 echo ""
@@ -100,16 +101,15 @@ else
     prompt_val "REDIS_PASSWORD" "Redis Password (manual input)"
 fi
 
-prompt_val "CROWDSEC_UPDATE_INTERVAL" "CrowdSec Update Interval (seconds)"
+prompt_val "CROWDSEC_UPDATE_INTERVAL" "CrowdSec update interval (seconds)"
 
-prompt_val "GLOBAL_RATE_AVG" "Default Rate Limit (Requests/sec)"
-prompt_val "GLOBAL_RATE_BURST" "Default Burst"
-prompt_val "GLOBAL_CONCURRENCY" "Global Concurrency"
-prompt_val "HSTS_MAX_AGE" "HSTS Max Age (seconds)"
+prompt_val "GLOBAL_RATE_AVG" "Traefik default rate limit (requests/sec)"
+prompt_val "GLOBAL_RATE_BURST" "Traefik default burst limit"
+prompt_val "GLOBAL_CONCURRENCY" "Traefik global concurrency"
+prompt_val "HSTS_MAX_AGE" "HSTS max age (seconds)"
 
-prompt_val "GF_ADMIN_USER" "Grafana Admin User"
-prompt_val "GF_ADMIN_PASSWORD" "Grafana Admin Password"
-
+prompt_val "GF_ADMIN_USER" "Grafana admin user"
+prompt_val "GF_ADMIN_PASSWORD" "Grafana admin password"
 
 # --- AUTOMATED GENERATION ---
 
@@ -117,19 +117,21 @@ echo ""
 echo "🔐 GENERATING SECURITY KEYS..."
 
 # 1. ANUBIS_REDIS_PRIVATE_KEY
-read -p "👉 Generate new Anubis Redis Private Key (openssl)? (Y/n): " gen_anubis
+read -p "👉 Generate new Anubis Redis private key with openssl? (Y/n): " gen_anubis
 if [[ "$gen_anubis" == "y" || "$gen_anubis" == "Y" || -z "$gen_anubis" ]]; then
     NEW_KEY=$(openssl rand -hex 32)
     replace_val "ANUBIS_REDIS_PRIVATE_KEY" "$NEW_KEY"
     echo "   ✅ Generated ANUBIS_REDIS_PRIVATE_KEY"
 fi
 
-# 2. TRAEFIK_DASHBOARD_AUTH
+# 2. TRAEFIK_DASHBOARD_AUTH (valid for both Traefik and Dozzle dashboards)
 echo ""
-read -p "👉 Generate Traefik Dashboard Auth Hash? (Y/n): " gen_auth
+read -p "👉 Generate Traefik and Dozzle dashboard auth hash? (Y/n): " gen_auth
 if [[ "$gen_auth" == "y" || "$gen_auth" == "Y" || -z "$gen_auth" ]]; then
     read -p "   Username: " t_user
-    read -s -p "   Password: " t_pass
+    echo -n "   Password: "
+    read -s t_pass
+    echo ""
     echo ""
     echo "   ⏳ Hashing compatible with htpasswd..."
     # Run docker to generate hash consistently
@@ -141,8 +143,14 @@ fi
 
 # 3. CROWDSEC_API_KEY
 echo ""
-read -p "👉 Generate NEW CrowdSec API Key (Requires starting docker)? (y/N): " gen_cs
+read -p "👉 Generate NEW CrowdSec API Key (requires starting docker)? (y/N): " gen_cs
 if [[ "$gen_cs" == "y" || "$gen_cs" == "Y" ]]; then
+    # Ensure network exists
+    if ! docker network inspect traefik >/dev/null 2>&1; then
+        echo "   🌐 Creating required 'traefik' network..."
+        docker network create traefik
+    fi
+
     echo "   🚀 Starting CrowdSec container..."
     docker compose -f docker-compose-traefik-crowdsec-redis.yml up -d crowdsec
     
@@ -161,7 +169,7 @@ if [[ "$gen_cs" == "y" || "$gen_cs" == "Y" ]]; then
     echo ""
 
     if [ "$(docker inspect --format='{{.State.Health.Status}}' crowdsec 2>/dev/null)" == "healthy" ]; then
-        echo "   🔑 Generating Key..."
+        echo "   🔑 Generating CROWDSEC_API_KEY..."
         # First remove old one if exists to avoid error
         docker exec crowdsec cscli bouncers delete traefik-bouncer >/dev/null 2>&1 || true
         # Add new one and capture output
@@ -169,7 +177,7 @@ if [[ "$gen_cs" == "y" || "$gen_cs" == "Y" ]]; then
         
         if [ -n "$CS_KEY" ]; then
             replace_val "CROWDSEC_API_KEY" "$CS_KEY"
-            echo "   ✅ Generated and Saved CROWDSEC_API_KEY"
+            echo "   ✅ Generated and saved CROWDSEC_API_KEY"
         else
             echo "   ❌ Failed to retrieve key from cscli."
         fi

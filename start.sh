@@ -55,7 +55,7 @@ while [ "$(docker inspect --format='{{.State.Health.Status}}' crowdsec 2>/dev/nu
         exit 1
     fi
 done
-echo " ✅ CrowdSec operational."
+echo "✅ CrowdSec operational."
 
 # 3. IDENTITY MANAGEMENT (Now it's 100% safe to do it)
 echo "👮 Synchronizing Bouncer..."
