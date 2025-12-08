@@ -31,7 +31,7 @@ loki.source.docker "default" {
 }
 
 // 5. Procesamiento de Logs (Pipelines)
-loki.process.pipelines {
+loki.process "pipelines" {
     
     // 5.1 Drop noise: Eliminar logs de la propia monitorización
     stage.drop {
