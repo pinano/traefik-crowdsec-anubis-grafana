@@ -16,8 +16,9 @@ if [ ! -f ./config-traefik/acme.json ]; then
     chmod 600 ./config-traefik/acme.json
 fi
 
-echo "🔧 Generating configuration from domains.txt..."
+echo "🔧 Generating dynamic configuration with python script..."
 python3 generate-config.py
+echo "✅ Configuration generated."
 
 # 0. NETWORK PREPARATION
 echo "🌐 Checking for isolated network 'anubis-backend'..."
@@ -28,7 +29,7 @@ if ! docker network inspect anubis-backend >/dev/null 2>&1; then
     # --internal ensures no external host traffic can reach this network
     docker network create --internal anubis-backend
 else
-    echo "    Network already exists correctly."
+    echo "   Network already exists correctly."
 fi
 
 # Define the compose files to avoid repeating the list and potential errors
@@ -38,7 +39,7 @@ COMPOSE_FILES="-f docker-compose-traefik-crowdsec-redis.yml \
                -f docker-compose-grafana-loki-alloy.yml"
 
 # 1. SECURE BOOT PHASE: CrowdSec + Redis
-echo "🛡️  Booting up security layer (CrowdSec)..."
+echo "🛡️ Booting up security layer (CrowdSec)..."
 # Start only the security/persistence services first
 docker compose $COMPOSE_FILES up -d crowdsec redis
 
