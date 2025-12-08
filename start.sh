@@ -35,7 +35,7 @@ fi
 COMPOSE_FILES="-f docker-compose-traefik-crowdsec-redis.yml \
                -f docker-compose-dozzle-ctop.yml \
                -f docker-compose-anubis-generated.yml \
-               -f docker-compose-grafana-loki-promtail.yml"
+               -f docker-compose-grafana-loki-alloy.yml"
 
 # 1. SECURE BOOT PHASE: CrowdSec + Redis
 echo "🛡️  Booting up security layer (CrowdSec)..."

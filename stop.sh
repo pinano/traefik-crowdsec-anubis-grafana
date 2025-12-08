@@ -11,7 +11,7 @@ echo "🛑 Stopping and cleaning the entire fleet..."
 COMPOSE_FILES="-f docker-compose-traefik-crowdsec-redis.yml \
                -f docker-compose-dozzle-ctop.yml \
                -f docker-compose-anubis-generated.yml \
-               -f docker-compose-grafana-loki-promtail.yml"
+               -f docker-compose-grafana-loki-alloy.yml"
 
 # --remove-orphans is KEY here: it cleans containers for domains
 # that were deleted from the CSV and no longer exist in the new generated .yml.

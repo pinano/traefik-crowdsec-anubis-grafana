@@ -35,7 +35,7 @@ loki.process.pipelines {
     
     // 5.1 Drop noise: Eliminar logs de la propia monitorización
     stage.drop {
-        expression = ".*(alloy|loki|grafana|promtail).*"
+        expression = ".*(alloy|loki|grafana|alloy).*"
     }
 
     // ============================================

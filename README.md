@@ -34,8 +34,8 @@ graph TD
     end
 
     subgraph "👁️ Observability (Out of Band)"
-        Docker_Sock(Docker Socket) -->|Read logs| Promtail:::observ
-        Promtail -->|Push| Loki[(Loki DB)]:::observ
+        Docker_Sock(Docker Socket) -->|Read logs| Alloy:::observ
+        Alloy -->|Push| Loki[(Loki DB)]:::observ
         Loki -->|Query| Grafana[Grafana Dashboard]:::observ
         Traefik_Logs[Traefik Logs] -.->|Read files| CrowdSec_Agent[CrowdSec Parser]:::security
         CrowdSec_Agent -.->|Ban Decision| MW_CS
@@ -56,7 +56,7 @@ This project provides a robust, production-ready stack designed to protect over 
     2.  **Traefik Plugin**: Bounces bad IPs at the edge.
     3.  **Anubis**: Proof-of-Work (PoW) CAPTCHA for suspicious traffic (human verification).
     4.  **Rate Limiting**: Fine-grained control per domain (Average/Burst).
-* **Full Observability**: Centralized logging with Loki and Promtail, visualized in Grafana. Real-time container monitoring with Dozzle and Ctop.
+* **Full Observability**: Centralized logging with Loki and Alloy, visualized in Grafana. Real-time container monitoring with Dozzle and Ctop.
 
 ---
 
