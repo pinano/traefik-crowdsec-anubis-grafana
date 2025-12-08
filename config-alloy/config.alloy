@@ -1,0 +1,149 @@
+// config-alloy/config.alloy
+
+// 1. Configuración del Servidor Interno de Alloy
+logging {
+    level  = "info"
+    format = "logfmt"
+}
+
+// 2. Descubrimiento de Contenedores Docker
+discovery.docker "containers" {
+    host = "unix:///var/run/docker.sock"
+}
+
+// 3. Re-etiquetado (Relabeling) para limpiar nombres de contenedores
+//    Equivalente a tu regex '/(.*)' anterior
+discovery.relabel "docker_logs" {
+    targets = discovery.docker.containers.targets
+
+    rule {
+        source_labels = ["__meta_docker_container_name"]
+        regex         = "/(.*)"
+        target_label  = "container"
+    }
+}
+
+// 4. Ingesta de Logs (Input)
+loki.source.docker "default" {
+    host       = "unix:///var/run/docker.sock"
+    targets    = discovery.relabel.docker_logs.output
+    forward_to = [loki.process.pipelines.receiver]
+}
+
+// 5. Procesamiento de Logs (Pipelines)
+loki.process.pipelines {
+    
+    // 5.1 Drop noise: Eliminar logs de la propia monitorización
+    stage.drop {
+        expression = ".*(alloy|loki|grafana|promtail).*"
+    }
+
+    // ============================================
+    // TRAEFIK PIPELINE
+    // ============================================
+    stage.match {
+        selector = "{container=\"traefik\"}"
+        
+        stage.json {
+            expressions = {
+                client_ip  = "ClientHost",
+                status     = "DownstreamStatus",
+                method     = "RequestMethod",
+                host       = "RequestHost",
+                router     = "RouterName",
+                duration   = "Duration",
+                user_agent = "RequestHeader_User_Agent",
+            }
+        }
+        
+        stage.labels {
+            values = {
+                status = "status",
+                method = "method",
+                host   = "host",
+                router = "router",
+            }
+        }
+    }
+
+    // ============================================
+    // APACHE / PHP PIPELINE
+    // ============================================
+    stage.match {
+        selector = "{container=~ \".*php.*|.*apache.*\"}"
+        
+        stage.json {
+            expressions = {
+                apache_time = "time",
+                remote_ip   = "remote_ip",
+                host        = "host",
+                method      = "method",
+                uri         = "uri",
+                status      = "status",
+                duration    = "duration_us",
+                referer     = "referer",
+                user_agent  = "user_agent",
+            }
+        }
+
+        stage.labels {
+            values = {
+                status = "status",
+                method = "method",
+                host   = "host",
+            }
+        }
+
+        // Timestamp Adjustment: "2025-12-04T15:01:17+0100"
+        stage.timestamp {
+            source = "apache_time"
+            format = "2006-01-02T15:04:05-0700"
+        }
+    }
+
+    // ============================================
+    // ANUBIS PIPELINE
+    // ============================================
+    stage.match {
+        selector = "{container=~ \".*anubis.*\"}"
+
+        stage.json {
+            expressions = {
+                anubis_time  = "time",
+                level        = "level",
+                msg          = "msg",
+                host         = "host",
+                method       = "method",
+                path         = "path",
+                // JMESPath escape for keys with hyphens
+                real_ip      = "\"x-real-ip\"",
+                challenge_id = "challenge",
+            }
+        }
+
+        stage.labels {
+            values = {
+                level  = "level",
+                host   = "host",
+                method = "method",
+                msg    = "msg",
+            }
+        }
+
+        // Anubis uses RFC3339Nano
+        stage.timestamp {
+            source = "anubis_time"
+            format = "RFC3339Nano"
+        }
+    }
+
+    // Enviar al output final
+    forward_to = [loki.write.local.receiver]
+}
+
+// 6. Envío a Loki (Output)
+loki.write "local" {
+    endpoint {
+        url = "http://loki:3100/loki/api/v1/push"
+    }
+}

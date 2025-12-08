@@ -10,15 +10,14 @@ services:
     environment:
       - GF_SERVER_ROOT_URL=https://grafana.${DOMAIN}
       - GF_SECURITY_ADMIN_USER=${GF_ADMIN_USER}
-      # NOTE: Ideally use a .env file, but it's up to you.
       - GF_SECURITY_ADMIN_PASSWORD=${GF_ADMIN_PASSWORD}
-      - GF_USERS_ALLOW_SIGN_UP=false  # Important: Disallow user registration
+      - GF_USERS_ALLOW_SIGN_UP=false # Important: Disallow user registration
       - TZ=${TZ}
     volumes:
       - grafana_data:/var/lib/grafana
       - ./config-grafana/config.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
-      - /etc/localtime:/etc/localtime:ro  # Syncs the system clock (Linux)
-      - /etc/timezone:/etc/timezone:ro    # Syncs the time zone (Linux)
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
     networks:
       - traefik
     labels:
@@ -45,8 +44,8 @@ services:
     restart: unless-stopped
     command: -config.file=/etc/loki/local-config.yaml
     volumes:
-      - /etc/localtime:/etc/localtime:ro  # Syncs the system clock (Linux)
-      - /etc/timezone:/etc/timezone:ro    # Syncs the time zone (Linux)
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
       - ./config-loki/config.yaml:/etc/loki/local-config.yaml:ro
       - loki_data:/loki
     environment:
@@ -65,25 +64,25 @@ services:
         max-size: "10m"
         max-file: "3"
 
+ # ===========================
+  #  ALLOY (The collector)
   # ===========================
-  #  PROMTAIL (The spy)
-  # ===========================
-  promtail:
-    image: grafana/promtail:3.6.2
-    container_name: promtail
+  alloy:
+    image: grafana/alloy:v1.12.0
+    container_name: alloy
     restart: unless-stopped
-    # Promtail needs root to read logs from other containers in /var/lib/docker
-    user: "0"
+    user: "root" # Alloy needs root to read logs from other containers in /var/lib/docker
     environment:
       - TZ=${TZ}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      - promtail_data:/var/lib/promtail
-      - ./config-promtail/config.yaml:/etc/promtail/config.yaml:ro
-      - /etc/localtime:/etc/localtime:ro  # Syncs the system clock (Linux)
-      - /etc/timezone:/etc/timezone:ro    # Syncs the time zone (Linux)
-    command: -config.file=/etc/promtail/config.yaml
+      - ./config-alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - alloy_data:/var/lib/alloy
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    # Alloy needs the 'run' argument and also to point at the config file
+    command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
     networks:
       - traefik
     logging:
@@ -94,8 +93,8 @@ services:
 
 volumes:
   grafana_data:
-  promtail_data:
   loki_data:
+  alloy_data: 
 
 networks:
   traefik:
