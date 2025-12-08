@@ -108,6 +108,9 @@ prompt_val "GLOBAL_RATE_BURST" "Traefik default burst limit"
 prompt_val "GLOBAL_CONCURRENCY" "Traefik global concurrency"
 prompt_val "HSTS_MAX_AGE" "HSTS max age (seconds)"
 
+prompt_val "GF_ADMIN_USER" "Admin User (Grafana, Traefik, Dozzle)"
+prompt_val "GF_ADMIN_PASSWORD" "Admin Password (Grafana, Traefik, Dozzle)"
+
 # --- AUTOMATED GENERATION ---
 
 echo ""
@@ -121,29 +124,22 @@ if [[ "$gen_anubis" == "y" || "$gen_anubis" == "Y" || -z "$gen_anubis" ]]; then
     echo "   ✅ Generated ANUBIS_REDIS_PRIVATE_KEY"
 fi
 
-# 2. ADMINISTRATIVE CREDENTIALS (Grafana + Traefik/Dozzle)
+# 2. TRAEFIK/DOZZLE DASHBOARD AUTH (Auto-generated from above)
 echo ""
-read -p "👉 Configure unified Admin Credentials (Grafana + Traefik/Dozzle)? (Y/n): " gen_auth
-if [[ "$gen_auth" == "y" || "$gen_auth" == "Y" || -z "$gen_auth" ]]; then
-    printf "   Username: "
-    read -r admin_user
-    printf "   Password: "
-    read -r -s admin_pass
-    echo ""
-    echo ""
+echo "� Generating Traefik/Dozzle Auth Hash from Admin credentials..."
+# Read values directly from the .env file (handled by prompt_val earlier)
+ADM_USER=$(grep "^GF_ADMIN_USER=" "$ENV_FILE" | cut -d'=' -f2-)
+ADM_PASS=$(grep "^GF_ADMIN_PASSWORD=" "$ENV_FILE" | cut -d'=' -f2-)
 
-    # Action 1: Update Grafana (Plaintext)
-    replace_val "GF_ADMIN_USER" "$admin_user"
-    replace_val "GF_ADMIN_PASSWORD" "$admin_pass"
-    echo "   ✅ Updated Grafana credentials"
-
-    # Action 2: Update Traefik/Dozzle (Hashed)
+if [ -n "$ADM_USER" ] && [ -n "$ADM_PASS" ]; then
     echo "   ⏳ Hashing compatible with htpasswd..."
     # Run docker to generate hash consistently
-    HASH=$(docker run --rm httpd:alpine htpasswd -Bbn "$admin_user" "$admin_pass")
+    HASH=$(docker run --rm httpd:alpine htpasswd -Bbn "$ADM_USER" "$ADM_PASS")
     # Wrap in single quotes to handle special chars in hash
     replace_val "TRAEFIK_DASHBOARD_AUTH" "'$HASH'"
     echo "   ✅ Updated TRAEFIK_DASHBOARD_AUTH hash"
+else
+    echo "   ⚠️  Skipping hash generation: GF_ADMIN_USER or GF_ADMIN_PASSWORD not set."
 fi
 
 # 3. CROWDSEC_API_KEY
