@@ -211,6 +211,8 @@ def generate_configs():
             'loadBalancer': {
                 'servers': [
                     # Fixed IP used since host.docker.internal failed in the user's Linux environment
+                    # NOTE: '172.17.0.1' is the default bridge gateway on Linux. 
+                    # For macOS/Windows Docker Desktop, this IP will NOT work (logic requires 'host.docker.internal').
                     {'url': 'http://172.17.0.1:8080'}
                 ],
                 'passHostHeader': True
