@@ -1,234 +1,196 @@
 # Ironclad Anti-DDoS & Anti-Bot Stack
 
-### Traefik + CrowdSec + Anubis + Grafana (LGT Stack)
+**Traefik + CrowdSec + Anubis + Grafana (LGT Stack)**
 
-> **Automated, resource-efficient protection for multi-domain Docker environments or legacy web servers.**
+> **Automated, resource-efficient protection for multi-domain Docker environments and legacy web servers.**
+
+## Introduction
+
+High-traffic environments require robust defense mechanisms that do not compromise performance. This project provides a production-ready infrastructure stack designed to protect hundreds of domains running on a single Docker host or hybrid environments.
+
+It integrates industry-standard components to provide a multi-layered defense strategy:
+1.  **Traefik**: High-performance edge routing and SSL termination.
+2.  **CrowdSec**: Collaborative Intrusion Prevention System (IPS) leveraging global threat intelligence.
+3.  **Anubis**: Custom "ForwardAuth" middleware implementing Proof-of-Work (PoW) challenges to mitigate sophisticated bot attacks.
+4.  **Alloy & Loki**: Modern, resource-efficient log aggregation and processing pipeline.
+5.  **Grafana**: Centralized observability and analytics.
+
+The system is fully automated. A Python orchestrator (`generate-config.py`) dynamically compiles complex Traefik configurations from a simple CSV inventory, ensuring consistent security policies across all services.
+
+## Architecture
+
+The stack operates on a "Defense in Depth" principle, filtering traffic through a precise middleware chain (The "Golden Chain") before it ever reaches the backend application.
 
 ```mermaid
 graph TD
-    %% Estilos
-    classDef user fill:#f9f,stroke:#333,stroke-width:2px;
+    classDef user fill:#e0e0e0,stroke:#333,stroke-width:2px;
     classDef traefik fill:#8cb5ff,stroke:#333,stroke-width:2px;
     classDef security fill:#ff9999,stroke:#333,stroke-width:2px;
     classDef app fill:#99ff99,stroke:#333,stroke-width:2px;
     classDef observ fill:#ffffcc,stroke:#333,stroke-width:2px;
 
-    User((👤 User/Bot)):::user -->|HTTPS :443| T_Entry[Traefik EntryPoint]:::traefik
+    User((User/Bot)):::user -->|HTTPS :443| T_Entry[Traefik EntryPoint]:::traefik
 
-    subgraph "🛡️ Traefik Middleware Chain (Golden Chain)"
-        T_Entry --> MW_CS{1. CrowdSec OK?}:::security
-        MW_CS -- NO (IP Ban) --> Block[⛔ 403 Forbidden]:::security
-        MW_CS -- YES --> MW_Sec["2. Security Headers<br>HSTS/XSS"]:::traefik
-        MW_Sec --> MW_RL["3. Rate Limit &<br>Concurrency"]:::traefik
-        MW_RL --> MW_Comp["4. Compress (Gzip)"]:::traefik
+    subgraph "Traefik Middleware Chain"
+        T_Entry --> MW_CS{1. CrowdSec Check}:::security
+        MW_CS -- Blocked IP --> Block[403 Forbidden]:::security
+        MW_CS -- Allowed --> MW_Sec["2. Security Headers"]:::traefik
+        MW_Sec --> MW_RL["3. Rate Limiting"]:::traefik
+        MW_RL --> MW_Comp["4. Compression"]:::traefik
         MW_Comp --> MW_Auth{5. Auth Required?}:::traefik
     end
 
-    subgraph "🐶 Anubis Logic"
-        MW_Auth -- NO (Public Web) --> Backend
-        MW_Auth -- YES (Protected Web) --> Check_Auth{"Cookie Valid?"}:::security
-        Check_Auth -- YES --> Backend[🚀 Apache/PHP Container]:::app
-        Check_Auth -- NO --> Anubis_Svc[Anubis Service :8080]:::security
-        Anubis_Svc -->|Redirect to Challenge| User
-        Anubis_Svc -.->|Store State| Redis[(Redis/Valkey)]:::app
+    subgraph "Anubis Logic (Bot Defense)"
+        MW_Auth -- No (Public) --> Backend
+        MW_Auth -- Yes (Protected) --> Check_Auth{"Valid Cookie?"}:::security
+        Check_Auth -- Yes --> Backend[Backend Service]:::app
+        Check_Auth -- No --> Anubis_Svc[Anubis Service]:::security
+        Anubis_Svc -->|Challenge Page| User
+        Anubis_Svc -.->|Session State| Redis[(Redis/Valkey)]:::app
     end
 
-    subgraph "👁️ Observability (Out of Band)"
-        Docker_Sock(Docker Socket) -->|Read logs| Alloy:::observ
-        Alloy -->|Push| Loki[(Loki DB)]:::observ
-        Loki -->|Query| Grafana[Grafana Dashboard]:::observ
-        Traefik_Logs[Traefik Logs] -.->|Read files| CrowdSec_Agent[CrowdSec Parser]:::security
-        CrowdSec_Agent -.->|Ban Decision| MW_CS
+    subgraph "Observability Pipeline"
+        Docker_Sock(Docker Socket) -->|Discovery| Alloy:::observ
+        Alloy -->|Filter & Push| Loki[(Loki DB)]:::observ
+        Loki -->|Query| Grafana[Grafana]:::observ
+        
+        Traefik_Logs[Traefik Logs] -.->|Analysis| CrowdSec[CrowdSec Engine]:::security
+        CrowdSec -.->|Bouncer API| MW_CS
     end
 ```
 
-## Overview
+## Component Deep Dive
 
-This project provides a robust, production-ready stack designed to protect over 100+ domains running on a single Docker host or Apache web server. It combines the ease of **Traefik**, the intelligence of **CrowdSec**, the challenge-based protection of **Anubis**, and a full observability suite with **Grafana/Loki**.
+### Traefik (Edge Router)
+Traefik serves as the ingress controller and the first line of defense.
+*   **SSL Termination**: Automatically handles Let's Encrypt certificates.
+*   **Bouncer Integration**: Uses the CrowdSec Traefik Bouncer plugin to enforce IP bans at the edge, dropping malicious traffic before it consumes resources.
+*   **Dynamic Configuration**: Reloads rules on-the-fly without downtime.
 
-### Key Features
+### CrowdSec (IPS)
+CrowdSec analyzes behavior to detect attacks (brute force, scanning, bot spam).
+*   **Log Analysis**: Readings logs via the Docker socket (or file volume), it matches patterns against community scenarios.
+*   **Community Blocklist**: Automatically shares and receives ban lists from the global network, preemptively blocking known attackers.
+*   **Remediation**: Instructs Traefik to ban IPs (403 Forbidden) or can be configured to send them to a Captcha portal.
 
-* **High Efficiency**: Optimized for performance. Anubis instances are capped at minimal CPU/RAM resources. Redis is tuned to prevent OOM events.
-* **Automated Configuration**: A Python script (`generate-config.py`) reads a simple CSV file and automatically generates complex Traefik dynamic configurations and Docker Compose overrides.
-* **Anubis per TLD**: Automatically deploys one Anubis middleware instance per Root Domain (TLD) to handle "Same-Site" cookie constraints strictly.
-* **Multi-Layer Defense**:
-    1.  **CrowdSec**: IP-based blocking using community blocklists and behavior analysis (reads Traefik logs directly).
-    2.  **Traefik Plugin**: Bounces bad IPs at the edge.
-    3.  **Anubis**: Proof-of-Work (PoW) CAPTCHA for suspicious traffic (human verification).
-    4.  **Rate Limiting**: Fine-grained control per domain (Average/Burst).
-* **Full Observability**: Centralized logging with Loki and Alloy, visualized in Grafana. Real-time container monitoring with Dozzle and Ctop.
+### Anubis (Application Defense)
+Anubis is a specialized "ForwardAuth" middleware for mitigating bots that bypass IP reputation checks.
+*   **Mechanism**: When a user accesses a protected route without a valid session, Anubis intercepts the request.
+*   **Challenge**: It presents a cryptographic Proof-of-Work (PoW) challenge that the client browser must solve using JavaScript. This is computationally expensive for bots but trivial for legitimate browsers.
+*   **Isolation**: One Anubis instance is deployed per Top-Level Domain (TLD) to respect "Same-Site" cookie policies and isolate failure domains.
 
----
+### Redis (State Management)
+A high-performance Valkey (Redis compatible) instance acts as the session store for Anubis.
+*   **Configuration**: Tuned for cache usage (`allkeys-lru`). If memory creates pressure, it acts as a cache, evicting the oldest sessions rather than crashing.
+*   **Persistence**: Uses AOF (Append Only File) with per-second synchronization to balance performance and data safety.
 
-## Architecture
+### Observability Stack (Alloy, Loki, Grafana)
+We utilize the modern Grafana LGT stack for comprehensive monitoring.
+*   **Alloy**: The OpenTelemetry Collector compatible agent. It discovers Docker containers, processes logs (filtering noise, formatting JSON), and forwards them to Loki.
+*   **Loki**: A log aggregation system optimized for efficiency, indexing only metadata (labels) rather than the full log text.
+*   **Grafana**: Provides visual dashboards for traffic analysis, attack monitoring, and system resource usage.
 
-The stack is composed of several modular `docker-compose` files orchestrated by a central bash script.
-
-| Component | Role | Description |
-| :--- | :--- | :--- |
-| **Traefik** | Edge Router | Handles SSL (Let's Encrypt), routing, and acts as the CrowdSec bouncer. |
-| **CrowdSec** | IPS / IDS | Analyzes logs to ban malicious IPs. Sinks decisions to the Traefik plugin. |
-| **Anubis** | Bot Protection | Provides "ForwardAuth" middleware. Users must solve a challenge to pass. |
-| **Redis (Valkey)**| Session Store | Shared backend for all Anubis instances. Configured with LRU eviction. |
-| **Python Script** | Orchestrator | Converts `domains.csv` into Docker & Traefik configs. |
-| **Grafana/Loki** | Monitoring | Visualizes traffic, blocks, and system health. |
-
----
-
-## Installation & Configuration
+## Installation & Setup
 
 ### 1. Prerequisites
+*   **Docker Engine** & **Docker Compose**
+*   **Python 3** (for the configuration generator)
+    ```bash
+    sudo apt install python3-yaml python3-tldextract
+    ```
+*   Ports `80` and `443` free on the host machine.
 
-* Docker Engine & Docker Compose (v2+)
-* Python 3 with required libraries:
-  ```bash
-  sudo apt install python3-yaml python3-tldextract
-  ```
-* Ports `80` and `443` available on the host.
+### 2. Environment Initialization
+We provide an automated script to securely initialize the environment configuration.
 
-### 2. Environment Setup (Critical)
-
-We provide an interactive script to set up your environment securely and automatically.
-
-1.  **Run the initialization script:**
+1.  **Execute the script:**
     ```bash
     chmod +x initialize-env.sh
     ./initialize-env.sh
     ```
-    This script will:
-    *   Create your `.env` file from `.env.dist` (backing up any existing one).
-    *   Generate secure keys for Anubis and CrowdSec.
-    *   Hash your Traefik dashboard password.
-    *   Prompt you for domain, timezone, and other settings.
+2.  **Follow the prompts:**
+    *   **Administrative Credentials**: You will be asked for a username and password. These will be applied to **Grafana** (plaintext) and hashed securely (bcrypt) for the **Traefik** and **Dozzle** dashboards.
+    *   **Domain & Timezone**: Set your primary domain and server timezone.
+    *   **Key Generation**: The script automatically generates cryptographic keys for Anubis signatures and CrowdSec API communication.
 
-2.  **Verify the content:**
-    Check the generated `.env` file to ensure everything looks correct.
+### 3. Domain Configuration
+The `domains.csv` file acts as the single source of truth for your infrastructure.
 
-### 3. Domain Definition
+**File Location:** `domains.csv` (Copy from `domains.csv.dist`)
 
-This is the core of the automation. Edit `domains.csv` to define your protected services.
-
-```bash
-cp domains.csv.dist domains.csv
-nano domains.csv
-```
-
-**CSV Structure:**
-`domain, docker_service, anubis_subdomain, rate_limit, burst, concurrency`
-
+**Columns:**
 | Column | Description | Example |
 | :--- | :--- | :--- |
-| `domain` | The public FQDN. | `example.com` |
-| `docker_service` | Internal Docker container/service name. | `wordpress` |
-| `anubis_subdomain` | Prefix for the auth portal (optional). | `auth` (result: `auth.example.com`) |
-| `rate_limit` | Requests per second (average). | `50` |
-| `burst` | Max burst of requests. | `100` |
-| `concurrency` | Max simultaneous connections. | `20` |
+| `domain` | The public Fully Qualified Domain Name. | `app.example.com` |
+| `service` | Internal Docker container name OR `apache-host` (points to host:8080). | `wordpress` or `apache-host` |
+| `anubis_subdomain` | Subdomain prefix for the auth portal (optional). | `auth` (creates `auth.example.com`) |
+| `rate_limit` | Requests per second limit (average). | `50` |
+| `burst` | Maximum burst size allowed. | `100` |
+| `concurrency` | Maximum simultaneous connections. | `20` |
 
----
+### 4. Deployment
+Start the stack using the provided helper script, which handles the generation pipeline and Docker commands.
+```bash
+./start.sh
+```
 
-## Operations Manual (Cheat Sheet)
+## Configuration Reference
+
+### Environment Variables (`.env`)
+Key variables that control the stack's behavior:
+
+*   **ANUBIS**:
+    *   `ANUBIS_DIFFICULTY`: (1-5) Complexity of the PoW challenge. Higher = harder for CPU.
+    *   `ANUBIS_CPU_LIMIT`: Docker resource limit to prevents DoS via the auth service.
+*   **TRAEFIK**:
+    *   `GLOBAL_RATE_AVG`: Default rate limit for services not specified in CSV.
+    *   `HSTS_MAX_AGE`: Duration for Strict-Transport-Security header (seconds).
+*   **CROWDSEC**:
+    *   `CROWDSEC_UPDATE_INTERVAL`: Frequency of blocklist updates.
+
+### Configuration Generator (`generate-config.py`)
+This script runs automatically during startup. It:
+1.  Parses `domains.csv`.
+2.  Groups subdomains by Root Domain (TLD).
+3.  Generates a specific `docker-compose-anubis-generated.yml` with one Anubis service per TLD.
+4.  Generates `config-traefik/dynamic-config/routes.yml` defining Routers, Services, and Middleware chains.
+
+## Operations Manual
 
 ### Service Management
-
-**Start/Restart the Stack**
-This script handles the Python generation and Docker deployment.
-```bash
-./start.sh
-```
-
-**Stop the Stack**
-Safely stops containers and removes orphans (important when removing domains from CSV).
-```bash
-./stop.sh
-```
-
-**Update Docker Images**
-Keep your security layers up to date.
-```bash
-docker compose -f docker-compose-traefik-crowdsec-redis.yml pull
-docker compose -f docker-compose-anubis-base.yml pull
-./start.sh
-```
+*   **Start/Update**: `./start.sh` (Re-runs generation and applies changes).
+*   **Stop**: `./stop.sh` (Stops containers and cleans up orphans).
 
 ### Security Operations (CrowdSec)
+Interact with the CrowdSec engine via `cscli` inside the container.
 
-All commands are run inside the `crowdsec` container.
-
-**Ban an IP Manually**
-If you spot an attacker that hasn't been caught yet:
+**Ban an IP:**
 ```bash
-docker exec crowdsec cscli decisions add --ip 192.168.1.50 --duration 24h --reason "manual ban"
+docker exec crowdsec cscli decisions add --ip <IP_ADDRESS> --duration 24h --reason "Manual Ban"
 ```
 
-**Unban an IP**
-If a legitimate user is blocked:
+**Unban an IP:**
 ```bash
-docker exec crowdsec cscli decisions delete --ip 192.168.1.50
+docker exec crowdsec cscli decisions delete --ip <IP_ADDRESS>
 ```
 
-**View Active Bans**
-List all current decisions (bans):
+**Inspect Active Bans:**
 ```bash
 docker exec crowdsec cscli decisions list
 ```
 
-**Update Intelligence Hub**
-Update signatures and scenarios from the community:
-```bash
-docker exec crowdsec cscli hub update
-docker exec crowdsec cscli hub upgrade
-docker exec crowdsec kill -HUP 1  # Reload configuration
-```
-
-### Observability & Logs
-
-**View Traefik Logs (Real-time)**
-Useful for debugging routing or SSL issues.
-```bash
-docker compose -f docker-compose-traefik-crowdsec-redis.yml logs -f traefik
-```
-
-**Check Redis Memory Usage**
-Ensure sessions aren't consuming too much RAM.
-```bash
-docker exec redis redis-cli info memory | grep used_memory_human
-```
-
-**Access Dashboards**
-* **Traefik**: `https://traefik.yourdomain.com` (Inspect routers/middlewares)
-* **Grafana**: `https://grafana.yourdomain.com` (Visual analytics)
-* **Dozzle**: `https://dozzle.yourdomain.com` (Log viewer)
-
----
-
-## Advanced Details
-
-### The Python Logic (`generate-config.py`)
-The script is the orchestrator of this architecture. It performs:
-1.  **TLD Extraction**: Groups subdomains under their Root Domain to launch **one single Anubis container per TLD**. This optimizes resources while respecting cookies.
-2.  **Custom Headers**: Injects HSTS and Security Headers via Traefik Middlewares.
-3.  **Logo Injection**: Uses a `redirectRegex` middleware to swap the default Anubis loading GIF with your custom `ANUBIS_LOGO_URL` defined in `.env`.
-
-### Redis Tuning
-The `redis.conf` is tuned for stability over data retention:
-* `maxmemory 256mb`: Prevents Redis from consuming excessive host RAM.
-* `maxmemory-policy allkeys-lru`: If full, it drops old sessions instead of halting.
-* `appendfsync everysec`: Balance between speed and persistence.
-
----
+### Monitoring
+Access the following dashboards (credentials configured during initialization):
+*   **Traefik Dashboard**: `https://traefik.<your-domain>` - Route health and middleware status.
+*   **Grafana**: `https://grafana.<your-domain>` - Logs, metrics, and traffic visualization.
+*   **Dozzle**: `https://dozzle.<your-domain>` - live container logs viewer.
 
 ## Troubleshooting
 
-* **Error 500 / Bad Gateway**: Check `docker ps`. Ensure the target service name in `domains.csv` matches the actual container name or Traefik service name.
-* **Anubis Loops**: Ensure the `anubis_subdomain` is unique per root domain. If you use `auth.example.com`, ensure no other service is claiming that specific host.
-* **CrowdSec Bouncer Error**: If Traefik logs show "connection refused" to CrowdSec, run `./start.sh` again to force the API Key re-sync.
-* **"Orphaned" Containers**: If you remove a domain from `domains.csv`, run `./stop.sh` before restarting to ensure the old Anubis container is removed.
-
----
+*   **502 Bad Gateway**: Usually indicates Traefik cannot reach the backend container. Verify the `docker_service` name in `domains.csv` matches the actual container name and that they share the `traefik` network.
+*   **CrowdSec Connection Refused**: If the Bouncer cannot reach the LAPI, ensure the `CROWDSEC_API_KEY` in `.env` matches the one registered in CrowdSec (`docker exec crowdsec cscli bouncers list`). existence.
+*   **Anubis Loops**: Ensure your browser accepts cookies. If using `auth` subdomain, verify DNS records point to the server.
 
 ## License
 
-MIT License.
-
-**"Efficiency is not just about speed, it's about not wasting cycles."**
+This project is licensed under the **MIT License**.
