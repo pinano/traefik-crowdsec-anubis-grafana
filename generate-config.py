@@ -4,17 +4,16 @@ import os
 import csv
 import re # Added for robust name validation
 
-# =================CONFIGURATION=================
+# ================= CONFIGURATION =================
 INPUT_FILE = 'domains.csv'
 OUTPUT_COMPOSE = 'docker-compose-anubis-generated.yml'
 OUTPUT_TRAEFIK = 'config-traefik/dynamic-config/routers-anubis.yml'
 BASE_FILENAME = 'docker-compose-anubis-base.yml'
 
-# --- ENVIRONMENT VARIABLES ---
+# ============= ENVIRONMENT VARIABLES =============
 CROWDSEC_API_KEY = os.getenv('CROWDSEC_API_KEY')
 REDIS_PASSWORD = os.getenv('REDIS_PASSWORD')
-# Default logo for Anubis challenge page, configurable via ENV
-LOGO_URL = os.getenv('ANUBIS_LOGO_URL', 'https://www.sailti.com/anubis-loading.gif')
+LOGO_URL = os.getenv('ANUBIS_LOGO_URL', 'https://mydomain.com/anubis-loading.gif')
 
 # CrowdSec Update Interval
 try:
@@ -41,7 +40,6 @@ try:
     HSTS_SECONDS = int(os.getenv('HSTS_MAX_AGE', 31536000))
 except ValueError:
     HSTS_SECONDS = 31536000
-# ===============================================
 
 # Regex for validating Docker/Traefik service names (alphanumeric and hyphens only)
 VALID_SERVICE_NAME_REGEX = re.compile(r'^[a-z0-9-]+$')
@@ -59,14 +57,15 @@ class IndentDumper(yaml.Dumper):
     def increase_indent(self, flow=False, indentless=False):
         return super(IndentDumper, self).increase_indent(flow, False)
 
+# Extract root domains from csustom Dumper to avoid excessive indentation (KISS principle applied to YAML structure)
 def get_root_domain(domain):
     extracted = tldextract.extract(domain)
     if extracted.suffix:
         return f"{extracted.domain}.{extracted.suffix}"
     return domain
 
+# This is only for router/middleware naming internally in Traefik, less strict than service naming
 def sanitize_name(name):
-    # This is only for router/middleware naming internally in Traefik, less strict than service naming
     return name.replace('.', '-').replace('_', '-').lower()
 
 def generate_configs():
@@ -94,12 +93,11 @@ def generate_configs():
                 service = row[1].strip().lower() # Standardize service name to lowercase
                 anubis_sub = row[2].strip().lower() if len(row) > 2 else ""
 
-                # --- NEW ROBUSTNESS CHECK: Docker Service Name Format ---
+                # --- ROBUSTNESS CHECK: Docker Service Name Format ---
                 if service != 'apache-host' and not VALID_SERVICE_NAME_REGEX.match(service):
                     print(f"    ❌ [Line {line_num}] Error: Service name '{service}' must only contain lowercase letters, numbers, and hyphens ('-'). Entry skipped.")
                     error_count += 1
                     continue
-                # --------------------------------------------------------
 
                 extra = {}
                 def get_int(idx):
@@ -133,8 +131,7 @@ def generate_configs():
 
     print(f"    ✅ Successfully processed {len(raw_entries)} domains.")
     if error_count > 0:
-        # Changed 'WARN' to 'WARN' for clarity, keeping it concise.
-        print(f"    ⚠️  WARN: {error_count} lines were skipped due to format errors.")
+        print(f"    ⚠️ WARN: {error_count} lines were skipped due to format errors.")
     print(f"    ⚙️ Global Config: Rate={G_RATE_AVG}/{G_RATE_BURST}, HSTS={HSTS_SECONDS}s, Logo={LOGO_URL}")
 
     services = {}
@@ -174,12 +171,14 @@ def generate_configs():
                 'anubis-custom-logo': {
                     'redirectRegex': {
                         'regex': "^https?://[^/]+/.within.website/x/cmd/anubis/static/img/pensive\\.webp.*",
-                        'replacement': LOGO_URL, # <--- Variable
+                        'replacement': LOGO_URL,
                         'permanent': False
                     }
                 },
                 # 4. GLOBAL COMPRESSION
-                'global-compress': {'compress': {'minResponseBodyBytes': 1024}},
+                'global-compress': {
+                    'compress': {'minResponseBodyBytes': 1024}
+                },
                 # 5. TRAEFIK RATE LIMIT
                 'global-ratelimit': {
                     'rateLimit': {
@@ -189,8 +188,14 @@ def generate_configs():
                 },
                 # 6. TRAEFIK CONCURRENCY
                 'global-concurrency': {
-                    'inFlightReq': {
-                        'amount': G_CONCURRENCY
+                    'inFlightReq': {'amount': G_CONCURRENCY}
+                },
+                # 7. PROTOCOL FORWARDER (For Apache/WordPress HTTP->HTTPS redirect fix)
+                'apache-forward-headers': {
+                    'headers': {
+                        'customRequestHeaders': {
+                            'X-Forwarded-Proto': 'https'
+                        }
                     }
                 },
             },
@@ -205,12 +210,10 @@ def generate_configs():
         'apache-host-8080': {
             'loadBalancer': {
                 'servers': [
-                    # We use Docker's internal DNS to reference the host.
-                    # If this fails (e.g., in some Proxmox LXCs), use the docker0 gateway IP:
-                    # {'url': 'http://172.17.0.1:8080'}
-                    {'url': 'http://host.docker.internal:8080'}
+                    # Fixed IP used since host.docker.internal failed in the user's Linux environment
+                    {'url': 'http://172.17.0.1:8080'}
                 ],
-                'passHostHeader': True # CRITICAL for Apache VirtualHosts resolution
+                'passHostHeader': True
             }
         }
     }
@@ -302,7 +305,6 @@ def generate_configs():
 
     print("    ✅ Traefik dynamic configuration generated successfully.")
 
-
 def process_router(entry, http_conf):
     domain = entry['domain']
     service = entry['service']
@@ -347,6 +349,12 @@ def process_router(entry, http_conf):
         mw_auth_name = f"anubis-mw-{safe_root}-{safe_auth}"
         mw_list.append(mw_auth_name)
 
+    # Middleware for fixing apache https redirects in Wordpress
+    if service == 'apache-host':
+        # We add the @internal qualifier (or @docker if it were in labels)
+        # Traefik forces to qualify the provider if the router is dynamic!
+        mw_list.append('apache-forward-headers')
+
     # --- SERVICE LOGIC: Docker vs. External Host ---
     # Determine the service target based on the CSV entry (service)
     if service == 'apache-host':
@@ -355,7 +363,6 @@ def process_router(entry, http_conf):
     else:
         # Default: Point to a Docker service discovered via labels @docker
         target_service = f"{service}@docker"
-    # ---------------------------------------------
 
     # Register the main application router
     http_conf['http']['routers'][router_name] = {
