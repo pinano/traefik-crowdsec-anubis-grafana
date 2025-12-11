@@ -7,9 +7,9 @@ from collections import defaultdict  # <--- NEW: To group domains
 
 # ================= CONFIGURATION =================
 INPUT_FILE = 'domains.csv'
-OUTPUT_COMPOSE = 'docker-compose-anubis-generated.yml'
-OUTPUT_TRAEFIK = 'config-traefik/dynamic-config/routers-anubis.yml'
 BASE_FILENAME = 'docker-compose-anubis-base.yml'
+OUTPUT_COMPOSE = 'docker-compose-anubis-generated.yml'
+OUTPUT_TRAEFIK = 'config-traefik/dynamic-config/routers-generated.yml'
 
 # ============= ENVIRONMENT VARIABLES =============
 CROWDSEC_API_KEY = os.getenv('CROWDSEC_API_KEY')
@@ -220,10 +220,8 @@ def generate_configs():
                 }
             }
         },
-        # TLS SECTION FOR CERTIFICATE GROUPING
-        'tls': {
-            'domains': []
-        }
+        # TLS SECTION (Will be populated per router if needed, no global 'domains' allowed here)
+        'tls': {}
     }
 
     # =========================================================================
@@ -257,9 +255,17 @@ def generate_configs():
             
             tls_configs.append(cert_def)
 
-    # Inject the generated configuration into the main object
-    traefik_dynamic_conf['tls']['domains'] = tls_configs
-    print(f"    🔐 TLS Config: Generados {len(tls_configs)} certificados agrupados (Batch size: {TLS_BATCH_SIZE}).")
+    # Inject the generated configuration into the ROUTERS (not global)
+    # traefik_dynamic_conf['tls']['domains'] = tls_configs # <--- INVALID IN TRAEFIK DYNAMIC CONFIG
+    
+    # Map domain -> certificate definition (batch)
+    domain_to_cert_def = {}
+    for batch in tls_configs:
+         domains_in_batch = [batch['main']] + batch.get('sans', [])
+         for d in domains_in_batch:
+             domain_to_cert_def[d] = batch
+             
+    print(f"    🔐 TLS Config: Generated {len(tls_configs)} certificates grouped (Batch size: {TLS_BATCH_SIZE}).")
     # =========================================================================
 
 
@@ -273,8 +279,8 @@ def generate_configs():
                 protected_groups[key] = []
             protected_groups[key].append(entry)
 
-        # Pass the reference to the HTTP section of the config
-        process_router(entry, traefik_dynamic_conf['http'])
+        # Pass the reference to the HTTP section of the config AND the cert map
+        process_router(entry, traefik_dynamic_conf['http'], domain_to_cert_def)
 
     # GENERATE ANUBIS SERVICES
     for (root, auth_sub), entries in protected_groups.items():
@@ -326,7 +332,7 @@ def generate_configs():
             'rule': f"Host(`{auth_sub}.{root}`)",
             'entryPoints': ["websecure"],
             'service': f"{anubis_service_name}@docker",
-            'tls': {'certResolver': 'le'}, # Use the resolver, Traefik will match with tls.domains automatically
+            'tls': {'certResolver': 'le', 'domains': [domain_to_cert_def.get(f"{auth_sub}.{root}", {})]}, # Apply cert def if exists
             'middlewares': ["security-headers", "anubis-custom-logo"]
         }
 
@@ -348,7 +354,7 @@ def generate_configs():
 
     print("    ✅ Traefik dynamic configuration generated successfully.")
 
-def process_router(entry, http_section):
+def process_router(entry, http_section, domain_to_cert_def):
     domain = entry['domain']
     service = entry['service']
     anubis_sub = entry['anubis_sub']
@@ -397,13 +403,19 @@ def process_router(entry, http_section):
         target_service = f"{service}@docker"
 
     # Router config
-    http_section['routers'][router_name] = {
+    router_conf = {
         'rule': f"Host(`{domain}`)",
         'entryPoints': ["websecure"],
         'service': target_service,
         'tls': {'certResolver': 'le'},
         'middlewares': mw_list
     }
+    
+    # Inject TLS domains if we have a specific batch for this domain
+    if domain in domain_to_cert_def:
+        router_conf['tls']['domains'] = [domain_to_cert_def[domain]]
+
+    http_section['routers'][router_name] = router_conf
 
 def generate_policy_file():
     input_policy = 'config-anubis/botPolicy.yaml'
