@@ -219,9 +219,7 @@ def generate_configs():
                     }
                 }
             }
-        },
-        # TLS SECTION (Will be populated per router if needed, no global 'domains' allowed here)
-        'tls': {}
+        }
     }
 
     # =========================================================================
