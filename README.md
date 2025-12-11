@@ -79,6 +79,12 @@ Anubis is a specialized "ForwardAuth" middleware for mitigating bots that bypass
 *   **Challenge**: It presents a cryptographic Proof-of-Work (PoW) challenge that the client browser must solve using JavaScript. This is computationally expensive for bots but trivial for legitimate browsers.
 *   **Isolation**: One Anubis instance is deployed per Top-Level Domain (TLD) to respect "Same-Site" cookie policies and isolate failure domains.
 
+### Cert Monitor (SSL Watchdog)
+A lightweight utility service that ensures SSL reliability.
+*   **Audit**: Daily scans of Traefik's `acme.json` certificate store.
+*   **Alerting**: Sends a **Telegram** notification if any certificate is close to expiration (default 10 days) and has not been automatically renewed by Traefik.
+*   **Zero-Config**: Uses the existing `acme.json` volume and requires only a Bot Token and Chat ID.
+
 ### Redis (State Management)
 A high-performance Valkey (Redis compatible) instance acts as the session store for Anubis.
 *   **Configuration**: Tuned for cache usage (`allkeys-lru`). If memory creates pressure, it acts as a cache, evicting the oldest sessions rather than crashing.
@@ -147,6 +153,9 @@ Key variables that control the stack's behavior:
     *   `HSTS_MAX_AGE`: Duration for Strict-Transport-Security header (seconds).
 *   **CROWDSEC**:
     *   `CROWDSEC_UPDATE_INTERVAL`: Frequency of blocklist updates.
+*   **TELEGRAM ALERTS** (Optional):
+    *   `TELEGRAM_BOT_TOKEN`: Bot Token from @BotFather.
+    *   `TELEGRAM_RECIPIENT_ID`: Chat ID or Group ID to receive expiration alerts.
 
 ### Configuration Generator (`generate-config.py`)
 This script runs automatically during startup. It:
