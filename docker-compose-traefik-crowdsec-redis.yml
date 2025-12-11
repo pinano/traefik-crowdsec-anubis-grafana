@@ -19,8 +19,8 @@ services:
       - net.core.somaxconn=1024
       - net.ipv4.tcp_keepalive_time=60
     environment:
-        - TZ=${TZ}
-        - TRAEFIK_CERTIFICATESRESOLVERS_LE_ACME_EMAIL=${ACME_EMAIL}
+      - TZ=${TZ}
+      - TRAEFIK_CERTIFICATESRESOLVERS_LE_ACME_EMAIL=${ACME_EMAIL}
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
@@ -85,7 +85,7 @@ services:
     restart: unless-stopped
     command: redis-server /redis.conf --requirepass "${REDIS_PASSWORD}"
     environment:
-        - TZ=${TZ}
+      - TZ=${TZ}
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
@@ -96,7 +96,37 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M # Give it a bit more margin for the OS
+          memory: 256M
+
+  # ===========================
+  #  CERT-MONITOR 
+  #  checks acme.json and sends alert if a cert
+  #  has not been renewed and is close to expiration
+  # ===========================
+  cert-monitor:
+    image: alpine:3.23
+    container_name: cert-monitor
+    restart: unless-stopped
+    # Install dependencies on startup to avoid maintaining a custom image
+    # Script: Infinite loop running every 24h (86400 sec)
+    entrypoint: >
+      sh -c "apk add --no-cache jq openssl curl tzdata && 
+             while true; do 
+               sh /check-certs.sh; 
+               echo 'Sleeping for 24h...'; 
+               sleep 86400; 
+             done"
+    volumes:
+      - ./config-traefik/acme.json:/acme.json:ro 
+      - ./config-traefik/check-certs.sh:/check-certs.sh:ro
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_RECIPIENT_ID=${TELEGRAM_RECIPIENT_ID}
+      - TZ=${TZ}
+    resources:
+      limits:
+        cpus: '0.05'
+        memory: 32M
 
 networks:
   traefik:

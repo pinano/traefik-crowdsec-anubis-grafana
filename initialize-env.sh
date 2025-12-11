@@ -111,6 +111,9 @@ prompt_val "HSTS_MAX_AGE" "HSTS max age (seconds)"
 prompt_val "GF_ADMIN_USER" "Admin User (Grafana, Traefik, Dozzle)"
 prompt_val "GF_ADMIN_PASSWORD" "Admin Password (Grafana, Traefik, Dozzle)"
 
+prompt_val "TELEGRAM_BOT_TOKEN" "Telegram Bot Token (for Let's Encrypt renewal alerts)"
+prompt_val "TELEGRAM_RECIPIENT_ID" "Telegram Chat/Group ID (for Let's Encrypt renewal alerts)"
+
 # --- AUTOMATED GENERATION ---
 
 echo ""

@@ -2,7 +2,8 @@ import tldextract
 import yaml
 import os
 import csv
-import re # Added for robust name validation
+import re
+from collections import defaultdict  # <--- NEW: To group domains
 
 # ================= CONFIGURATION =================
 INPUT_FILE = 'domains.csv'
@@ -14,6 +15,9 @@ BASE_FILENAME = 'docker-compose-anubis-base.yml'
 CROWDSEC_API_KEY = os.getenv('CROWDSEC_API_KEY')
 REDIS_PASSWORD = os.getenv('REDIS_PASSWORD')
 LOGO_URL = os.getenv('ANUBIS_LOGO_URL', 'https://mydomain.com/anubis-loading.gif')
+
+# TLS Chunking Limit (Let's Encrypt max is 100, we use a smaller amount for safety)
+TLS_BATCH_SIZE = 90
 
 # CrowdSec Update Interval
 try:
@@ -136,8 +140,9 @@ def generate_configs():
 
     services = {}
 
-    # === TRAEFIK MIDDLEWARE CONFIGURATION (DYNAMIC FILE) ===
-    http_conf = {
+    # === TRAEFIK DYNAMIC CONFIGURATION ===
+    # Main structure that will contain 'http' and now also 'tls'
+    traefik_dynamic_conf = {
         'http': {
             'middlewares': {
                 # 1. BROWSER SECURITY (PARAMETERIZED HEADERS)
@@ -149,7 +154,7 @@ def generate_configs():
                         'contentTypeNosniff': True,
                         'stsIncludeSubdomains': True,
                         'stsPreload': True,
-                        'stsSeconds': HSTS_SECONDS, # <--- Variable
+                        'stsSeconds': HSTS_SECONDS,
                         'customFrameOptionsValue': 'SAMEORIGIN'
                     }
                 },
@@ -199,26 +204,64 @@ def generate_configs():
                     }
                 },
             },
-            'routers': {}
+            'routers': {},           
+            'services': {
+                # 1. EXTERNAL BACKEND SERVICE CONFIGURATION (HOST APACHE ON 8080)
+                # This service is defined statically here (@file) and will be referenced
+                # by routers if the 'docker_service' column in domains.csv is 'apache-host'.
+                'apache-host-8080': {
+                    'loadBalancer': {
+                        # Fixed IP used since host.docker.internal failed in the user's Linux environment
+                        # NOTE: '172.17.0.1' is the default bridge gateway on Linux. 
+                        # For macOS/Windows Docker Desktop, this IP will NOT work (logic requires 'host.docker.internal').
+                        'servers': [{'url': 'http://172.17.0.1:8080'}],
+                        'passHostHeader': True
+                    }
+                }
+            }
+        },
+        # TLS SECTION FOR CERTIFICATE GROUPING
+        'tls': {
+            'domains': []
         }
     }
 
-    # === EXTERNAL BACKEND SERVICE CONFIGURATION (HOST APACHE ON 8080) ===
-    # This service is defined statically here (@file) and will be referenced
-    # by routers if the 'docker_service' column in domains.csv is 'apache-host'.
-    http_conf['http']['services'] = {
-        'apache-host-8080': {
-            'loadBalancer': {
-                'servers': [
-                    # Fixed IP used since host.docker.internal failed in the user's Linux environment
-                    # NOTE: '172.17.0.1' is the default bridge gateway on Linux. 
-                    # For macOS/Windows Docker Desktop, this IP will NOT work (logic requires 'host.docker.internal').
-                    {'url': 'http://172.17.0.1:8080'}
-                ],
-                'passHostHeader': True
-            }
-        }
-    }
+    # =========================================================================
+    # TLS GROUPING LOGIC (SAN GROUPING / CHUNKING)
+    # =========================================================================
+    # 1. Group all domains by their root
+    domains_by_root = defaultdict(list)
+    for entry in raw_entries:
+        domains_by_root[entry['root']].append(entry['domain'])
+
+        # We also add the Anubis subdomain to the certificate if it exists
+        if entry['anubis_sub']:
+            full_anubis_url = f"{entry['anubis_sub']}.{entry['root']}"
+            domains_by_root[entry['root']].append(full_anubis_url)
+
+    # 2. Generate the chunked 'tls.domains' configuration
+    tls_configs = []
+    
+    for root_domain, subdomains in domains_by_root.items():
+        # Deduplicate and sort for consistency
+        subs_unicos = sorted(list(set(subdomains)))
+        
+        # Chunking loop in batches of TLS_BATCH_SIZE
+        for i in range(0, len(subs_unicos), TLS_BATCH_SIZE):
+            batch = subs_unicos[i:i + TLS_BATCH_SIZE]
+            
+            # The first one is Main, the rest are SANs
+            cert_def = {"main": batch[0]}
+            if len(batch) > 1:
+                cert_def["sans"] = batch[1:]
+            
+            tls_configs.append(cert_def)
+
+    # Inject the generated configuration into the main object
+    traefik_dynamic_conf['tls']['domains'] = tls_configs
+    print(f"    🔐 TLS Config: Generados {len(tls_configs)} certificados agrupados (Batch size: {TLS_BATCH_SIZE}).")
+    # =========================================================================
+
 
     protected_groups = {}
     anubis_service_names = set() # To track generated Anubis service names
@@ -226,15 +269,14 @@ def generate_configs():
     for entry in raw_entries:
         if entry['anubis_sub']:
             key = (entry['root'], entry['anubis_sub'])
-
             if key not in protected_groups:
                 protected_groups[key] = []
             protected_groups[key].append(entry)
 
-        process_router(entry, http_conf)
+        # Pass the reference to the HTTP section of the config
+        process_router(entry, traefik_dynamic_conf['http'])
 
-    # GENERATE ANUBIS SERVICES (docker-compose part)
-    # The 'services' dictionary is used to build the docker-compose YAML file.
+    # GENERATE ANUBIS SERVICES
     for (root, auth_sub), entries in protected_groups.items():
         safe_root = sanitize_name(root)
         safe_auth = sanitize_name(auth_sub)
@@ -268,10 +310,9 @@ def generate_configs():
             ]
         }
 
-        # Middleware for ForwardAuth: Must be generated dynamically here because
-        # the 'address' points to a dynamically named Anubis container.
+        # Middleware for Anubis
         mw_auth_name = f"anubis-mw-{safe_root}-{safe_auth}"
-        http_conf['http']['middlewares'][mw_auth_name] = {
+        traefik_dynamic_conf['http']['middlewares'][mw_auth_name] = {
             'forwardAuth': {
                 'address': f"http://{anubis_service_name}:8080/.within.website/x/cmd/anubis/api/check",
                 'trustForwardHeader': True,
@@ -279,13 +320,13 @@ def generate_configs():
             }
         }
 
-        # Router for Anubis Portal itself (Must NOT have the forwardAuth middleware)
+        # Router for Anubis Portal
         panel_router_name = f"anubis-panel-{safe_root}-{safe_auth}"
-        http_conf['http']['routers'][panel_router_name] = {
+        traefik_dynamic_conf['http']['routers'][panel_router_name] = {
             'rule': f"Host(`{auth_sub}.{root}`)",
             'entryPoints': ["websecure"],
             'service': f"{anubis_service_name}@docker",
-            'tls': {'certResolver': 'le'},
+            'tls': {'certResolver': 'le'}, # Use the resolver, Traefik will match with tls.domains automatically
             'middlewares': ["security-headers", "anubis-custom-logo"]
         }
 
@@ -303,11 +344,11 @@ def generate_configs():
     os.makedirs(os.path.dirname(OUTPUT_TRAEFIK), exist_ok=True)
     with open(OUTPUT_TRAEFIK, 'w') as f:
         f.write("# AUTOMATICALLY GENERATED BY PYTHON\n")
-        yaml.dump(http_conf, f, Dumper=IndentDumper, default_flow_style=False, sort_keys=False)
+        yaml.dump(traefik_dynamic_conf, f, Dumper=IndentDumper, default_flow_style=False, sort_keys=False)
 
     print("    ✅ Traefik dynamic configuration generated successfully.")
 
-def process_router(entry, http_conf):
+def process_router(entry, http_section):
     domain = entry['domain']
     service = entry['service']
     anubis_sub = entry['anubis_sub']
@@ -317,25 +358,22 @@ def process_router(entry, http_conf):
     safe_domain = sanitize_name(domain)
     router_name = f"router-{safe_domain}"
 
-    # === MIDDLEWARE CHAIN: CrowdSec -> Headers -> Limits -> Compress -> Auth ===
     mw_list = ['crowdsec-check', 'security-headers']
 
-    # Custom Rate Limiting (if defined in CSV)
     if 'rate' in extra or 'burst' in extra:
         custom_rl_name = f"rl-{safe_domain}"
         avg = extra.get('rate', G_RATE_AVG)
         burst = extra.get('burst', G_RATE_BURST)
-        http_conf['http']['middlewares'][custom_rl_name] = {
+        http_section['middlewares'][custom_rl_name] = {
             'rateLimit': {'average': avg, 'burst': burst}
         }
         mw_list.append(custom_rl_name)
     else:
         mw_list.append('global-ratelimit')
 
-    # Custom Concurrency Limiting (if defined in CSV)
     if 'concurrency' in extra:
         custom_conc_name = f"conc-{safe_domain}"
-        http_conf['http']['middlewares'][custom_conc_name] = {
+        http_section['middlewares'][custom_conc_name] = {
             'inFlightReq': {'amount': extra['concurrency']}
         }
         mw_list.append(custom_conc_name)
@@ -344,33 +382,25 @@ def process_router(entry, http_conf):
 
     mw_list.append('global-compress')
 
-    # Add Anubis ForwardAuth Middleware if configured for this domain
     if anubis_sub:
         safe_root = sanitize_name(root)
         safe_auth = sanitize_name(anubis_sub)
         mw_auth_name = f"anubis-mw-{safe_root}-{safe_auth}"
         mw_list.append(mw_auth_name)
 
-    # Middleware for fixing apache https redirects in Wordpress
     if service == 'apache-host':
-        # We add the @internal qualifier (or @docker if it were in labels)
-        # Traefik forces to qualify the provider if the router is dynamic!
         mw_list.append('apache-forward-headers')
 
-    # --- SERVICE LOGIC: Docker vs. External Host ---
-    # Determine the service target based on the CSV entry (service)
     if service == 'apache-host':
-        # If 'apache-host' is specified, point to the static service defined @file
         target_service = 'apache-host-8080@file'
     else:
-        # Default: Point to a Docker service discovered via labels @docker
         target_service = f"{service}@docker"
 
-    # Register the main application router
-    http_conf['http']['routers'][router_name] = {
+    # Router config
+    http_section['routers'][router_name] = {
         'rule': f"Host(`{domain}`)",
         'entryPoints': ["websecure"],
-        'service': target_service, # Use the determined service target
+        'service': target_service,
         'tls': {'certResolver': 'le'},
         'middlewares': mw_list
     }
@@ -389,10 +419,7 @@ def generate_policy_file():
         with open(input_policy, 'r') as f:
             policy_data = yaml.safe_load(f)
 
-        # Inject the Redis password into the connection URL
-        # Format: redis://:password@host:port/db
         if REDIS_PASSWORD:
-            # Inject empty username and password
             policy_data['store']['parameters']['url'] = f"redis://:{REDIS_PASSWORD}@redis:6379/0"
         else:
             print("    ⚠️ WARN: REDIS_PASSWORD not set. Redis will be exposed.")
