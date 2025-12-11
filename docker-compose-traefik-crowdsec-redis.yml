@@ -123,10 +123,11 @@ services:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_RECIPIENT_ID=${TELEGRAM_RECIPIENT_ID}
       - TZ=${TZ}
-    resources:
-      limits:
-        cpus: '0.05'
-        memory: 32M
+    deploy:
+      resources:
+        limits:
+          cpus: '0.05'
+          memory: 32M
 
 networks:
   traefik:
