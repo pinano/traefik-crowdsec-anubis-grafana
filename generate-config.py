@@ -3,7 +3,7 @@ import yaml
 import os
 import csv
 import re
-from collections import defaultdict  # <--- To group domains
+from collections import defaultdict  # for grouping domains
 
 # ================= CONFIGURATION =================
 INPUT_FILE = 'domains.csv'
@@ -14,9 +14,6 @@ OUTPUT_TRAEFIK = 'config-traefik/dynamic-config/routers-generated.yml'
 # ============= ENVIRONMENT VARIABLES =============
 CROWDSEC_API_KEY = os.getenv('CROWDSEC_API_KEY')
 REDIS_PASSWORD = os.getenv('REDIS_PASSWORD')
-# LOGO_URL ya no es necesaria como variable de entorno para el redirect, 
-# pero la dejamos por si la usas en otro sitio, aunque la logica de assets ahora es local.
-LOGO_URL = os.getenv('ANUBIS_LOGO_URL', 'https://mydomain.com/anubis-loading.gif')
 
 # TLS Chunking Limit (Let's Encrypt max is 100, we use a smaller amount for safety)
 TLS_BATCH_SIZE = 90
@@ -136,8 +133,10 @@ def generate_configs():
         return
 
     print(f"    ✅ Successfully processed {len(raw_entries)} domains.")
+
     if error_count > 0:
         print(f"    ⚠️ WARN: {error_count} lines were skipped due to format errors.")
+
     print(f"    ⚙️ Global Config: Rate={G_RATE_AVG}/{G_RATE_BURST}, HSTS={HSTS_SECONDS}s")
 
     services = {}
@@ -202,6 +201,13 @@ def generate_configs():
                 'anubis-assets-stripper': {
                     'stripPrefix': {
                         'prefixes': ['/.within.website/x/cmd/anubis']
+                    }
+                },
+                # ### CAMBIO NUEVO: Middleware para reescribir la ruta del CSS ###
+                # Transforma la petición rara de Go en el nombre de tu fichero local
+                'anubis-css-replace': {
+                    'replacePath': {
+                        'path': '/custom.css'
                     }
                 },
             },
@@ -278,7 +284,7 @@ def generate_configs():
         # Pass the reference to the HTTP section of the config AND the cert map
         process_router(entry, traefik_dynamic_conf['http'], domain_to_cert_def)
 
-    # GENERATE ANUBIS SERVICES
+    # GENERATE ANUBIS SERVICES & ROUTERS
     for (root, auth_sub), entries in protected_groups.items():
         safe_root = sanitize_name(root)
         safe_auth = sanitize_name(auth_sub)
@@ -322,27 +328,38 @@ def generate_configs():
             }
         }
 
-        # --- ANUBIS ASSETS ROUTER (OPTIMIZATION) ---
-        # Intercepts requests for logo/reject image and serves them via Nginx local container
-        assets_router_name = f"anubis-assets-{safe_root}-{safe_auth}"
+        # 1. Anubis: Router para IMAGENES (Logo & Reject)
+        assets_router_name = f"anubis-assets-img-{safe_root}-{safe_auth}"
         traefik_dynamic_conf['http']['routers'][assets_router_name] = {
-            # Matches Anubis subdomain AND specific image paths
             'rule': f"Host(`{auth_sub}.{root}`) && (Path(`/.within.website/x/cmd/anubis/static/img/pensive.webp`) || Path(`/.within.website/x/cmd/anubis/static/img/reject.webp`))",
             'entryPoints': ["websecure"],
-            'service': "anubis-assets@docker", # Defined in global docker-compose
-            'priority': 2000, # High priority to override the general Anubis router
+            'service': "anubis-assets@docker", 
+            'priority': 2000, 
             'tls': {'certResolver': 'le', 'domains': [domain_to_cert_def.get(f"{auth_sub}.{root}", {})]},
-            'middlewares': ["security-headers", "anubis-assets-stripper", "global-compress"]
+            'middlewares': ["security-headers", "anubis-assets-strip", "global-compress"]
         }
 
-        # Router for Anubis Portal (Standard)
+        # 2. Anubis: Router para CSS
+        css_router_name = f"anubis-assets-css-{safe_root}-{safe_auth}"
+        traefik_dynamic_conf['http']['routers'][css_router_name] = {
+            # Capturamos el path exacto del CSS de Anubis
+            'rule': f"Host(`{auth_sub}.{root}`) && Path(`/.within.website/x/xess/xess.min.css`)",
+            'entryPoints': ["websecure"],
+            'service': "anubis-assets@docker", # Mismo contenedor Nginx
+            'priority': 2000, 
+            'tls': {'certResolver': 'le', 'domains': [domain_to_cert_def.get(f"{auth_sub}.{root}", {})]},
+            # Usamos el nuevo middleware que reemplaza el path largo por /custom.css
+            'middlewares': ["security-headers", "anubis-css-replace", "global-compress"]
+        }
+
+        # 3. Anubis: Router Principal
         panel_router_name = f"anubis-panel-{safe_root}-{safe_auth}"
         traefik_dynamic_conf['http']['routers'][panel_router_name] = {
             'rule': f"Host(`{auth_sub}.{root}`)",
             'entryPoints': ["websecure"],
             'service': f"{anubis_service_name}@docker",
             'tls': {'certResolver': 'le', 'domains': [domain_to_cert_def.get(f"{auth_sub}.{root}", {})]}, 
-            'middlewares': ["security-headers"] # No longer using 'anubis-custom-logo'
+            'middlewares': ["security-headers"]
         }
 
     if services:
@@ -364,6 +381,8 @@ def generate_configs():
     print("    ✅ Traefik dynamic configuration generated successfully.")
 
 def process_router(entry, http_section, domain_to_cert_def):
+    # (El código de process_router sigue igual, te lo ahorro para no spammear)
+    # ... pero asegúrate de mantenerlo en tu fichero original ...
     domain = entry['domain']
     service = entry['service']
     anubis_sub = entry['anubis_sub']

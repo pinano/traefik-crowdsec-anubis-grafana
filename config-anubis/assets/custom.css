@@ -1,0 +1,56 @@
+/* custom.css */
+
+/* Fondo oscuro y fuente técnica */
+body,
+html {
+    background-color: #0d1117 !important;
+    color: #c9d1d9 !important;
+    font-family: 'Courier New', Courier, monospace !important;
+}
+
+/* El título */
+h1#title {
+    color: #58a6ff !important;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    border-bottom: 1px solid #30363d;
+    padding-bottom: 10px;
+}
+
+/* Ocultar las imágenes originales si quieres, o dejarlas */
+/* img#image { display: none; } */
+
+/* Barra de progreso personalizada */
+#progress {
+    outline: #58a6ff solid 2px !important;
+    background-color: #161b22 !important;
+}
+
+.bar-inner {
+    background-color: #2ea043 !important;
+    /* Verde éxito */
+}
+
+/* Ocultar el footer de "Protected by Anubis" */
+footer {
+    display: none !important;
+    /* O si quieres poner el tuyo propio: */
+    /* visibility: hidden; position: relative; */
+}
+
+/*
+footer::after {
+    visibility: visible;
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    content: "Sistemas de Seguridad Fernando © 2025";
+    text-align: center;
+    color: #8b949e;
+}
+*/
+
+/* Texto de estado */
+#status {
+    color: #f0883e !important;
+    font-weight: bold;
+}
