@@ -129,6 +129,43 @@ services:
           cpus: '0.05'
           memory: 32M
 
+  # ===========================
+  #  ANUBIS-ASSETS
+  #  superlight container for serving static assets
+  #  (man-in-the-middle for Anubis logo)
+  # ===========================
+  anubis-assets:
+    image: nginx:alpine
+    container_name: anubis-assets
+    restart: unless-stopped
+    volumes:
+      # Montamos el logo simulando la ruta exacta que pide el navegador.
+      # Así Nginx lo sirve directo sin necesidad de middlewares de RewritePath (ahorro CPU).
+      # Asegúrate de que existe ./config-anubis/logo.webp en tu host.
+      - ./config-anubis/pensive.webp:/usr/share/nginx/html/static/img/pensive.webp:ro
+    networks:
+      - traefik
+    deploy:
+      resources:
+        limits:
+          cpus: '0.05'
+          memory: 10M
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+
+      # REGLA MAESTRA:
+      # 1. Captura cualquier host que empiece por 'anubis.' (HostRegexp)
+      # 2. Y ADEMÁS pida exactamente la imagen 'pensive.webp'
+      - "traefik.http.routers.anubis-assets.rule=HostRegexp(`{subdomain:anubis\..+}`) && Path(`/static/img/pensive.webp`)"
+
+      # PRIORIDAD ALTA: Gana siempre a los routers de los contenedores Anubis
+      - "traefik.http.routers.anubis-assets.priority=100"
+
+      - "traefik.http.routers.anubis-assets.entrypoints=websecure"
+      - "traefik.http.routers.anubis-assets.tls.certresolver=le"
+      - "traefik.http.services.anubis-assets.loadbalancer.server.port=80"
+      
 networks:
   traefik:
     name: traefik
