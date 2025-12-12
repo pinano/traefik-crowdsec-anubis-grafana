@@ -9,24 +9,39 @@ set -a
 source .env
 set +a
 
-# Logic to set ACME_CA_SERVER based on ACME_ENV_TYPE
-if [ -z "$ACME_CA_SERVER" ]; then
-    if [ "$ACME_ENV_TYPE" = "staging" ]; then
-        export ACME_CA_SERVER="https://acme-staging-v02.api.letsencrypt.org/directory"
-        echo "⚠️  Traefik configured for Let's Encrypt STAGING environment."
-    else
-        export ACME_CA_SERVER="https://acme-v02.api.letsencrypt.org/directory"
-        echo "🔒 Traefik configured for Let's Encrypt PRODUCTION environment."
-    fi
-else
-    echo "🔧 Using custom ACME_CA_SERVER: $ACME_CA_SERVER"
-fi
-
 # If Traefik's acme.json doesn't exist, create it empty first
 if [ ! -f ./config-traefik/acme.json ]; then
     touch ./config-traefik/acme.json
     # Set restrictive permissions (rw for owner, nothing for others)
     chmod 600 ./config-traefik/acme.json
+fi
+
+# Logic to set ACME_CA_SERVER based on ACME_ENV_TYPE
+# PRIORITY: ACME_ENV_TYPE > ACME_CA_SERVER (from .env)
+# This ensures that if the user sets ACME_ENV_TYPE, it is respected, 
+# even if an old ACME_CA_SERVER variable remains in the .env file.
+
+if [ -n "$ACME_ENV_TYPE" ]; then
+    if [ "$ACME_ENV_TYPE" = "staging" ]; then
+        export ACME_CA_SERVER="https://acme-staging-v02.api.letsencrypt.org/directory"
+        echo "⚠️  Traefik configured for Let's Encrypt STAGING environment (via ACME_ENV_TYPE)."
+    elif [ "$ACME_ENV_TYPE" = "production" ]; then
+        export ACME_CA_SERVER="https://acme-v02.api.letsencrypt.org/directory"
+        echo "🔒 Traefik configured for Let's Encrypt PRODUCTION environment (via ACME_ENV_TYPE)."
+    else
+        # If set but unknown value, fall back to what might be in ACME_CA_SERVER or default
+        echo "⚠️  Unknown ACME_ENV_TYPE: '$ACME_ENV_TYPE'. Ignoring."
+    fi
+fi
+
+# If ACME_CA_SERVER is still empty (ACME_ENV_TYPE was not set or invalid, and no ACME_CA_SERVER in .env),
+# default to Production.
+if [ -z "$ACME_CA_SERVER" ]; then
+     export ACME_CA_SERVER="https://acme-v02.api.letsencrypt.org/directory"
+     echo "🔒 Traefik configured for Let's Encrypt PRODUCTION environment (Default)."
+elif [ -z "$ACME_ENV_TYPE" ]; then
+     # Only show this message if we are using the manual override (ACME_ENV_TYPE is empty)
+     echo "🔧 Using custom ACME_CA_SERVER from .env: $ACME_CA_SERVER"
 fi
 
 echo "🔧 Generating dynamic configuration with python script..."
