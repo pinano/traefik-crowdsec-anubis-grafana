@@ -3,7 +3,7 @@ import yaml
 import os
 import csv
 import re
-from collections import defaultdict  # for grouping domains
+from collections import defaultdict  # for grouping
 
 # ================= CONFIGURATION =================
 INPUT_FILE = 'domains.csv'
@@ -336,7 +336,7 @@ def generate_configs():
             'service': "anubis-assets@docker", 
             'priority': 2000, 
             'tls': {'certResolver': 'le', 'domains': [domain_to_cert_def.get(f"{auth_sub}.{root}", {})]},
-            'middlewares': ["security-headers", "anubis-assets-strip", "global-compress"]
+            'middlewares': ["security-headers", "anubis-assets-stripper", "global-compress"]
         }
 
         # 2. Anubis: Router para CSS
@@ -348,7 +348,6 @@ def generate_configs():
             'service': "anubis-assets@docker", # Mismo contenedor Nginx
             'priority': 2000, 
             'tls': {'certResolver': 'le', 'domains': [domain_to_cert_def.get(f"{auth_sub}.{root}", {})]},
-            # Usamos el nuevo middleware que reemplaza el path largo por /custom.css
             'middlewares': ["security-headers", "anubis-css-replace", "global-compress"]
         }
 
