@@ -78,7 +78,9 @@ Anubis is a specialized "ForwardAuth" middleware for mitigating bots that bypass
 *   **Mechanism**: When a user accesses a protected route without a valid session, Anubis intercepts the request.
 *   **Challenge**: It presents a cryptographic Proof-of-Work (PoW) challenge that the client browser must solve using JavaScript. This is computationally expensive for bots but trivial for legitimate browsers.
 *   **Isolation**: One Anubis instance is deployed per Top-Level Domain (TLD) to respect "Same-Site" cookie policies and isolate failure domains.
-
+*   **Customization**: Anubis assets are served locally from `config-anubis/assets/`. You can customize the look and feel by modifying:
+    *   **Images**: Replace `pensive.webp` (loading state), `happy.webp` (success state) and `reject.webp` (failure state) with your own images.
+    *   **Styles**: Edit `custom.css` to change fonts, colors, and layout. No external dependencies are required.
 ### Cert Monitor (SSL Watchdog)
 A lightweight utility service that ensures SSL reliability.
 *   **Audit**: Daily scans of Traefik's `acme.json` certificate store.
