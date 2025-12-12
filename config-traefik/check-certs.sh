@@ -2,7 +2,7 @@
 
 # Configuration
 ACME_FILE="/acme.json"
-DAYS_WARNING=10
+DAYS_WARNING=${DAYS_WARNING:-10}
 TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN}"
 TELEGRAM_RECIPIENT_ID="${TELEGRAM_RECIPIENT_ID}"
 
@@ -19,7 +19,7 @@ send_telegram() {
     # Ensure curl is available or handle failure silently
     curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
         -d chat_id="${TELEGRAM_RECIPIENT_ID}" \
-        -d text="⚠️ *SSL ALERT* ⚠️%0A%0A${MSG}" \
+        -d text="⚠️ *SSL ALERT* [${SERVER_DOMAIN}] ⚠️%0A%0A${MSG}" \
         -d parse_mode="Markdown" > /dev/null
 }
 
@@ -74,7 +74,7 @@ for CERT_B64 in $CERTS; do
         echo -e "${RED}[DANGER] $DOMAIN expires in $DAYS_LEFT days ($END_DATE_STR)${NC}"
         
         # Send Telegram alert
-        MESSAGE="Domain *${DOMAIN}* expires in *${DAYS_LEFT} days* and has not renewed automatically. Check Traefik logs."
+        MESSAGE="The certificate for *${DOMAIN}* expires in *${DAYS_LEFT} days* (threshold: ${DAYS_WARNING} days).%0AAutomatic renewal has failed or is delayed.%0A👉 *Action Required:* Review Traefik renewal process immediately."
         send_telegram "$MESSAGE"
         ERRORS=$((ERRORS + 1))
     else

@@ -196,15 +196,15 @@ def generate_configs():
                     }
                 },
                 # 7. ANUBIS ASSETS STRIPPER
-                # Limpia la ruta interna de Go para que Nginx reciba una ruta limpia.
-                # Elimina "/.within.website/x/cmd/anubis" para dejar "/static/img/..."
+                # Cleans the internal Go path so Nginx receives a clean path.
+                # Removes "/.within.website/x/cmd/anubis" to leave "/static/img/..."
                 'anubis-assets-stripper': {
                     'stripPrefix': {
                         'prefixes': ['/.within.website/x/cmd/anubis']
                     }
                 },
-                # ### CAMBIO NUEVO: Middleware para reescribir la ruta del CSS ###
-                # Transforma la petición rara de Go en el nombre de tu fichero local
+                # ### NEW CHANGE: Middleware to rewrite CSS path ###
+                # Transforms the unusual Go request into your local file name
                 'anubis-css-replace': {
                     'replacePath': {
                         'path': '/custom.css'
@@ -328,7 +328,7 @@ def generate_configs():
             }
         }
 
-        # 1. Anubis: Router para IMAGENES (Logo & Reject)
+        # 1. Anubis: Router for IMAGES (Pensive, Happy & Reject)
         assets_router_name = f"anubis-assets-img-{safe_root}-{safe_auth}"
         traefik_dynamic_conf['http']['routers'][assets_router_name] = {
             'rule': f"Host(`{auth_sub}.{root}`) && (Path(`/.within.website/x/cmd/anubis/static/img/pensive.webp`) || Path(`/.within.website/x/cmd/anubis/static/img/reject.webp`))",
@@ -339,19 +339,19 @@ def generate_configs():
             'middlewares': ["security-headers", "anubis-assets-stripper", "global-compress"]
         }
 
-        # 2. Anubis: Router para CSS
+        # 2. Anubis: Router for CSS
         css_router_name = f"anubis-assets-css-{safe_root}-{safe_auth}"
         traefik_dynamic_conf['http']['routers'][css_router_name] = {
-            # Capturamos el path exacto del CSS de Anubis
+            # Capture the exact path of the Anubis CSS
             'rule': f"Host(`{auth_sub}.{root}`) && Path(`/.within.website/x/xess/xess.min.css`)",
             'entryPoints': ["websecure"],
-            'service': "anubis-assets@docker", # Mismo contenedor Nginx
+            'service': "anubis-assets@docker", # Same Nginx container
             'priority': 2000, 
             'tls': {'certResolver': 'le', 'domains': [domain_to_cert_def.get(f"{auth_sub}.{root}", {})]},
             'middlewares': ["security-headers", "anubis-css-replace", "global-compress"]
         }
 
-        # 3. Anubis: Router Principal
+        # 3. Anubis: Main Router
         panel_router_name = f"anubis-panel-{safe_root}-{safe_auth}"
         traefik_dynamic_conf['http']['routers'][panel_router_name] = {
             'rule': f"Host(`{auth_sub}.{root}`)",
@@ -380,8 +380,8 @@ def generate_configs():
     print("    ✅ Traefik dynamic configuration generated successfully.")
 
 def process_router(entry, http_section, domain_to_cert_def):
-    # (El código de process_router sigue igual, te lo ahorro para no spammear)
-    # ... pero asegúrate de mantenerlo en tu fichero original ...
+    # (The process_router code remains the same, saving you spam)
+    # ... but make sure to keep it in your original file ...
     domain = entry['domain']
     service = entry['service']
     anubis_sub = entry['anubis_sub']

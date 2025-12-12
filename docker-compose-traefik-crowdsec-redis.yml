@@ -122,6 +122,8 @@ services:
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_RECIPIENT_ID=${TELEGRAM_RECIPIENT_ID}
+      - SERVER_DOMAIN=${DOMAIN} # For customizing the alert message
+      - DAYS_WARNING=${DAYS_WARNING}
       - TZ=${TZ}
     deploy:
       resources:

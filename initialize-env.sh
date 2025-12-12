@@ -112,6 +112,7 @@ prompt_val "GF_ADMIN_PASSWORD" "Admin Password (Grafana, Traefik, Dozzle)"
 
 prompt_val "TELEGRAM_BOT_TOKEN" "Telegram Bot Token (for Let's Encrypt renewal alerts)"
 prompt_val "TELEGRAM_RECIPIENT_ID" "Telegram Chat/Group ID (for Let's Encrypt renewal alerts)"
+prompt_val "DAYS_WARNING" "Days before SSL certificateexpiration to send alert (default: 10)"
 
 # --- AUTOMATED GENERATION ---
 
