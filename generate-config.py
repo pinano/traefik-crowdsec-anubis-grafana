@@ -182,7 +182,9 @@ def generate_configs():
                 #},
                 # 4. GLOBAL COMPRESSION
                 'global-compress': {
-                    'compress': {'minResponseBodyBytes': 1024}
+                    'compress': {
+                        'minResponseBodyBytes': 1024
+                    }
                 },
                 # 5. TRAEFIK RATE LIMIT
                 'global-ratelimit': {
@@ -193,7 +195,9 @@ def generate_configs():
                 },
                 # 6. TRAEFIK CONCURRENCY
                 'global-concurrency': {
-                    'inFlightReq': {'amount': G_CONCURRENCY}
+                    'inFlightReq': {
+                        'amount': G_CONCURRENCY
+                    }
                 },
                 # 7. PROTOCOL FORWARDER (For Apache/WordPress HTTP->HTTPS redirect fix)
                 'apache-forward-headers': {
@@ -204,7 +208,7 @@ def generate_configs():
                     }
                 },
             },
-            'routers': {},           
+            'routers': {},
             'services': {
                 # 1. EXTERNAL BACKEND SERVICE CONFIGURATION (HOST APACHE ON 8080)
                 # This service is defined statically here (@file) and will be referenced
