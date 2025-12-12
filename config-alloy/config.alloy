@@ -1,18 +1,18 @@
 // config-alloy/config.alloy
 
-// 1. Configuración del Servidor Interno de Alloy
+// 1. Alloy Internal Server Configuration
 logging {
     level  = "info"
     format = "logfmt"
 }
 
-// 2. Descubrimiento de Contenedores Docker
+// 2. Docker Container Discovery
 discovery.docker "containers" {
     host = "unix:///var/run/docker.sock"
 }
 
-// 3. Re-etiquetado (Relabeling) para limpiar nombres de contenedores
-//    Equivalente a tu regex '/(.*)' anterior
+// 3. Relabeling to clean container names
+//    Equivalent to your previous regex '/(.*)'
 discovery.relabel "docker_logs" {
     targets = discovery.docker.containers.targets
 
@@ -23,17 +23,17 @@ discovery.relabel "docker_logs" {
     }
 }
 
-// 4. Ingesta de Logs (Input)
+// 4. Log Ingestion (Input)
 loki.source.docker "default" {
     host       = "unix:///var/run/docker.sock"
     targets    = discovery.relabel.docker_logs.output
     forward_to = [loki.process.pipelines.receiver]
 }
 
-// 5. Procesamiento de Logs (Pipelines)
+// 5. Log Processing (Pipelines)
 loki.process "pipelines" {
     
-    // 5.1 Drop noise: Eliminar logs de la propia monitorización
+    // 5.1 Drop noise: Remove self-monitoring logs
     stage.drop {
         expression = ".*(alloy|loki|grafana|alloy).*"
     }
@@ -137,11 +137,11 @@ loki.process "pipelines" {
         }
     }
 
-    // Enviar al output final
+    // Send to final output
     forward_to = [loki.write.local.receiver]
 }
 
-// 6. Envío a Loki (Output)
+// 6. Send to Loki (Output)
 loki.write "local" {
     endpoint {
         url = "http://loki:3100/loki/api/v1/push"
