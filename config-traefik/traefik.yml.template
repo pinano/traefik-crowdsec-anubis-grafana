@@ -42,8 +42,8 @@ certificatesResolvers:
   le:
     acme:
       tlsChallenge: {}
-      email: "my@email.com"
-      caServer: "https://acme-staging-v02.api.letsencrypt.org/directory"
+      email: "ACME_EMAIL_PLACEHOLDER"
+      caServer: "ACME_CASERVER_PLACEHOLDER"
       storage: "/acme.json"
 
 tls:

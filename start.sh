@@ -35,13 +35,25 @@ if [ -n "$ACME_ENV_TYPE" ]; then
 fi
 
 # If ACME_CA_SERVER is still empty (ACME_ENV_TYPE was not set or invalid, and no ACME_CA_SERVER in .env),
-# default to Production.
+# default to Staging.
 if [ -z "$ACME_CA_SERVER" ]; then
-     export ACME_CA_SERVER="https://acme-v02.api.letsencrypt.org/directory"
-     echo "🔒 Traefik configured for Let's Encrypt PRODUCTION environment (Default)."
+     export ACME_CA_SERVER="https://acme-staging-v02.api.letsencrypt.org/directory"
+     echo "⚠️ Traefik configured for Let's Encrypt STAGING environment (Default)."
 elif [ -z "$ACME_ENV_TYPE" ]; then
      # Only show this message if we are using the manual override (ACME_ENV_TYPE is empty)
      echo "🔧 Using custom ACME_CA_SERVER from .env: $ACME_CA_SERVER"
+fi
+
+# Generate traefik.yml from template
+echo "🔧 Generating traefik.yml from template..."
+if [ -f "./config-traefik/traefik.yml.template" ]; then
+    sed -e "s|ACME_EMAIL_PLACEHOLDER|${ACME_EMAIL}|g" \
+        -e "s|ACME_CASERVER_PLACEHOLDER|${ACME_CA_SERVER}|g" \
+        ./config-traefik/traefik.yml.template > ./config-traefik/traefik.yml
+    echo "✅ traefik.yml generated successfully."
+else
+    echo "❌ Error: config-traefik/traefik.yml.template not found!"
+    exit 1
 fi
 
 echo "🔧 Generating dynamic configuration with python script..."

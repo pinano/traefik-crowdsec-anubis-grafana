@@ -20,12 +20,6 @@ services:
       - net.ipv4.tcp_keepalive_time=60
     environment:
       - TZ=${TZ}
-    command:
-      # Explicitly tell Traefik to look for the config file, although it's in the default path
-      - "--configFile=/traefik.yml"
-      # ACME Config via CLI arguments (overrides static config file)
-      - "--certificatesresolvers.le.acme.caserver=${ACME_CA_SERVER}"
-      - "--certificatesresolvers.le.acme.email=${ACME_EMAIL}"
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
