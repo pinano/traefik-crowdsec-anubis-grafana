@@ -3,7 +3,7 @@ import yaml
 import os
 import csv
 import re
-from collections import defaultdict  # <--- NEW: To group domains
+from collections import defaultdict  # <--- To group domains
 
 # ================= CONFIGURATION =================
 INPUT_FILE = 'domains.csv'
@@ -14,6 +14,8 @@ OUTPUT_TRAEFIK = 'config-traefik/dynamic-config/routers-generated.yml'
 # ============= ENVIRONMENT VARIABLES =============
 CROWDSEC_API_KEY = os.getenv('CROWDSEC_API_KEY')
 REDIS_PASSWORD = os.getenv('REDIS_PASSWORD')
+# LOGO_URL ya no es necesaria como variable de entorno para el redirect, 
+# pero la dejamos por si la usas en otro sitio, aunque la logica de assets ahora es local.
 LOGO_URL = os.getenv('ANUBIS_LOGO_URL', 'https://mydomain.com/anubis-loading.gif')
 
 # TLS Chunking Limit (Let's Encrypt max is 100, we use a smaller amount for safety)
@@ -61,7 +63,7 @@ class IndentDumper(yaml.Dumper):
     def increase_indent(self, flow=False, indentless=False):
         return super(IndentDumper, self).increase_indent(flow, False)
 
-# Extract root domains from csustom Dumper to avoid excessive indentation (KISS principle applied to YAML structure)
+# Extract root domains
 def get_root_domain(domain):
     extracted = tldextract.extract(domain)
     if extracted.suffix:
@@ -136,12 +138,12 @@ def generate_configs():
     print(f"    ✅ Successfully processed {len(raw_entries)} domains.")
     if error_count > 0:
         print(f"    ⚠️ WARN: {error_count} lines were skipped due to format errors.")
-    print(f"    ⚙️ Global Config: Rate={G_RATE_AVG}/{G_RATE_BURST}, HSTS={HSTS_SECONDS}s, Logo={LOGO_URL}")
+    print(f"    ⚙️ Global Config: Rate={G_RATE_AVG}/{G_RATE_BURST}, HSTS={HSTS_SECONDS}s")
 
     services = {}
 
     # === TRAEFIK DYNAMIC CONFIGURATION ===
-    # Main structure that will contain 'http' and now also 'tls'
+    # Main structure that will contain 'http' and 'tls'
     traefik_dynamic_conf = {
         'http': {
             'middlewares': {
@@ -171,40 +173,35 @@ def generate_configs():
                         }
                     }
                 },
-                # 3. UTILS: LOGO CUSTOMIZATION
-                # Intercepts the default pensive.webp and redirects it to the corporate logo URL.
-                'anubis-custom-logo': {
-                    'redirectRegex': {
-                        'regex': "^https?://[^/]+/.within.website/x/cmd/anubis/static/img/pensive\\.webp.*",
-                        'replacement': LOGO_URL,
-                        'permanent': False
-                    }
-                },
-                # 4. GLOBAL COMPRESSION
+                # 3. GLOBAL COMPRESSION
                 'global-compress': {
-                    'compress': {
-                        'minResponseBodyBytes': 1024
-                    }
+                    'compress': {'minResponseBodyBytes': 1024}
                 },
-                # 5. TRAEFIK RATE LIMIT
+                # 4. TRAEFIK RATE LIMIT
                 'global-ratelimit': {
                     'rateLimit': {
                         'average': G_RATE_AVG,
                         'burst': G_RATE_BURST
                     }
                 },
-                # 6. TRAEFIK CONCURRENCY
+                # 5. TRAEFIK CONCURRENCY
                 'global-concurrency': {
-                    'inFlightReq': {
-                        'amount': G_CONCURRENCY
-                    }
+                    'inFlightReq': {'amount': G_CONCURRENCY}
                 },
-                # 7. PROTOCOL FORWARDER (For Apache/WordPress HTTP->HTTPS redirect fix)
+                # 6. PROTOCOL FORWARDER (For Apache/WordPress HTTP->HTTPS redirect fix)
                 'apache-forward-headers': {
                     'headers': {
                         'customRequestHeaders': {
                             'X-Forwarded-Proto': 'https'
                         }
+                    }
+                },
+                # 7. ANUBIS ASSETS STRIPPER
+                # Limpia la ruta interna de Go para que Nginx reciba una ruta limpia.
+                # Elimina "/.within.website/x/cmd/anubis" para dejar "/static/img/..."
+                'anubis-assets-stripper': {
+                    'stripPrefix': {
+                        'prefixes': ['/.within.website/x/cmd/anubis']
                     }
                 },
             },
@@ -257,9 +254,6 @@ def generate_configs():
             
             tls_configs.append(cert_def)
 
-    # Inject the generated configuration into the ROUTERS (not global)
-    # traefik_dynamic_conf['tls']['domains'] = tls_configs # <--- INVALID IN TRAEFIK DYNAMIC CONFIG
-    
     # Map domain -> certificate definition (batch)
     domain_to_cert_def = {}
     for batch in tls_configs:
@@ -328,14 +322,27 @@ def generate_configs():
             }
         }
 
-        # Router for Anubis Portal
+        # --- ANUBIS ASSETS ROUTER (OPTIMIZATION) ---
+        # Intercepts requests for logo/reject image and serves them via Nginx local container
+        assets_router_name = f"anubis-assets-{safe_root}-{safe_auth}"
+        traefik_dynamic_conf['http']['routers'][assets_router_name] = {
+            # Matches Anubis subdomain AND specific image paths
+            'rule': f"Host(`{auth_sub}.{root}`) && (Path(`/.within.website/x/cmd/anubis/static/img/pensive.webp`) || Path(`/.within.website/x/cmd/anubis/static/img/reject.webp`))",
+            'entryPoints': ["websecure"],
+            'service': "anubis-assets@docker", # Defined in global docker-compose
+            'priority': 2000, # High priority to override the general Anubis router
+            'tls': {'certResolver': 'le', 'domains': [domain_to_cert_def.get(f"{auth_sub}.{root}", {})]},
+            'middlewares': ["security-headers", "anubis-assets-stripper", "global-compress"]
+        }
+
+        # Router for Anubis Portal (Standard)
         panel_router_name = f"anubis-panel-{safe_root}-{safe_auth}"
         traefik_dynamic_conf['http']['routers'][panel_router_name] = {
             'rule': f"Host(`{auth_sub}.{root}`)",
             'entryPoints': ["websecure"],
             'service': f"{anubis_service_name}@docker",
-            'tls': {'certResolver': 'le', 'domains': [domain_to_cert_def.get(f"{auth_sub}.{root}", {})]}, # Apply cert def if exists
-            'middlewares': ["security-headers", "anubis-custom-logo"]
+            'tls': {'certResolver': 'le', 'domains': [domain_to_cert_def.get(f"{auth_sub}.{root}", {})]}, 
+            'middlewares': ["security-headers"] # No longer using 'anubis-custom-logo'
         }
 
     if services:
