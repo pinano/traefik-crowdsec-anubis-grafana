@@ -173,13 +173,13 @@ def generate_configs():
                 },
                 # 3. UTILS: LOGO CUSTOMIZATION
                 # Intercepts the default pensive.webp and redirects it to the corporate logo URL.
-                'anubis-custom-logo': {
-                    'redirectRegex': {
-                        'regex': "^https?://[^/]+/.within.website/x/cmd/anubis/static/img/pensive\\.webp.*",
-                        'replacement': LOGO_URL,
-                        'permanent': False
-                    }
-                },
+                #'anubis-custom-logo': {
+                #    'redirectRegex': {
+                #        'regex': "^https?://[^/]+/.within.website/x/cmd/anubis/static/img/pensive\\.webp.*",
+                #        'replacement': LOGO_URL,
+                #        'permanent': False
+                #    }
+                #},
                 # 4. GLOBAL COMPRESSION
                 'global-compress': {
                     'compress': {'minResponseBodyBytes': 1024}
@@ -331,7 +331,8 @@ def generate_configs():
             'entryPoints': ["websecure"],
             'service': f"{anubis_service_name}@docker",
             'tls': {'certResolver': 'le', 'domains': [domain_to_cert_def.get(f"{auth_sub}.{root}", {})]}, # Apply cert def if exists
-            'middlewares': ["security-headers", "anubis-custom-logo"]
+            #'middlewares': ["security-headers", "anubis-custom-logo"]
+            'middlewares': ["security-headers"]
         }
 
     if services:
