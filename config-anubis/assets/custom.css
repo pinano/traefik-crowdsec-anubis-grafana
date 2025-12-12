@@ -7,7 +7,7 @@ html {
     font-family: 'Courier New', Courier, monospace !important;
 }
 
-/* El título */
+/* Title */
 h1#title {
     color: #58a6ff !important;
     text-transform: uppercase;
@@ -16,7 +16,7 @@ h1#title {
     padding-bottom: 10px;
 }
 
-/* Barra de progreso personalizada */
+/* Custom progress bar */
 #progress {
     outline: #58a6ff solid 2px !important;
     background-color: #161b22 !important;
@@ -27,26 +27,25 @@ h1#title {
     /* Verde éxito */
 }
 
-/* Ocultar el footer de "Protected by Anubis" */
+/* Hide original "Protected by Anubis" footer */
 footer {
-    display: none !important;
-    /* O si quieres poner el tuyo propio: */
-    /* visibility: hidden; position: relative; */
+    visibility: hidden;
+    position: relative;
 }
 
+/* Inject custom footer */
 footer::after {
     visibility: visible;
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
-    content: "Bogo Agencia Interactiva";
+    content: "&copy; Bogo Agencia Interactiva";
     text-align: center;
     color: #8b949e;
 }
 
-
-/* Texto de estado */
+/* Status */
 #status {
     color: #f0883e !important;
     font-weight: bold;
