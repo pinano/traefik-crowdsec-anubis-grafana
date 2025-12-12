@@ -85,7 +85,6 @@ prompt_val "TZ" "Timezone (e.g. Europe/Madrid)"
 prompt_val "ACME_EMAIL" "Let's Encrypt email"
 
 prompt_val "ANUBIS_DIFFICULTY" "Anubis challenge difficulty (1-5)"
-prompt_val "ANUBIS_LOGO_URL" "URL for custom Anubis logo"
 prompt_val "ANUBIS_CPU_LIMIT" "Anubis CPU limit per instance"
 prompt_val "ANUBIS_MEM_LIMIT" "Anubis memory limit per instance"
 

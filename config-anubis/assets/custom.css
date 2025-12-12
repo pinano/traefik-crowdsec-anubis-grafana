@@ -4,7 +4,7 @@ body,
 html {
     background-color: #FFF !important;
     color: #000 !important;
-    font-family: 'Courier New', Courier, monospace !important;
+    font-family: Arial, Helvetica, sans-serif !important;
 }
 
 /* Title */
@@ -27,7 +27,7 @@ h1#title {
     /* Verde éxito */
 }
 
-/* Hide original "Protected by Anubis" footer */
+/* Hide original footer */
 footer {
     visibility: hidden;
     position: relative;
@@ -40,7 +40,7 @@ footer::after {
     top: 0;
     left: 0;
     right: 0;
-    content: "© Bogo Agencia Interactiva";
+    content: "No free cycles. Prove your humanity.";
     text-align: center;
     color: #8b949e;
 }
