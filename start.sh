@@ -9,6 +9,19 @@ set -a
 source .env
 set +a
 
+# Logic to set ACME_CA_SERVER based on ACME_ENV_TYPE
+if [ -z "$ACME_CA_SERVER" ]; then
+    if [ "$ACME_ENV_TYPE" = "staging" ]; then
+        export ACME_CA_SERVER="https://acme-staging-v02.api.letsencrypt.org/directory"
+        echo "⚠️  Traefik configured for Let's Encrypt STAGING environment."
+    else
+        export ACME_CA_SERVER="https://acme-v02.api.letsencrypt.org/directory"
+        echo "🔒 Traefik configured for Let's Encrypt PRODUCTION environment."
+    fi
+else
+    echo "🔧 Using custom ACME_CA_SERVER: $ACME_CA_SERVER"
+fi
+
 # If Traefik's acme.json doesn't exist, create it empty first
 if [ ! -f ./config-traefik/acme.json ]; then
     touch ./config-traefik/acme.json

@@ -21,6 +21,7 @@ services:
     environment:
       - TZ=${TZ}
       - TRAEFIK_CERTIFICATESRESOLVERS_LE_ACME_EMAIL=${ACME_EMAIL}
+      - TRAEFIK_CERTIFICATESRESOLVERS_LE_ACME_CASERVER=${ACME_CA_SERVER}
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
