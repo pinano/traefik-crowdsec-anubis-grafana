@@ -9,7 +9,7 @@ from collections import defaultdict  # for grouping
 INPUT_FILE = 'domains.csv'
 BASE_FILENAME = 'docker-compose-anubis-base.yml'
 OUTPUT_COMPOSE = 'docker-compose-anubis-generated.yml'
-OUTPUT_TRAEFIK = 'config-traefik/dynamic-config/routers-generated.yml'
+OUTPUT_TRAEFIK = 'config/traefik/dynamic-config/routers-generated.yml'
 
 # ============= ENVIRONMENT VARIABLES =============
 CROWDSEC_API_KEY = os.getenv('CROWDSEC_API_KEY')
@@ -468,8 +468,8 @@ def process_router(entry, http_section, domain_to_cert_def):
     http_section['routers'][router_name] = router_conf
 
 def generate_policy_file():
-    input_policy = 'config-anubis/botPolicy.yaml'
-    output_policy = 'config-anubis/botPolicy-generated.yaml'
+    input_policy = 'config/anubis/botPolicy.yaml'
+    output_policy = 'config/anubis/botPolicy-generated.yaml'
 
     if not os.path.exists(input_policy):
         print(f"    ⚠️ WARN: {input_policy} not found, skipping policy generation.")

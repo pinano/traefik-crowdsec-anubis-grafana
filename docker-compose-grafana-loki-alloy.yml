@@ -15,7 +15,7 @@ services:
       - TZ=${TZ}
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./config-grafana/config.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
+      - ./config/grafana/config.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
     networks:
@@ -46,7 +46,7 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
-      - ./config-loki/config.yaml:/etc/loki/local-config.yaml:ro
+      - ./config/loki/config.yaml:/etc/loki/local-config.yaml:ro
       - loki_data:/loki
     environment:
       - TZ=${TZ}
@@ -77,7 +77,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      - ./config-alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - ./config/alloy/config.alloy:/etc/alloy/config.alloy:ro
       - alloy_data:/var/lib/alloy
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro

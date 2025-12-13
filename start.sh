@@ -10,10 +10,10 @@ source .env
 set +a
 
 # If Traefik's acme.json doesn't exist, create it empty first
-if [ ! -f ./config-traefik/acme.json ]; then
-    touch ./config-traefik/acme.json
+if [ ! -f ./config/traefik/acme.json ]; then
+    touch ./config/traefik/acme.json
     # Set restrictive permissions (rw for owner, nothing for others)
-    chmod 600 ./config-traefik/acme.json
+    chmod 600 ./config/traefik/acme.json
 fi
 
 # Logic to set ACME_CA_SERVER based on ACME_ENV_TYPE
@@ -46,13 +46,13 @@ fi
 
 # Generate traefik-generated.yml from template
 echo "🔧 Generating traefik-generated.yml from template..."
-if [ -f "./config-traefik/traefik.yml.template" ]; then
+if [ -f "./config/traefik/traefik.yml.template" ]; then
     sed -e "s|ACME_EMAIL_PLACEHOLDER|${ACME_EMAIL}|g" \
         -e "s|ACME_CASERVER_PLACEHOLDER|${ACME_CA_SERVER}|g" \
-        ./config-traefik/traefik.yml.template > ./config-traefik/traefik-generated.yml
+        ./config/traefik/traefik.yml.template > ./config/traefik/traefik-generated.yml
     echo "✅ traefik-generated.yml generated successfully."
 else
-    echo "❌ Error: config-traefik/traefik.yml.template not found!"
+    echo "❌ Error: config/traefik/traefik.yml.template not found!"
     exit 1
 fi
 

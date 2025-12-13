@@ -32,7 +32,7 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
-      - ./config-anubis/botPolicy-generated.yaml:/botPolicy.yaml:ro
+      - ./config/anubis/botPolicy-generated.yaml:/botPolicy.yaml:ro
     healthcheck:
       disable: true
     logging:

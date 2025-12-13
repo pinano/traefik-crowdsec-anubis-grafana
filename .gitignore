@@ -2,7 +2,7 @@
 .env.save
 domains.csv
 docker-compose-anubis-generated.yml
-config-traefik/acme.json
-config-traefik/traefik-generated.yml
-config-traefik/dynamic-config/*
-config-anubis/botPolicy-generated.yaml
+config/traefik/acme.json
+config/traefik/traefik-generated.yml
+config/traefik/dynamic-config/*
+config/anubis/botPolicy-generated.yaml
