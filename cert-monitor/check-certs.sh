@@ -38,7 +38,7 @@ fi
 # Note: Traefik v2/v3 stores certs under the resolver name. We iterate recursively.
 CERTS=$(jq -r '.. | .Certificates? | select(. != null) | .[] | .certificate' "$ACME_FILE")
 
-CURRENT_DATE=$(date +%s)
+CURRENT_DATE=$(gdate +%s)
 WARNING_SECONDS=$((DAYS_WARNING * 86400))
 
 # Counters
@@ -54,7 +54,7 @@ for CERT_B64 in $CERTS; do
         continue
     fi
 
-    END_DATE_STR=$(echo "$CERT_TEXT" | grep "notAfter=" | cut -d= -f2)
+    END_DATE_STR=$(echo "$CERT_TEXT" | grep "notAfter=" | cut -d= -f2 | xargs)
     DOMAIN=$(echo "$CERT_TEXT" | grep "subject=" | sed -n 's/^.*CN = \(.*\)$/\1/p')
     
     # Convert date to timestamp
