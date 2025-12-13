@@ -306,7 +306,8 @@ def generate_configs():
             'container_name': anubis_service_name,
             'environment': [
                 f"PUBLIC_URL={public_url}",
-                f"REDIRECT_DOMAINS={redirect_domains_str}"
+                f"REDIRECT_DOMAINS={redirect_domains_str}",
+                f"COOKIE_PREFIX={safe_root}"
             ],
             # Minimal labels required for Traefik to discover the Anubis container
             'labels': [

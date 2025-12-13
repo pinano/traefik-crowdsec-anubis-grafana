@@ -130,6 +130,7 @@ The `domains.csv` file acts as the single source of truth for your infrastructur
 | Column | Description | Example |
 | :--- | :--- | :--- |
 | `domain` | The public Fully Qualified Domain Name. | `app.example.com` |
+| `redirection` | (Optional) Target URL.  The domain will 301 redirect to this URL. | `www.example.com` |
 | `service` | Internal Docker container name OR `apache-host` (points to host:8080). | `wordpress` or `apache-host` |
 | `anubis_subdomain` | Subdomain prefix for the auth portal (optional). | `auth` (creates `auth.example.com`) |
 | `rate_limit` | Requests per second limit (average). | `50` |
