@@ -11,8 +11,8 @@ services:
       crowdsec:
         condition: service_healthy
     ports:
-      - 80:80
-      - 443:443
+      - "${TRAEFIK_LISTEN_IP:-0.0.0.0}:80:80"
+      - "${TRAEFIK_LISTEN_IP:-0.0.0.0}:443:443"
     networks:
       - traefik
     sysctls:

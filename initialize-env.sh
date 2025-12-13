@@ -83,6 +83,7 @@ echo "🔧 CONFIGURING VARIABLES..."
 prompt_val "DOMAIN" "Core domain (e.g. example.com)"
 prompt_val "TZ" "Timezone (e.g. Europe/Madrid)"
 prompt_val "ACME_EMAIL" "Let's Encrypt email"
+prompt_val "TRAEFIK_LISTEN_IP" "Traefik Listen IP (default: 0.0.0.0 for all)"
 prompt_val "ACME_ENV_TYPE" "ACME Environment (production/staging)"
 
 prompt_val "ANUBIS_DIFFICULTY" "Anubis challenge difficulty (1-5)"
