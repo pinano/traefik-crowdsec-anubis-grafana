@@ -23,9 +23,9 @@ send_telegram() {
         -d parse_mode="Markdown" > /dev/null
 }
 
-# Verify requirements (jq and openssl are required)
-if ! command -v jq > /dev/null 2>&1 || ! command -v openssl > /dev/null 2>&1; then
-    echo "❌ Error: jq and openssl are required."
+# Verify requirements (jq, openssl and date are required)
+if ! command -v jq > /dev/null 2>&1 || ! command -v openssl > /dev/null 2>&1 || ! command -v date > /dev/null 2>&1; then
+    echo "❌ Error: jq, openssl, and date (from coreutils) are required."
     exit 1
 fi
 
@@ -38,7 +38,7 @@ fi
 # Note: Traefik v2/v3 stores certs under the resolver name. We iterate recursively.
 CERTS=$(jq -r '.. | .Certificates? | select(. != null) | .[] | .certificate' "$ACME_FILE")
 
-CURRENT_DATE=$(gdate +%s)
+CURRENT_DATE=$(date +%s)
 WARNING_SECONDS=$((DAYS_WARNING * 86400))
 
 # Counters
@@ -47,19 +47,19 @@ ERRORS=0
 
 for CERT_B64 in $CERTS; do
     # Decode and read expiration date
-    # Use openssl to extract end date and subject (CN)
-    CERT_TEXT=$(echo "$CERT_B64" | base64 -d | openssl x509 -noout -enddate -subject 2>/dev/null)
+    # Force the ISO 8601 format with '-dateopt iso_8601' to avoid parsing problems in Alpine
+    CERT_TEXT=$(echo "$CERT_B64" | base64 -d | openssl x509 -noout -enddate -subject -dateopt iso_8601 2>/dev/null)
     
     if [ -z "$CERT_TEXT" ]; then
         continue
     fi
 
+    # Clean whitespaces with xargs after trimming the openssl string
     END_DATE_STR=$(echo "$CERT_TEXT" | grep "notAfter=" | cut -d= -f2 | xargs)
-    DOMAIN=$(echo "$CERT_TEXT" | grep "subject=" | sed -n 's/^.*CN = \(.*\)$/\1/p')
+    DOMAIN=$(echo "$CERT_B64" | base64 -d | openssl x509 -noout -subject -nameopt RFC2253 | sed -n 's/^subject=CN=\([^,]*\).*$/\1/p')
     
-    # Convert date to timestamp
-    # Note: date -d is GNU specific. On Alpine/BusyBox, we use gdate, provided by coreutils.
-    EXP_DATE=$(gdate -d "$END_DATE_STR" +%s 2>/dev/null)
+    # Convert date to timestamp with date (GNU date from coreutils) which supports the -d flag.
+    EXP_DATE=$(date -d "$END_DATE_STR" +%s 2>/dev/null)
     
     # Fallback for systems where date -d fails or formats differ
     if [ -z "$EXP_DATE" ]; then
