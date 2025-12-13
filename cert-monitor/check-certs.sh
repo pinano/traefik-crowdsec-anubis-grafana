@@ -58,8 +58,8 @@ for CERT_B64 in $CERTS; do
     DOMAIN=$(echo "$CERT_TEXT" | grep "subject=" | sed -n 's/^.*CN = \(.*\)$/\1/p')
     
     # Convert date to timestamp
-    # Note: date -d is GNU specific. On Alpine/BusyBox, specific handling might be needed depending on the version.
-    EXP_DATE=$(date -d "$END_DATE_STR" +%s 2>/dev/null)
+    # Note: date -d is GNU specific. On Alpine/BusyBox, we use gdate, provided by coreutils.
+    EXP_DATE=$(gdate -d "$END_DATE_STR" +%s 2>/dev/null)
     
     # Fallback for systems where date -d fails or formats differ
     if [ -z "$EXP_DATE" ]; then

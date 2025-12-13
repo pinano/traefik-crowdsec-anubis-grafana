@@ -116,7 +116,7 @@ services:
              done"
     volumes:
       - ./config-traefik/acme.json:/acme.json:ro
-      - ./config-traefik/check-certs.sh:/check-certs.sh:ro
+      - ./cert-monitor/check-certs.sh:/check-certs.sh:ro
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_RECIPIENT_ID=${TELEGRAM_RECIPIENT_ID}
