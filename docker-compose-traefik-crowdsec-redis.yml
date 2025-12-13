@@ -4,7 +4,7 @@ services:
   #  TRAEFIK
   # ===========================
   traefik:
-    image: traefik:latest
+    image: traefik:v3.6.4
     container_name: traefik
     restart: always
     depends_on:
@@ -49,7 +49,7 @@ services:
   #  CROWDSEC
   # ===========================
   crowdsec:
-    image: crowdsecurity/crowdsec:latest
+    image: crowdsecurity/crowdsec:v1.7.4
     container_name: crowdsec
     restart: unless-stopped
     environment:
@@ -79,7 +79,7 @@ services:
   #  REDIS ("valkey" backend for Anubis)
   # ===========================
   redis:
-    image: valkey/valkey:8-alpine
+    image: valkey/valkey:9.0.1-alpine
     container_name: redis
     restart: unless-stopped
     command: redis-server /redis.conf --requirepass "${REDIS_PASSWORD}"
@@ -134,7 +134,7 @@ services:
   #  serves static files for Anubis
   # ===========================
   anubis-assets:
-    image: nginx:alpine
+    image: nginx:alpine3.23-slim
     container_name: anubis-assets
     restart: unless-stopped
     volumes:
