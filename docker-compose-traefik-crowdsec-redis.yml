@@ -103,14 +103,13 @@ services:
   #  has not been renewed and is close to expiration
   # ===========================
   cert-monitor:
-    image: alpine:3.23
+    build: ./cert-monitor
     container_name: cert-monitor
     restart: unless-stopped
     # Install dependencies on startup to avoid maintaining a custom image
     # Script: Infinite loop running every 24h (86400 sec)
     entrypoint: >
-      sh -c "apk add --no-cache jq openssl curl tzdata && 
-             while true; do 
+      sh -c "while true; do 
                sh /check-certs.sh; 
                echo 'Sleeping for 24h...'; 
                sleep 86400; 
