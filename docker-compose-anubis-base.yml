@@ -27,6 +27,7 @@ services:
       - 'TARGET= '
       - COOKIE_DYNAMIC_DOMAIN=true
       - ED25519_PRIVATE_KEY_HEX=${ANUBIS_REDIS_PRIVATE_KEY}
+      # Now cookie prefix is set based on the domain name
       #- COOKIE_PREFIX=${ANUBIS_COOKIE_PREFIX:-anubis}
     volumes:
       - /etc/localtime:/etc/localtime:ro
