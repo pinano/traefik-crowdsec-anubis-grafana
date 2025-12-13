@@ -87,14 +87,15 @@ def generate_configs():
                 if not row or row[0].strip().startswith('#'):
                     continue
 
-                if len(row) < 2:
+                if len(row) < 3:
                     print(f"    ⚠️ WARN [Line {line_num}] Ignored: Insufficient data.")
                     error_count += 1
                     continue
 
                 domain = row[0].strip()
-                service = row[1].strip().lower() # Standardize service name to lowercase
-                anubis_sub = row[2].strip().lower() if len(row) > 2 else ""
+                redirection = row[1].strip()
+                service = row[2].strip().lower() # Standardize service name to lowercase
+                anubis_sub = row[3].strip().lower() if len(row) > 3 else ""
 
                 # --- ROBUSTNESS CHECK: Docker Service Name Format ---
                 if service != 'apache-host' and not VALID_SERVICE_NAME_REGEX.match(service):
@@ -109,15 +110,16 @@ def generate_configs():
                         except ValueError: return None
                     return None
 
-                rate = get_int(3)
+                rate = get_int(4)
                 if rate: extra['rate'] = rate
-                burst = get_int(4)
+                burst = get_int(5)
                 if burst: extra['burst'] = burst
-                concurrency = get_int(5)
+                concurrency = get_int(6)
                 if concurrency: extra['concurrency'] = concurrency
 
                 raw_entries.append({
                     'domain': domain,
+                    'redirection': redirection,
                     'service': service,
                     'anubis_sub': anubis_sub,
                     'extra': extra,
@@ -420,6 +422,26 @@ def process_router(entry, http_section, domain_to_cert_def):
         safe_auth = sanitize_name(anubis_sub)
         mw_auth_name = f"anubis-mw-{safe_root}-{safe_auth}"
         mw_list.append(mw_auth_name)
+
+    # ### REDIRECTION MIDDLEWARE ###
+    redirection = entry.get('redirection')
+    if redirection:
+        redirect_mw_name = f"redirect-{safe_domain}"
+        
+        # Normalize target to have protocol
+        target = redirection
+        if not target.startswith("http"):
+            target = f"https://{target}"
+            
+        http_section['middlewares'][redirect_mw_name] = {
+            'redirectRegex': {
+                'regex': f"^https?://{domain}/(.*)",
+                'replacement': f"{target}/${{1}}",
+                'permanent': True
+            }
+        }
+        # Add to the middleware chain
+        mw_list.append(redirect_mw_name)
 
     if service == 'apache-host':
         mw_list.append('apache-forward-headers')
