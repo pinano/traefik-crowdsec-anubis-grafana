@@ -103,7 +103,7 @@ services:
   #  has not been renewed and is close to expiration
   # ===========================
   cert-monitor:
-    build: ./cert-monitor
+    build: ./config/cert-monitor
     container_name: cert-monitor
     restart: unless-stopped
     # Install dependencies on startup to avoid maintaining a custom image
@@ -116,7 +116,7 @@ services:
              done"
     volumes:
       - ./config/traefik/acme.json:/acme.json:ro
-      - ./cert-monitor/check-certs.sh:/check-certs.sh:ro
+      - ./config/cert-monitor/check-certs.sh:/check-certs.sh:ro
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_RECIPIENT_ID=${TELEGRAM_RECIPIENT_ID}
