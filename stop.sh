@@ -9,7 +9,7 @@ echo "🛑 Stopping and cleaning the entire fleet..."
 
 # Define the same compose files as in start.sh to ensure nothing is missed
 COMPOSE_FILES="-f docker-compose-traefik-crowdsec-redis.yml \
-               -f docker-compose-dozzle-ctop.yml \
+               -f docker-compose-tools.yml \
                -f docker-compose-anubis-generated.yml \
                -f docker-compose-grafana-loki-alloy.yml"
 

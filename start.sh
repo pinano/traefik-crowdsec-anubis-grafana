@@ -74,7 +74,7 @@ fi
 
 # Define the compose files to avoid repeating the list and potential errors
 COMPOSE_FILES="-f docker-compose-traefik-crowdsec-redis.yml \
-               -f docker-compose-dozzle-ctop.yml \
+               -f docker-compose-tools.yml \
                -f docker-compose-anubis-generated.yml \
                -f docker-compose-grafana-loki-alloy.yml"
 
