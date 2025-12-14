@@ -101,28 +101,42 @@ services:
   #  CERT-MONITOR 
   #  checks acme.json and sends alert if a cert
   #  has not been renewed and is close to expiration
+  #  also checks DNS records for all domains
   # ===========================
   cert-monitor:
     build: ./config/cert-monitor
     container_name: cert-monitor
     restart: unless-stopped
-    # Install dependencies on startup to avoid maintaining a custom image
-    # Script: Infinite loop running every 24h (86400 sec)
+    # Run both check scripts in parallel with independent intervals
+    # check-certs.sh runs every 24h, check-dns.sh runs every DNS_CHECK_INTERVAL
     entrypoint: >
-      sh -c "while true; do
-               sh /check-certs.sh;
-               echo 'Sleeping for 24h...';
-               sleep 86400;
-             done"
+      sh -c "
+        # Start certificate check loop in background
+        (while true; do
+          sh /check-certs.sh;
+          echo 'Cert check: sleeping for 24h...';
+          sleep 86400;
+        done) &
+        # Start DNS check loop in foreground
+        while true; do
+          sh /check-dns.sh;
+          echo \"DNS check: sleeping for \$${DNS_CHECK_INTERVAL:-21600}s...\";
+          sleep \$${DNS_CHECK_INTERVAL:-21600};
+        done
+      "
     volumes:
       - ./config/traefik/acme.json:/acme.json:ro
       - ./config/cert-monitor/check-certs.sh:/check-certs.sh:ro
+      - ./config/cert-monitor/check-dns.sh:/check-dns.sh:ro
+      - ./domains.csv:/domains.csv:ro
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_RECIPIENT_ID=${TELEGRAM_RECIPIENT_ID}
       - SERVER_DOMAIN=${DOMAIN} # For customizing the alert message
       - DAYS_WARNING=${DAYS_WARNING}
       - TZ=${TZ}
+      - TRAEFIK_LISTEN_IP=${TRAEFIK_LISTEN_IP}
+      - DNS_CHECK_INTERVAL=${DNS_CHECK_INTERVAL:-21600}
     deploy:
       resources:
         limits:
