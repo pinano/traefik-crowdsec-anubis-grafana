@@ -141,7 +141,107 @@ loki.process "pipelines" {
     forward_to = [loki.write.local.receiver]
 }
 
-// 6. Send to Loki (Output)
+// ============================================
+// APACHE HOST LOGS (Legacy Applications)
+// Files from /var/log/apache2 on the host
+// ============================================
+
+// 6. Discover Apache log files from host
+local.file_match "apache_host_logs" {
+    path_targets = [
+        {"__path__" = "/var/log/apache2/*access*.log", "log_type" = "access"},
+        {"__path__" = "/var/log/apache2/*error*.log", "log_type" = "error"},
+        {"__path__" = "/var/log/apache2/other_vhosts_access.log", "log_type" = "access"},
+    ]
+}
+
+// 7. Read Apache log files
+loki.source.file "apache_host" {
+    targets    = local.file_match.apache_host_logs.targets
+    forward_to = [loki.process.apache_host.receiver]
+}
+
+// 8. Process Apache host logs
+loki.process "apache_host" {
+    
+    // Add static labels for identification
+    stage.static_labels {
+        values = {
+            job       = "apache-host",
+            source    = "file",
+            container = "apache-host",
+        }
+    }
+
+    // Extract vhost from filename (e.g., example.com-access.log)
+    stage.regex {
+        expression = ".*/(?P<vhost>[^/]+?)[-_]?(access|error)\\.log$"
+        source     = "filename"
+    }
+    stage.labels {
+        values = {
+            vhost = "",
+        }
+    }
+
+    // ============================================
+    // ACCESS LOG PIPELINE (Combined Format)
+    // Format: %h %l %u %t "%r" %>s %b "%{Referer}i" "%{User-agent}i"
+    // Example: 192.168.1.1 - - [14/Dec/2024:16:30:00 +0100] "GET /index.html HTTP/1.1" 200 1234 "-" "Mozilla/5.0..."
+    // ============================================
+    stage.match {
+        selector = "{log_type=\"access\"}"
+        
+        stage.regex {
+            expression = "^(?P<client_ip>[\\d.]+) (?P<identd>\\S+) (?P<user>\\S+) \\[(?P<timestamp>[^\\]]+)\\] \"(?P<method>\\w+) (?P<path>[^ ]*) [^\"]*\" (?P<status>\\d+) (?P<bytes>\\d+|-) \"(?P<referer>[^\"]*)\" \"(?P<user_agent>[^\"]*)\""
+        }
+        
+        stage.labels {
+            values = {
+                client_ip = "",
+                method    = "",
+                status    = "",
+            }
+        }
+        
+        // Parse Apache timestamp format: 14/Dec/2024:16:30:00 +0100
+        stage.timestamp {
+            source = "timestamp"
+            format = "02/Jan/2006:15:04:05 -0700"
+        }
+    }
+
+    // ============================================
+    // ERROR LOG PIPELINE
+    // Format: [Day Mon DD HH:MM:SS.microseconds YYYY] [module:level] [pid PID] [client IP:PORT] message
+    // Example: [Sat Dec 14 16:30:00.123456 2024] [php:error] [pid 12345] [client 192.168.1.1:54321] Error message
+    // ============================================
+    stage.match {
+        selector = "{log_type=\"error\"}"
+        
+        stage.regex {
+            expression = "^\\[(?P<timestamp>[^\\]]+)\\] \\[(?P<module>[^:]*):(?P<level>[^\\]]+)\\]( \\[pid (?P<pid>\\d+)\\])?( \\[client (?P<client_ip>[^:]+):\\d+\\])? (?P<message>.*)"
+        }
+        
+        stage.labels {
+            values = {
+                level     = "",
+                module    = "",
+                client_ip = "",
+            }
+        }
+        
+        // Parse Apache error timestamp: Sat Dec 14 16:30:00.123456 2024
+        stage.timestamp {
+            source = "timestamp"
+            format = "Mon Jan 02 15:04:05.000000 2006"
+        }
+    }
+
+    forward_to = [loki.write.local.receiver]
+}
+
+// 9. Send to Loki (Output)
 loki.write "local" {
     endpoint {
         url = "http://loki:3100/loki/api/v1/push"

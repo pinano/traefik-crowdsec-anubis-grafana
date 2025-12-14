@@ -1,0 +1,10 @@
+services:
+
+  # ===========================
+  #  ALLOY APACHE LOGS EXTENSION
+  #  Optional: Include this file only on hosts with Apache legacy installations
+  #  Usage: Add "-f docker-compose-apache-logs.yml" to COMPOSE_FILES in start.sh
+  # ===========================
+  alloy:
+    volumes:
+      - /var/log/apache2:/var/log/apache2:ro

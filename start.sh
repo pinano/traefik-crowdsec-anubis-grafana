@@ -78,6 +78,12 @@ COMPOSE_FILES="-f docker-compose-traefik-crowdsec-redis.yml \
                -f docker-compose-anubis-generated.yml \
                -f docker-compose-grafana-loki-alloy.yml"
 
+# Optional: Include Apache host logs if the directory exists (legacy installations)
+if [ -d "/var/log/apache2" ]; then
+    COMPOSE_FILES="$COMPOSE_FILES -f docker-compose-apache-logs.yml"
+    echo "📋 Apache logs directory detected, including docker-compose-apache-logs.yml"
+fi
+
 # 1. SECURE BOOT PHASE: CrowdSec + Redis
 echo "🛡️ Booting up security layer (CrowdSec)..."
 # Start only the security/persistence services first
