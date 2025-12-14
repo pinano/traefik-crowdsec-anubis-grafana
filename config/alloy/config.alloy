@@ -215,6 +215,8 @@ loki.process "apache_host" {
     // ERROR LOG PIPELINE
     // Format: [Day Mon DD HH:MM:SS.microseconds YYYY] [module:level] [pid PID] [client IP:PORT] message
     // Example: [Sat Dec 14 16:30:00.123456 2024] [php:error] [pid 12345] [client 192.168.1.1:54321] Error message
+    // Note: Timestamp parsing disabled - Apache error logs don't include timezone,
+    //       which causes "timestamp too new" errors. Using ingestion time instead.
     // ============================================
     stage.match {
         selector = "{log_type=\"error\"}"
@@ -231,11 +233,7 @@ loki.process "apache_host" {
             }
         }
         
-        // Parse Apache error timestamp: Sat Dec 14 16:30:00.123456 2024
-        stage.timestamp {
-            source = "timestamp"
-            format = "Mon Jan 02 15:04:05.000000 2006"
-        }
+        // Timestamp parsing intentionally omitted - see note above
     }
 
     forward_to = [loki.write.local.receiver]
