@@ -102,13 +102,15 @@ services:
   #  checks acme.json and sends alert if a cert
   #  has not been renewed and is close to expiration
   #  also checks DNS records for all domains
+  #  also monitors CrowdSec health and bouncer status
   # ===========================
   cert-monitor:
     build: ./config/cert-monitor
     container_name: cert-monitor
     restart: unless-stopped
-    # Run both check scripts in parallel with independent intervals
-    # check-certs.sh runs every 24h, check-dns.sh runs every DNS_CHECK_INTERVAL
+    # Run all check scripts in parallel with independent intervals
+    # check-certs.sh: every 24h, check-dns.sh: every DNS_CHECK_INTERVAL
+    # check-crowdsec.sh: every CROWDSEC_CHECK_INTERVAL (default 1h)
     entrypoint: >
       sh -c "
         # Start certificate check loop in background
@@ -116,6 +118,12 @@ services:
           sh /check-certs.sh;
           echo 'Cert check: sleeping for 24h...';
           sleep 86400;
+        done) &
+        # Start CrowdSec check loop in background
+        (while true; do
+          sh /check-crowdsec.sh;
+          echo \"CrowdSec check: sleeping for \$${CROWDSEC_CHECK_INTERVAL:-3600}s...\";
+          sleep \$${CROWDSEC_CHECK_INTERVAL:-3600};
         done) &
         # Start DNS check loop in foreground
         while true; do
@@ -128,7 +136,10 @@ services:
       - ./config/traefik/acme.json:/acme.json:ro
       - ./config/cert-monitor/check-certs.sh:/check-certs.sh:ro
       - ./config/cert-monitor/check-dns.sh:/check-dns.sh:ro
+      - ./config/cert-monitor/check-crowdsec.sh:/check-crowdsec.sh:ro
       - ./domains.csv:/domains.csv:ro
+      # Docker socket for CrowdSec container inspection
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_RECIPIENT_ID=${TELEGRAM_RECIPIENT_ID}
@@ -137,6 +148,8 @@ services:
       - TZ=${TZ}
       - TRAEFIK_LISTEN_IP=${TRAEFIK_LISTEN_IP}
       - DNS_CHECK_INTERVAL=${DNS_CHECK_INTERVAL:-21600}
+      - CROWDSEC_CHECK_INTERVAL=${CROWDSEC_CHECK_INTERVAL:-3600}
+      - CROWDSEC_CONTAINER=crowdsec
     deploy:
       resources:
         limits:
