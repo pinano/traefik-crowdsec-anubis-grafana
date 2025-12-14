@@ -15,6 +15,7 @@
 - [Installation & Setup](#installation--setup)
 - [Configuration Reference](#configuration-reference)
 - [Operations Manual](#operations-manual)
+- [Apache Legacy Configuration](#apache-legacy-configuration)
 - [Troubleshooting](#troubleshooting)
 - [License](#license)
 
@@ -360,6 +361,139 @@ The stack-watchdog sends Telegram notifications for:
 - ⚠️ **SSL Alerts**: Certificate expiring within threshold
 - 🌐 **DNS Alerts**: Domain not resolving to expected IP
 - 🛡️ **CrowdSec Alerts**: LAPI down, no bouncers, or stale bouncer connections
+
+---
+
+## Apache Legacy Configuration
+
+This section covers the configuration required for legacy Apache installations running directly on the host (not in Docker containers). When using the `apache-host` service type in `domains.csv`, Traefik proxies requests to Apache on `host.docker.internal:8080`. Additional configuration is needed to ensure proper functionality.
+
+### Real Client IP Forwarding
+
+By default, Apache will log Docker's internal IP (e.g., `172.18.0.5`) instead of the real client IP because Traefik acts as a reverse proxy. To restore real client IPs in Apache logs and applications, configure the `mod_remoteip` module.
+
+#### Step 1: Enable the RemoteIP Module
+
+```bash
+sudo a2enmod remoteip
+```
+
+#### Step 2: Create the RemoteIP Configuration
+
+Create or edit `/etc/apache2/conf-available/remoteip.conf`:
+
+```apache
+# ==============================================
+# RemoteIP Configuration for Traefik Proxy
+# ==============================================
+
+# Use X-Forwarded-For header to determine the real client IP
+RemoteIPHeader X-Forwarded-For
+
+# Trust requests from Docker networks
+# These ranges cover typical Docker bridge networks
+RemoteIPTrustedProxy 172.16.0.0/12
+RemoteIPTrustedProxy 10.0.0.0/8
+RemoteIPTrustedProxy 192.168.0.0/16
+
+# Trust localhost (for local testing)
+RemoteIPTrustedProxy 127.0.0.1
+RemoteIPTrustedProxy ::1
+```
+
+#### Step 3: Enable the Configuration
+
+```bash
+sudo a2enconf remoteip
+```
+
+#### Step 4: Update Log Format (Recommended)
+
+Edit `/etc/apache2/apache2.conf` and update the `LogFormat` directives to use `%a` (actual client IP after mod_remoteip processing) instead of `%h` (direct connection IP):
+
+```apache
+# Before (logs Docker proxy IP):
+LogFormat "%h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\"" combined
+
+# After (logs real client IP):
+LogFormat "%a %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\"" combined
+```
+
+> [!TIP]
+> The `%a` format specifier automatically uses the IP from `X-Forwarded-For` when `mod_remoteip` is configured, falling back to the direct connection IP if the header is not present.
+
+#### Step 5: Restart Apache
+
+```bash
+sudo systemctl restart apache2
+```
+
+#### Verification
+
+Check that real IPs are now appearing in logs:
+
+```bash
+tail -f /var/log/apache2/*access*.log
+```
+
+You should see external client IPs instead of Docker internal IPs (172.x.x.x).
+
+### Apache Log Aggregation (Optional)
+
+To include Apache host logs in the Grafana/Loki observability pipeline, the stack provides an optional `docker-compose-apache-logs.yml` file. This is automatically included by `start.sh` when `/var/log/apache2` exists on the host.
+
+#### How It Works
+
+1. **Automatic Detection**: `start.sh` checks for `/var/log/apache2` directory
+2. **Volume Mount**: If found, mounts the logs into the Alloy container
+3. **Log Parsing**: Alloy processes both access and error logs with proper label extraction
+
+#### Parsed Labels
+
+The following labels are automatically extracted and available in Grafana:
+
+| Label | Description | Log Type |
+|-------|-------------|----------|
+| `job` | Always `apache-host` | Both |
+| `log_type` | `access` or `error` | Both |
+| `vhost` | Virtual host from filename | Both |
+| `client_ip` | Client IP address | Both |
+| `method` | HTTP method (GET, POST, etc.) | Access |
+| `status` | HTTP status code | Access |
+| `level` | Error level (error, warn, notice) | Error |
+| `module` | Apache module (php, proxy_fcgi, etc.) | Error |
+
+#### Querying Apache Logs in Grafana
+
+Example LogQL queries for Apache host logs:
+
+```logql
+# All Apache host logs
+{job="apache-host"}
+
+# Only error logs
+{job="apache-host", log_type="error"}
+
+# Errors from a specific vhost
+{job="apache-host", log_type="error", vhost="example.com"}
+
+# 5xx errors from access logs
+{job="apache-host", log_type="access", status=~"5.."}
+
+# PHP errors
+{job="apache-host", log_type="error", module="php"}
+```
+
+#### Manual Inclusion
+
+If you need to manually control Apache log inclusion (instead of automatic detection), edit `start.sh` and modify the `COMPOSE_FILES` variable:
+
+```bash
+# Always include Apache logs
+COMPOSE_FILES="$COMPOSE_FILES -f docker-compose-apache-logs.yml"
+
+# Or remove the automatic detection block entirely
+```
 
 ---
 
