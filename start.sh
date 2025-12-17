@@ -116,6 +116,14 @@ else
     exit 1
 fi
 
+# Calculate hash of the generated config to force restart on changes
+# relying on Docker Compose to detect env var changes
+if [ -f "./config/traefik/traefik-generated.yml" ]; then
+    TRAEFIK_CONFIG_HASH=$(python3 -c "import hashlib; print(hashlib.sha1(open('./config/traefik/traefik-generated.yml', 'rb').read()).hexdigest())")
+    export TRAEFIK_CONFIG_HASH
+    echo "   #️⃣  Traefik Config Hash: $TRAEFIK_CONFIG_HASH"
+fi
+
 # Generate dynamic configuration with Python script
 echo "🔧 Generating dynamic configuration..."
 python3 generate-config.py

@@ -31,6 +31,8 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"
+      # Restart on config change
+      - "traefik.config.hash=${TRAEFIK_CONFIG_HASH}"
       # Dashboard
       - "traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN}`)"
       - "traefik.http.routers.traefik.entrypoints=websecure"
