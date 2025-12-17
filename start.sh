@@ -35,7 +35,7 @@ if [ ! -f "$ANUBIS_ASSETS_DIR/custom.css" ]; then
         echo "   ✅ Copied default custom.css"
     fi
 else
-    echo "   ℹ️  Using custom custom.css"
+    echo "   ℹ️ Using custom custom.css"
 fi
 
 # Copy default images if custom versions don't exist
@@ -46,7 +46,7 @@ for img in happy.webp pensive.webp reject.webp; do
             echo "   ✅ Copied default $img"
         fi
     else
-        echo "   ℹ️  Using custom $img"
+        echo "   ℹ️ Using custom $img"
     fi
 done
 
@@ -77,14 +77,14 @@ if [ -n "$ACME_ENV_TYPE" ]; then
     case "$ACME_ENV_TYPE" in
         staging)
             export ACME_CA_SERVER="https://acme-staging-v02.api.letsencrypt.org/directory"
-            echo "   ⚠️  Let's Encrypt STAGING environment."
+            echo "   ⚠️ Let's Encrypt STAGING environment."
             ;;
         production)
             export ACME_CA_SERVER="https://acme-v02.api.letsencrypt.org/directory"
             echo "   ✅ Let's Encrypt PRODUCTION environment."
             ;;
         *)
-            echo "   ⚠️  Unknown ACME_ENV_TYPE: '$ACME_ENV_TYPE'. Ignoring."
+            echo "   ⚠️ Unknown ACME_ENV_TYPE: '$ACME_ENV_TYPE'. Ignoring."
             ;;
     esac
 fi
@@ -92,7 +92,7 @@ fi
 # Default to staging if ACME_CA_SERVER is still empty
 if [ -z "$ACME_CA_SERVER" ]; then
     export ACME_CA_SERVER="https://acme-staging-v02.api.letsencrypt.org/directory"
-    echo "   ⚠️  Let's Encrypt STAGING environment (default)."
+    echo "   ⚠️ Let's Encrypt STAGING environment (default)."
 elif [ -z "$ACME_ENV_TYPE" ]; then
     # Only show this if using manual override (ACME_ENV_TYPE is empty)
     echo "   🔧 Using custom ACME_CA_SERVER from .env."
@@ -186,12 +186,27 @@ docker exec crowdsec cscli bouncers add traefik-bouncer --key "${CROWDSEC_API_KE
 if [ $? -eq 0 ]; then
     echo "   🔑 Bouncer key registered successfully."
 else
-    echo "⚠️  Error registering bouncer key. Check CrowdSec logs."
+    echo "⚠️ Error registering bouncer key. Check CrowdSec logs."
     exit 1
 fi
 
 # =============================================================================
-# PHASE 9: Deploy Remaining Services
+# PHASE 9: CrowdSec Console Enrollment (Optional)
+# =============================================================================
+# If CROWDSEC_ENROLLMENT_KEY is set, enroll this instance with CrowdSec Console
+# for access to community blocklists and centralized management.
+
+if [ -n "$CROWDSEC_ENROLLMENT_KEY" ]; then
+    echo "🌐 Enrolling in CrowdSec Console..."
+    if docker exec crowdsec cscli console enroll "$CROWDSEC_ENROLLMENT_KEY" --name "$(hostname)" 2>/dev/null; then
+        echo "   ✅ Successfully enrolled in CrowdSec Console."
+    else
+        echo "   ⚠️ Console enrollment failed or already enrolled. Continuing..."
+    fi
+fi
+
+# =============================================================================
+# PHASE 10: Deploy Remaining Services
 # =============================================================================
 # Now that the security layer is ready, deploy everything else.
 # --remove-orphans cleans up any old containers not in current config.

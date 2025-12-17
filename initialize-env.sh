@@ -104,6 +104,17 @@ fi
 
 prompt_val "CROWDSEC_UPDATE_INTERVAL" "CrowdSec update interval (seconds)"
 
+echo ""
+echo "👉 CrowdSec Console Enrollment (optional)"
+echo "   Get your key from https://app.crowdsec.net"
+read -p "   Enter enrollment key (leave empty to skip): " cs_enroll_key
+if [ -n "$cs_enroll_key" ]; then
+    replace_val "CROWDSEC_ENROLLMENT_KEY" "$cs_enroll_key"
+    echo "   ✅ Set CROWDSEC_ENROLLMENT_KEY"
+else
+    echo "   ⏭️ Skipping console enrollment"
+fi
+
 prompt_val "GLOBAL_RATE_AVG" "Traefik default rate limit (requests/sec)"
 prompt_val "GLOBAL_RATE_BURST" "Traefik default burst limit"
 prompt_val "GLOBAL_CONCURRENCY" "Traefik global concurrency"

@@ -154,6 +154,15 @@ Custom profiles in `config/crowdsec/profiles.yaml` enforce longer ban durations:
 > [!TIP]
 > You can customize ban durations by editing `config/crowdsec/profiles.yaml`.
 
+#### CrowdSec Console (Optional)
+
+You can enroll your instance in the [CrowdSec Console](https://app.crowdsec.net) to gain:
+- Centralized view of alerts across multiple servers
+- Access to premium blocklists
+- Visual dashboards of attack trends
+
+To enable it, provide your enrollment key during setup (`config/crowdsec/console-enrollment-key` is not used, use the interactive script or `.env`).
+
 ### Anubis (Bot Defense)
 
 Anubis is a specialized "ForwardAuth" middleware for mitigating bots.
@@ -369,6 +378,7 @@ This script:
 |----------|-------------|---------|
 | `CROWDSEC_API_KEY` | Bouncer API key | Auto-generated |
 | `CROWDSEC_UPDATE_INTERVAL` | Blocklist refresh interval (seconds) | `60` |
+| `CROWDSEC_ENROLLMENT_KEY` | Optional key to connect instance to CrowdSec Console | - |
 
 #### Traefik
 
