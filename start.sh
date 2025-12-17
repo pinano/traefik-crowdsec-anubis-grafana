@@ -9,6 +9,35 @@ set -a
 source .env
 set +a
 
+# ============================================================
+# ANUBIS ASSETS: Copy defaults if user hasn't provided custom ones
+# ============================================================
+echo "🎨 Checking Anubis assets..."
+ANUBIS_ASSETS_DIR="./config/anubis/assets"
+ANUBIS_ASSETS_IMG_DIR="$ANUBIS_ASSETS_DIR/static/img"
+
+# CSS file
+if [ ! -f "$ANUBIS_ASSETS_DIR/custom.css" ]; then
+    if [ -f "$ANUBIS_ASSETS_DIR/custom.css.dist" ]; then
+        cp "$ANUBIS_ASSETS_DIR/custom.css.dist" "$ANUBIS_ASSETS_DIR/custom.css"
+        echo "   ✅ Copied default custom.css"
+    fi
+else
+    echo "   ℹ️  Using custom custom.css"
+fi
+
+# Image files
+for img in happy.webp pensive.webp reject.webp; do
+    if [ ! -f "$ANUBIS_ASSETS_IMG_DIR/$img" ]; then
+        if [ -f "$ANUBIS_ASSETS_IMG_DIR/$img.dist" ]; then
+            cp "$ANUBIS_ASSETS_IMG_DIR/$img.dist" "$ANUBIS_ASSETS_IMG_DIR/$img"
+            echo "   ✅ Copied default $img"
+        fi
+    else
+        echo "   ℹ️  Using custom $img"
+    fi
+done
+
 # If Traefik's acme.json doesn't exist, create it empty first
 if [ ! -f ./config/traefik/acme.json ]; then
     touch ./config/traefik/acme.json

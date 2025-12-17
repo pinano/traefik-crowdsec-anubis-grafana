@@ -92,11 +92,41 @@ Traefik serves as the ingress controller and the first line of defense.
 
 ### CrowdSec (IPS)
 
-CrowdSec analyzes behavior to detect attacks (brute force, scanning, bot spam).
+CrowdSec is a collaborative Intrusion Prevention System that analyzes behavior to detect attacks (brute force, scanning, bot spam).
 
 - **Log Analysis**: Reads logs via the Docker socket, matching patterns against community scenarios.
 - **Community Blocklist**: Automatically shares and receives ban lists from the global network.
-- **Remediation**: Instructs Traefik to ban IPs (403 Forbidden).
+- **Remediation**: Instructs Traefik to ban IPs (403 Forbidden) via the bouncer API.
+
+#### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      CrowdSec Engine                        │
+├─────────────────────────────────────────────────────────────┤
+│  Parsers          │  Scenarios         │  LAPI (REST API)   │
+│  ├─ traefik       │  ├─ http-probing   │  ├─ Decisions DB   │
+│  ├─ nginx         │  ├─ http-crawlers  │  ├─ Bouncer API    │
+│  └─ syslog        │  └─ brute-force    │  └─ Central API    │
+└─────────────────────────────────────────────────────────────┘
+         ▲                    │                    │
+         │ Logs               │ Alerts             ▼
+    ┌────┴────┐          ┌────┴────┐       ┌──────────────┐
+    │ Traefik │          │ Console │       │   Bouncer    │
+    │  Logs   │          │ CrowdSec│       │  (Traefik)   │
+    └─────────┘          └─────────┘       └──────────────┘
+```
+
+#### Key Concepts
+
+| Concept | Description |
+|---------|-------------|
+| **Parser** | Extracts structured data from logs (IP, user-agent, status codes) |
+| **Scenario** | Defines malicious behavior patterns (e.g., 10 failed logins in 1 minute) |
+| **Decision** | The remediation action (ban, captcha, throttle) with duration |
+| **Bouncer** | Component that enforces decisions (Traefik plugin in our case) |
+| **LAPI** | Local API that stores decisions and communicates with bouncers |
+| **CAPI** | Central API for sharing threat intelligence with the community |
 
 ### Anubis (Bot Defense)
 
@@ -105,7 +135,40 @@ Anubis is a specialized "ForwardAuth" middleware for mitigating bots.
 - **Mechanism**: When a user accesses a protected route without a valid session, Anubis intercepts the request.
 - **Challenge**: Presents a cryptographic Proof-of-Work (PoW) challenge the client must solve.
 - **Isolation**: One Anubis instance is deployed per TLD to respect "Same-Site" cookie policies.
-- **Customization**: Modify assets in `config/anubis/assets/` (images: `pensive.webp`, `happy.webp`, `reject.webp`; styles: `custom.css`).
+
+#### Custom Assets
+
+Anubis supports custom styling and images. The project includes default assets (with `.dist` extension) that are automatically used if you don't provide custom versions.
+
+**Asset files:**
+
+| File | Location | Description |
+|------|----------|-------------|
+| `custom.css` | `config/anubis/assets/` | Custom stylesheet for the challenge page |
+| `happy.webp` | `config/anubis/assets/static/img/` | Image shown on successful challenge |
+| `pensive.webp` | `config/anubis/assets/static/img/` | Image shown while solving challenge |
+| `reject.webp` | `config/anubis/assets/static/img/` | Image shown on failed challenge |
+
+**How it works:**
+
+1. Default assets are stored with `.dist` extension (e.g., `custom.css.dist`)
+2. When `start.sh` runs, it checks for each asset file
+3. If a custom version exists (without `.dist`), it uses your custom file
+4. If no custom version exists, it copies the default `.dist` file
+
+**To customize:**
+
+```bash
+# Example: Create custom CSS
+cp config/anubis/assets/custom.css.dist config/anubis/assets/custom.css
+# Edit config/anubis/assets/custom.css with your changes
+
+# Example: Use custom images
+cp /path/to/your/happy.webp config/anubis/assets/static/img/happy.webp
+```
+
+> [!TIP]
+> Your custom assets are git-ignored, so they won't be overwritten by project updates.
 
 ### Redis (State Management)
 
@@ -325,9 +388,22 @@ This script:
 
 ### Security Operations (CrowdSec)
 
+All CrowdSec commands use `cscli` (CrowdSec CLI) inside the container:
+
+```bash
+docker exec crowdsec cscli <command>
+```
+
+#### Decision Management (Bans)
+
 **Ban an IP:**
 ```bash
 docker exec crowdsec cscli decisions add --ip <IP> --duration 24h --reason "Manual Ban"
+```
+
+**Ban an IP range (CIDR):**
+```bash
+docker exec crowdsec cscli decisions add --range 192.168.1.0/24 --duration 24h --reason "Subnet ban"
 ```
 
 **Unban an IP:**
@@ -340,10 +416,121 @@ docker exec crowdsec cscli decisions delete --ip <IP>
 docker exec crowdsec cscli decisions list
 ```
 
+**List bans with details (JSON):**
+```bash
+docker exec crowdsec cscli decisions list -o json
+```
+
+#### Metrics & Statistics
+
+**View real-time metrics:**
+```bash
+docker exec crowdsec cscli metrics
+```
+
+This shows:
+- Parsed log lines per source
+- Active scenarios and their triggers
+- Bouncer API requests
+- Decision counts (bans, captchas)
+
+**View metrics in Prometheus format:**
+```bash
+docker exec crowdsec cscli metrics -o json
+```
+
+#### Alerts & Attack History
+
+**List recent alerts:**
+```bash
+docker exec crowdsec cscli alerts list
+```
+
+**View detailed alert information:**
+```bash
+docker exec crowdsec cscli alerts inspect <ALERT_ID>
+```
+
+**Show alerts from the last hour:**
+```bash
+docker exec crowdsec cscli alerts list --since 1h
+```
+
+#### Scenario & Parser Management
+
+**List installed scenarios:**
+```bash
+docker exec crowdsec cscli scenarios list
+```
+
+**List installed parsers:**
+```bash
+docker exec crowdsec cscli parsers list
+```
+
+**List installed collections:**
+```bash
+docker exec crowdsec cscli collections list
+```
+
+#### Hub Management (Install/Update Components)
+
+**Update the hub index:**
+```bash
+docker exec crowdsec cscli hub update
+```
+
+**Upgrade all installed components:**
+```bash
+docker exec crowdsec cscli hub upgrade
+```
+
+**Install a new collection (e.g., for WordPress):**
+```bash
+docker exec crowdsec cscli collections install crowdsecurity/wordpress
+```
+
+**Search for available scenarios:**
+```bash
+docker exec crowdsec cscli hub list -a | grep <keyword>
+```
+
+#### Bouncer Management
+
 **Check bouncer status:**
 ```bash
 docker exec crowdsec cscli bouncers list
 ```
+
+**Delete a bouncer:**
+```bash
+docker exec crowdsec cscli bouncers delete <bouncer_name>
+```
+
+**Add a new bouncer with specific key:**
+```bash
+docker exec crowdsec cscli bouncers add <name> --key <API_KEY>
+```
+
+#### Diagnostic Commands
+
+**Check CrowdSec health:**
+```bash
+docker exec crowdsec cscli lapi status
+```
+
+**Validate configuration:**
+```bash
+docker exec crowdsec cscli config show
+```
+
+**Test log parsing (dry-run):**
+```bash
+docker exec crowdsec cscli explain --file /var/log/traefik/access.log --type traefik
+```
+
+> [!TIP]
+> Use `docker exec crowdsec cscli <command> --help` for detailed options on any command.
 
 ### Monitoring Dashboards
 
