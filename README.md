@@ -128,6 +128,32 @@ CrowdSec is a collaborative Intrusion Prevention System that analyzes behavior t
 | **LAPI** | Local API that stores decisions and communicates with bouncers |
 | **CAPI** | Central API for sharing threat intelligence with the community |
 
+#### Installed Collections
+
+This stack comes pre-configured with the following CrowdSec collections:
+
+| Collection | Description |
+|------------|-------------|
+| `crowdsecurity/traefik` | Parsers and scenarios for Traefik access logs |
+| `crowdsecurity/http-cve` | Detection of CVE exploits in HTTP requests |
+| `crowdsecurity/sshd` | SSH brute-force detection |
+| `crowdsecurity/whitelist-good-actors` | Whitelists known good bots (Google, Bing, etc.) |
+| `crowdsecurity/base-http-scenarios` | Common HTTP attack patterns (path traversal, SQL injection) |
+| `crowdsecurity/http-dos` | HTTP flood and DDoS detection |
+
+#### Aggressive Ban Policy
+
+Custom profiles in `config/crowdsec/profiles.yaml` enforce longer ban durations:
+
+| Profile | Trigger | Ban Duration |
+|---------|---------|--------------|
+| Repeat Offender | IP triggers >5 events | **7 days** |
+| Standard Attack | Any IP-based alert | **24 hours** (default is 4h) |
+| Range Attack | Subnet-based alert | **48 hours** |
+
+> [!TIP]
+> You can customize ban durations by editing `config/crowdsec/profiles.yaml`.
+
 ### Anubis (Bot Defense)
 
 Anubis is a specialized "ForwardAuth" middleware for mitigating bots.
