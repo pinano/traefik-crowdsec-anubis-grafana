@@ -19,7 +19,7 @@ entryPoints:
       respondingTimeouts:
         readTimeout: "60s"
         writeTimeout: "60s"
-        idleTimeout: "60s"
+        idleTimeout: "90s"
 
   websecure:
     address: ":443"
@@ -33,7 +33,7 @@ entryPoints:
       respondingTimeouts:
         readTimeout: "60s"
         writeTimeout: "60s"
-        idleTimeout: "60s"
+        idleTimeout: "90s"
 
   mariadb:
     address: ":3306"
