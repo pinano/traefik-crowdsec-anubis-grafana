@@ -17,9 +17,9 @@ entryPoints:
     # prevent Slowloris type attacks
     transport:
       respondingTimeouts:
-        readTimeout: "10s"
-        writeTimeout: "10s"
-        idleTimeout: "30s"
+        readTimeout: "60s"
+        writeTimeout: "60s"
+        idleTimeout: "60s"
 
   websecure:
     address: ":443"
@@ -31,9 +31,9 @@ entryPoints:
     # prevent Slowloris type attacks
     transport:
       respondingTimeouts:
-        readTimeout: "10s"
-        writeTimeout: "10s"
-        idleTimeout: "30s"
+        readTimeout: "60s"
+        writeTimeout: "60s"
+        idleTimeout: "60s"
 
   mariadb:
     address: ":3306"
