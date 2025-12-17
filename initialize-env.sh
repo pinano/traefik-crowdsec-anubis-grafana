@@ -118,6 +118,8 @@ fi
 prompt_val "GLOBAL_RATE_AVG" "Traefik default rate limit (requests/sec)"
 prompt_val "GLOBAL_RATE_BURST" "Traefik default burst limit"
 prompt_val "GLOBAL_CONCURRENCY" "Traefik global concurrency"
+prompt_val "TRAEFIK_TIMEOUT_ACTIVE" "Traefik active timeout (read/write/header) in seconds"
+prompt_val "TRAEFIK_TIMEOUT_IDLE" "Traefik idle timeout in seconds"
 prompt_val "HSTS_MAX_AGE" "HSTS max age (seconds)"
 
 prompt_val "GF_ADMIN_USER" "Admin User (Grafana, Traefik, Dozzle)"

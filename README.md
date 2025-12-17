@@ -393,6 +393,19 @@ This script:
 | `ACME_ENV_TYPE` | `staging` or `production` | `staging` |
 | `TRAEFIK_DASHBOARD_AUTH` | Basic auth for dashboard (htpasswd format) | - |
 
+#### Traefik Timeouts
+
+Legacy applications or slow backends may require adjusted timeouts. We provide two variables to control the entire pipeline (**Client** ↔ **Traefik** ↔ **Backend**).
+
+| Variable | Default | Function |
+|----------|---------|----------|
+| `TRAEFIK_TIMEOUT_ACTIVE` | `60` | **Active Connection Limit** (Seconds).<br>Controls `readTimeout`, `writeTimeout` (EntryPoints) and `responseHeaderTimeout` (Transport).<br><br>• **readTimeout**: Max time to read the entire request (headers + body) from the client.<br>• **writeTimeout**: Max time to write the response to the client. This is the effective "Time To First Byte" limit for your apps.<br>• **responseHeaderTimeout**: Max time Traefik waits for the backend to send response headers. |
+| `TRAEFIK_TIMEOUT_IDLE` | `90` | **Idle Connection Buffer** (Seconds).<br>Controls `idleTimeout` (EntryPoints) and `idleConnTimeout` (Transport).<br><br>It is recommended to keep this value **higher** than the active timeout to avoid race conditions where a connection is closed just as a new request arrives.<br><br>• **idleTimeout**: Max time to keep an inactive connection open (Keep-Alive) waiting for a new request.<br>• **idleConnTimeout**: Max time an idle connection to the backend is kept open for reuse. |
+
+> [!IMPORTANT]
+> **Synchronization**: These variables update the configuration at **both ends** of the proxy.
+> If your application takes 70 seconds to respond, you must increase **`TRAEFIK_TIMEOUT_ACTIVE`** to at least 75s. Setting only one side (e.g., Transport) would be useless if the other side (EntryPoint) cuts the connection at 60s.
+
 #### Grafana
 
 | Variable | Description | Default |

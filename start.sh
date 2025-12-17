@@ -107,6 +107,8 @@ echo "🔧 Generating traefik-generated.yml from template..."
 if [ -f "./config/traefik/traefik.yml.template" ]; then
     sed -e "s|ACME_EMAIL_PLACEHOLDER|${ACME_EMAIL}|g" \
         -e "s|ACME_CASERVER_PLACEHOLDER|${ACME_CA_SERVER}|g" \
+        -e "s|TRAEFIK_TIMEOUT_ACTIVE_PLACEHOLDER|${TRAEFIK_TIMEOUT_ACTIVE:-60}s|g" \
+        -e "s|TRAEFIK_TIMEOUT_IDLE_PLACEHOLDER|${TRAEFIK_TIMEOUT_IDLE:-90}s|g" \
         ./config/traefik/traefik.yml.template > ./config/traefik/traefik-generated.yml
     echo "   ✅ traefik-generated.yml generated."
 else

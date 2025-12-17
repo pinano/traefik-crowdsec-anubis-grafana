@@ -24,6 +24,14 @@ try:
 except ValueError:
     CS_UPDATE_INTERVAL = 60
 
+# Traefik Timeouts
+try:
+    T_ACTIVE = int(os.getenv('TRAEFIK_TIMEOUT_ACTIVE', 60))
+    T_IDLE = int(os.getenv('TRAEFIK_TIMEOUT_IDLE', 90))
+except ValueError:
+    T_ACTIVE = 60
+    T_IDLE = 90
+
 # Global Rate Limits
 try:
     G_RATE_AVG = int(os.getenv('GLOBAL_RATE_AVG', 60))
@@ -153,8 +161,8 @@ def generate_configs():
             'serversTransports': {
                 'legacy-transport': {
                     'forwardingTimeouts': {
-                        'responseHeaderTimeout': '60s', # Wait 60s for the first byte
-                        'idleConnTimeout': '90s'        # Keep idle connection a bit longer
+                        'responseHeaderTimeout': f"{T_ACTIVE}s", # Wait T_ACTIVE (default 60s) for the first byte
+                        'idleConnTimeout': f"{T_IDLE}s"          # Keep idle connection a bit longer (default 90s)
                     }
                 }
             },
