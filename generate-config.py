@@ -14,6 +14,7 @@ OUTPUT_TRAEFIK = 'config/traefik/dynamic-config/routers-generated.yaml'
 # ============= ENVIRONMENT VARIABLES =============
 CROWDSEC_API_KEY = os.getenv('CROWDSEC_API_KEY')
 REDIS_PASSWORD = os.getenv('REDIS_PASSWORD')
+TRAEFIK_BLOCKED_PATHS = os.getenv('TRAEFIK_BLOCKED_PATHS', '').split(',')
 
 # TLS Chunking Limit (Let's Encrypt max is 100, we use a smaller amount for safety)
 TLS_BATCH_SIZE = 90
@@ -408,9 +409,9 @@ def generate_configs():
         print("    ℹ️ No Anubis protected domains found.")
 
     # === GLOBAL BLOCKED PATHS ROUTER ===
-    if BLOCKED_PATHS:
-        print(f"    🚫 global-blocker: Blocking {len(BLOCKED_PATHS)} path patterns.")
-        paths_rule = " || ".join([f"PathRegexp(`.*{p}.*`)" for p in BLOCKED_PATHS])
+    if TRAEFIK_BLOCKED_PATHS:
+        print(f"    🚫 global-blocker: Blocking {len(TRAEFIK_BLOCKED_PATHS)} path patterns.")
+        paths_rule = " || ".join([f"PathRegexp(`.*{p}.*`)" for p in TRAEFIK_BLOCKED_PATHS])
         traefik_dynamic_conf['http']['routers']['global-blocker'] = {
             # Catch-all host regex to apply to ALL domains
             'rule': f"HostRegexp(`{{host:.+}}`) && ({paths_rule})",
