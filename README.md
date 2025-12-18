@@ -303,6 +303,9 @@ chmod +x initialize-env.sh
 ./initialize-env.sh
 ```
 
+> [!NOTE]
+> **Auto-Initialization**: If you run `./start.sh` without a `.env` file, the system will automatically launch this wizard for you.
+
 The wizard will prompt for:
 - **Admin credentials**: Applied to Grafana (plaintext) and hashed (bcrypt) for Traefik/Dozzle dashboards.
 - **Domain & Timezone**: Your primary domain and server timezone.
@@ -336,13 +339,15 @@ cp domains.csv.dist domains.csv
 ```
 
 This script:
-1. Generates `traefik-generated.yml` from template
-2. Runs `generate-config.py` to create routes
-3. Creates required networks
-4. Boots CrowdSec/Redis first (security layer)
-5. Waits for CrowdSec health check
-6. Registers the bouncer API key
-7. Deploys all remaining services
+1. Synchronizes environment: Compares `.env` with `.env.dist`. It appends any missing variables from the template while preserving your current values and custom additions.
+2. Auto-Initialize: Runs `./initialize-env.sh` if the `.env` file is completely missing.
+3. Generates `traefik-generated.yml` from template
+4. Runs `generate-config.py` to create routes
+5. Creates required networks
+6. Boots CrowdSec/Redis first (security layer)
+7. Waits for CrowdSec health check
+8. Registers the bouncer API key
+9. Deploys all remaining services
 
 ---
 

@@ -10,9 +10,80 @@
 set -e  # Exit on any error
 
 # =============================================================================
-# PHASE 0: Load Environment Variables
+# PHASE 0: Environment Setup and Synchronization
 # =============================================================================
+# Ensures .env exists and is up to date with .env.dist structure.
 
+DIST_FILE=".env.dist"
+ENV_FILE=".env"
+
+# 1. Check if .env exists, if not, initialize
+if [ ! -f "$ENV_FILE" ]; then
+    echo "⚠️  $ENV_FILE not found. Running initialization..."
+    if [ -f "./initialize-env.sh" ]; then
+        chmod +x ./initialize-env.sh
+        ./initialize-env.sh
+        exit 0
+    else
+        echo "❌ Error: initialize-env.sh not found. Please create $ENV_FILE manually."
+        exit 1
+    fi
+fi
+
+# 2. Sync variables from .env.dist to .env, preserving order
+echo "🔄 Synchronizing $ENV_FILE with $DIST_FILE..."
+TEMP_ENV=$(mktemp)
+ADDED_VARS=0
+cp "$ENV_FILE" "${ENV_FILE}.bak"
+
+# Process all lines from .env.dist to maintain its structure
+while IFS= read -r line || [ -n "$line" ]; do
+    # Preserve comments and empty lines
+    if [[ "$line" =~ ^# ]] || [[ -z "$line" ]]; then
+        echo "$line" >> "$TEMP_ENV"
+        continue
+    fi
+
+    # Extract variable name (part before =)
+    VAR_NAME=$(echo "$line" | cut -d'=' -f1)
+    
+    # Check if variable exists in current .env
+    if grep -q "^${VAR_NAME}=" "$ENV_FILE"; then
+        # Use existing value from .env (take the first occurrence)
+        grep "^${VAR_NAME}=" "$ENV_FILE" | head -n 1 >> "$TEMP_ENV"
+    else
+        # Use default value from .env.dist
+        echo "$line" >> "$TEMP_ENV"
+        echo "   ➕ Added variable: $VAR_NAME"
+        ADDED_VARS=$((ADDED_VARS + 1))
+    fi
+done < "$DIST_FILE"
+
+# Append any custom variables from .env that are NOT in .env.dist
+EXTRA_VARS=0
+while IFS= read -r line || [ -n "$line" ]; do
+    if [[ "$line" =~ ^# ]] || [[ -z "$line" ]]; then continue; fi
+    VAR_NAME=$(echo "$line" | cut -d'=' -f1)
+    if ! grep -q "^${VAR_NAME}=" "$DIST_FILE"; then
+        if [ $EXTRA_VARS -eq 0 ]; then
+            echo "" >> "$TEMP_ENV"
+            echo "# --- Custom variables (not in .env.dist) ---" >> "$TEMP_ENV"
+        fi
+        echo "$line" >> "$TEMP_ENV"
+        EXTRA_VARS=$((EXTRA_VARS + 1))
+    fi
+done < "$ENV_FILE"
+
+mv "$TEMP_ENV" "$ENV_FILE"
+
+if [ $ADDED_VARS -gt 0 ]; then
+    echo "   ✅ Added $ADDED_VARS new variables from .env.dist."
+fi
+if [ $EXTRA_VARS -gt 0 ]; then
+    echo "   ℹ️  Preserved $EXTRA_VARS custom variables."
+fi
+
+# Load variables
 set -a
 source .env
 set +a
