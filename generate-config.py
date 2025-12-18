@@ -3,65 +3,62 @@ import yaml
 import os
 import csv
 import re
-from collections import defaultdict  # for grouping
+from collections import defaultdict
 
-# ================= CONFIGURATION =================
+# =============================================================================
+# CONSTANTS & FILE PATHS
+# =============================================================================
+
 INPUT_FILE = 'domains.csv'
 BASE_FILENAME = 'docker-compose-anubis-base.yaml'
 OUTPUT_COMPOSE = 'docker-compose-anubis-generated.yaml'
 OUTPUT_TRAEFIK = 'config/traefik/dynamic-config/routers-generated.yaml'
 
-# ============= ENVIRONMENT VARIABLES =============
+# =============================================================================
+# ENVIRONMENT VARIABLES
+# =============================================================================
+
 CROWDSEC_API_KEY = os.getenv('CROWDSEC_API_KEY')
 REDIS_PASSWORD = os.getenv('REDIS_PASSWORD')
+
+# Blocked Paths (Comma-separated list of regex patterns)
 BLOCKED_PATHS_STR = os.getenv('TRAEFIK_BLOCKED_PATHS', '').strip()
 
-# Robust stripping of surrounding quotes from the whole string
+# Robust stripping of surrounding quotes
 if (BLOCKED_PATHS_STR.startswith('"') and BLOCKED_PATHS_STR.endswith('"')) or \
    (BLOCKED_PATHS_STR.startswith("'") and BLOCKED_PATHS_STR.endswith("'")):
     BLOCKED_PATHS_STR = BLOCKED_PATHS_STR[1:-1]
 
 BLOCKED_PATHS = [p.strip().strip('"').strip("'") for p in BLOCKED_PATHS_STR.split(',') if p.strip()]
 
-# TLS Chunking Limit (Let's Encrypt max is 100, we use a smaller amount for safety)
+# TLS Chunking Limit (Let's Encrypt max is 100)
 TLS_BATCH_SIZE = 90
 
-# CrowdSec Update Interval
+# CrowdSec & Traefik Settings (with defaults)
 try:
     CS_UPDATE_INTERVAL = int(os.getenv('CROWDSEC_UPDATE_INTERVAL', 60))
-except ValueError:
-    CS_UPDATE_INTERVAL = 60
-
-# Traefik Timeouts
-try:
     T_ACTIVE = int(os.getenv('TRAEFIK_TIMEOUT_ACTIVE', 60))
     T_IDLE = int(os.getenv('TRAEFIK_TIMEOUT_IDLE', 90))
-except ValueError:
-    T_ACTIVE = 60
-    T_IDLE = 90
-
-# Global Rate Limits
-try:
     G_RATE_AVG = int(os.getenv('GLOBAL_RATE_AVG', 60))
     G_RATE_BURST = int(os.getenv('GLOBAL_RATE_BURST', 120))
-except ValueError:
-    G_RATE_AVG = 60
-    G_RATE_BURST = 120
-
-# Global Concurrency
-try:
     G_CONCURRENCY = int(os.getenv('GLOBAL_CONCURRENCY', 25))
-except ValueError:
-    G_CONCURRENCY = 25
-
-# HSTS Configuration
-try:
     HSTS_SECONDS = int(os.getenv('HSTS_MAX_AGE', 31536000))
 except ValueError:
+    # Fallback defaults if parsing fails
+    CS_UPDATE_INTERVAL = 60
+    T_ACTIVE = 60
+    T_IDLE = 90
+    G_RATE_AVG = 60
+    G_RATE_BURST = 120
+    G_CONCURRENCY = 25
     HSTS_SECONDS = 31536000
 
-# Regex for validating Docker/Traefik service names (alphanumeric and hyphens only)
+# Regex for validating Docker/Traefik service names
 VALID_SERVICE_NAME_REGEX = re.compile(r'^[a-z0-9-]+$')
+
+# -----------------------------------------------------------------------------
+# Validation
+# -----------------------------------------------------------------------------
 
 if not CROWDSEC_API_KEY:
     print("    ❌ FATAL ERROR: CROWDSEC_API_KEY environment variable not found.")
@@ -71,7 +68,11 @@ if not REDIS_PASSWORD:
     print("    ❌ FATAL ERROR: REDIS_PASSWORD environment variable not found.")
     exit(1)
 
-# Custom Dumper to avoid excessive indentation (KISS principle applied to YAML structure)
+# =============================================================================
+# HELPER CLASSES & FUNCTIONS
+# =============================================================================
+
+# Custom Dumper to avoid excessive indentation
 class IndentDumper(yaml.Dumper):
     def increase_indent(self, flow=False, indentless=False):
         return super(IndentDumper, self).increase_indent(flow, False)
@@ -86,6 +87,108 @@ def get_root_domain(domain):
 # This is only for router/middleware naming internally in Traefik, less strict than service naming
 def sanitize_name(name):
     return name.replace('.', '-').replace('_', '-').lower()
+
+def process_router(entry, http_section, domain_to_cert_def):
+    domain = entry['domain']
+    service = entry['service']
+    anubis_sub = entry['anubis_sub']
+    extra = entry['extra']
+    root = entry['root']
+
+    safe_domain = sanitize_name(domain)
+    router_name = f"router-{safe_domain}"
+
+    mw_list = ['crowdsec-check', 'security-headers']
+
+    if 'rate' in extra or 'burst' in extra:
+        custom_rl_name = f"rl-{safe_domain}"
+        avg = extra.get('rate', G_RATE_AVG)
+        burst = extra.get('burst', G_RATE_BURST)
+        http_section['middlewares'][custom_rl_name] = {
+            'rateLimit': {'average': avg, 'burst': burst}
+        }
+        mw_list.append(custom_rl_name)
+    else:
+        mw_list.append('global-ratelimit')
+
+    if 'concurrency' in extra:
+        custom_conc_name = f"conc-{safe_domain}"
+        http_section['middlewares'][custom_conc_name] = {
+            'inFlightReq': {'amount': extra['concurrency']}
+        }
+        mw_list.append(custom_conc_name)
+    else:
+        mw_list.append('global-concurrency')
+    mw_list.append('global-buffering')
+    mw_list.append('global-compress')
+
+    if anubis_sub:
+        safe_root = sanitize_name(root)
+        safe_auth = sanitize_name(anubis_sub)
+        mw_auth_name = f"anubis-mw-{safe_root}-{safe_auth}"
+        mw_list.append(mw_auth_name)
+
+    # -------------------------------------------------------------------------
+    # Redirection Middleware
+    # -------------------------------------------------------------------------
+    redirection = entry.get('redirection')
+    if redirection:
+        redirect_mw_name = f"redirect-{safe_domain}"
+        
+        # Normalize target to have protocol
+        target = redirection
+        if not target.startswith("http"):
+            target = f"https://{target}"
+            
+        http_section['middlewares'][redirect_mw_name] = {
+            'redirectRegex': {
+                'regex': f"^https?://{domain}/(.*)",
+                'replacement': f"{target}/${{1}}",
+                'permanent': True
+            }
+        }
+        mw_list.append(redirect_mw_name)
+
+    if service == 'apache-host':
+        mw_list.append('apache-forward-headers')
+        target_service = 'apache-host-8080@file'
+    else:
+        target_service = f"{service}@docker"
+
+    # Router config
+    router_conf = {
+        'rule': f"Host(`{domain}`)",
+        'entryPoints': ["websecure"],
+        'service': target_service,
+        'tls': {'certResolver': 'le'},
+        'middlewares': mw_list
+    }
+    
+    # Inject TLS domains if specific batch exists
+    if domain in domain_to_cert_def:
+        router_conf['tls']['domains'] = [domain_to_cert_def[domain]]
+
+    http_section['routers'][router_name] = router_conf
+
+    # -------------------------------------------------------------------------
+    # Path Blocking Router (Per-Domain)
+    # -------------------------------------------------------------------------
+    # Creates a higher priority router to intercept blocked paths
+    if BLOCKED_PATHS:
+        block_router_name = f"blocker-{safe_domain}"
+        paths_rule = " || ".join([f"PathRegexp(`.*{p}.*`)" for p in BLOCKED_PATHS])
+        http_section['routers'][block_router_name] = {
+            'rule': f"Host(`{domain}`) && ({paths_rule})",
+            'entryPoints': ["websecure"],
+            'service': "api@internal",
+            'priority': 11000,
+            'tls': router_conf.get('tls', {}),
+            'middlewares': ["block-unwanted-paths"]
+        }
+
+# =============================================================================
+# MAIN LOGIC
+# =============================================================================
 
 def generate_configs():
     if not os.path.exists(INPUT_FILE):
@@ -110,10 +213,10 @@ def generate_configs():
 
                 domain = row[0].strip()
                 redirection = row[1].strip()
-                service = row[2].strip().lower() # Standardize service name to lowercase
+                service = row[2].strip().lower() 
                 anubis_sub = row[3].strip().lower() if len(row) > 3 else ""
 
-                # --- ROBUSTNESS CHECK: Docker Service Name Format ---
+                # --- Robustness Check: Docker Service Name Format ---
                 if service != 'apache-host' and not VALID_SERVICE_NAME_REGEX.match(service):
                     print(f"    ❌ [Line {line_num}] Error: Service name '{service}' must only contain lowercase letters, numbers, and hyphens ('-'). Entry skipped.")
                     error_count += 1
@@ -159,13 +262,12 @@ def generate_configs():
 
     services = {}
 
-    # === TRAEFIK DYNAMIC CONFIGURATION ===
-    # Main structure that will contain 'http' and 'tls'
+    # -------------------------------------------------------------------------
+    # Traefik Dynamic Configuration (HTTP & TLS)
+    # -------------------------------------------------------------------------
     traefik_dynamic_conf = {
         'http': {
-            # =========================================================================
-            # SERVERS TRANSPORTS (Timeouts for legacy backends)
-            # =========================================================================
+            # Timeouts for legacy backends
             'serversTransports': {
                 'legacy-transport': {
                     'forwardingTimeouts': {
@@ -175,7 +277,7 @@ def generate_configs():
                 }
             },
             'middlewares': {
-                # 1. BROWSER SECURITY (PARAMETERIZED HEADERS)
+                # 1. Browser Security (Parameterized Headers)
                 'security-headers': {
                     'headers': {
                         'frameDeny': True,
@@ -188,7 +290,7 @@ def generate_configs():
                         'customFrameOptionsValue': 'SAMEORIGIN'
                     }
                 },
-                # 2. CROWDSEC API CHECK PLUGIN
+                # 2. CrowdSec API Check Plugin
                 'crowdsec-check': {
                     'plugin': {
                         'crowdsec': {
@@ -201,22 +303,22 @@ def generate_configs():
                         }
                     }
                 },
-                # 3. GLOBAL COMPRESSION
+                # 3. Global Compression
                 'global-compress': {
                     'compress': {'minResponseBodyBytes': 1024}
                 },
-                # 4. TRAEFIK RATE LIMIT
+                # 4. Traefik Rate Limit
                 'global-ratelimit': {
                     'rateLimit': {
                         'average': G_RATE_AVG,
                         'burst': G_RATE_BURST
                     }
                 },
-                # 5. TRAEFIK CONCURRENCY
+                # 5. Traefik Concurrency
                 'global-concurrency': {
                     'inFlightReq': {'amount': G_CONCURRENCY}
                 },
-                # 6. PROTOCOL FORWARDER (For Apache/WordPress HTTP->HTTPS redirect fix)
+                # 6. Protocol Forwarder (For Apache/WordPress HTTP->HTTPS redirect fix)
                 'apache-forward-headers': {
                     'headers': {
                         'customRequestHeaders': {
@@ -224,24 +326,22 @@ def generate_configs():
                         }
                     }
                 },
-                # 7. ANUBIS ASSETS STRIPPER
+                # 7. Anubis Assets Stripper
                 # Cleans the internal Go path so Nginx receives a clean path.
-                # Removes "/.within.website/x/cmd/anubis" to leave "/static/img/..."
                 'anubis-assets-stripper': {
                     'stripPrefix': {
                         'prefixes': ['/.within.website/x/cmd/anubis']
                     }
                 },
-                # 8. ANUBIS CSS REPLACEMENT
+                # 8. Anubis CSS Replacement
                 # Transforms the unusual Go request into your local file name
                 'anubis-css-replace': {
                     'replacePath': {
                         'path': '/custom.css'
                     }
                 },
-                # 9. DDOS PROTECTION: BUFFERING
-                # Protects against Slowloris attacks by reading the whole request
-                # before forwarding it to the backend.
+                # 9. DDoS Protection: Buffering
+                # Protects against Slowloris attacks
                 'global-buffering': {
                     'buffering': {
                         'maxRequestBodyBytes': 0, # No limit for body (handled by other layers)
@@ -253,16 +353,11 @@ def generate_configs():
             },
             'routers': {},
             'services': {
-                # 1. EXTERNAL BACKEND SERVICE CONFIGURATION (HOST APACHE ON 8080)
-                # This service is defined statically here (@file) and will be referenced
-                # by routers if the 'docker_service' column in domains.csv is 'apache-host'.
+                # 1. External Backend Service (Host Apache on 8080)
                 'apache-host-8080': {
                     'loadBalancer': {
-                        # LINK TO THE NEW TRANSPORT
                         'serversTransport': 'legacy-transport',
-                        # Fixed IP used since host.docker.internal failed in the user's Linux environment
-                        # NOTE: '172.17.0.1' is the default bridge gateway on Linux. 
-                        # For macOS/Windows Docker Desktop, this IP will NOT work (logic requires 'host.docker.internal').
+                        # Fixed IP for Linux environments where host.docker.internal may vary
                         'servers': [{'url': 'http://172.17.0.1:8080'}],
                         'passHostHeader': True
                     }
@@ -271,24 +366,22 @@ def generate_configs():
         }
     }
 
-    # === BLOCKED PATHS MIDDLEWARE ===
+    # Blocked Paths Middleware (If configured)
     if BLOCKED_PATHS:
-        # Blocking Middleware (returns 403 by allowing only localhost)
         traefik_dynamic_conf['http']['middlewares']['block-unwanted-paths'] = {
             'ipAllowList': {
                 'sourceRange': ['127.0.0.1/32']
             }
         }
 
-    # =========================================================================
-    # TLS GROUPING LOGIC (SAN GROUPING / CHUNKING)
-    # =========================================================================
+    # -------------------------------------------------------------------------
+    # TLS Grouping Logic (SAN / Chunking)
+    # -------------------------------------------------------------------------
     # 1. Group all domains by their root
     domains_by_root = defaultdict(list)
     for entry in raw_entries:
         domains_by_root[entry['root']].append(entry['domain'])
 
-        # We also add the Anubis subdomain to the certificate if it exists
         if entry['anubis_sub']:
             full_anubis_url = f"{entry['anubis_sub']}.{entry['root']}"
             domains_by_root[entry['root']].append(full_anubis_url)
@@ -297,7 +390,7 @@ def generate_configs():
     tls_configs = []
     
     for root_domain, subdomains in domains_by_root.items():
-        # Deduplicate and sort for consistency
+        # Deduplicate and sort
         subs_unicos = sorted(list(set(subdomains)))
         
         # Chunking loop in batches of TLS_BATCH_SIZE
@@ -319,11 +412,9 @@ def generate_configs():
              domain_to_cert_def[d] = batch
              
     print(f"    🔐 TLS Config: Generated {len(tls_configs)} certificates grouped (Batch size: {TLS_BATCH_SIZE}).")
-    # =========================================================================
-
 
     protected_groups = {}
-    anubis_service_names = set() # To track generated Anubis service names
+    anubis_service_names = set() 
 
     for entry in raw_entries:
         if entry['anubis_sub']:
@@ -335,7 +426,9 @@ def generate_configs():
         # Pass the reference to the HTTP section of the config AND the cert map
         process_router(entry, traefik_dynamic_conf['http'], domain_to_cert_def)
 
-    # GENERATE ANUBIS SERVICES & ROUTERS
+    # -------------------------------------------------------------------------
+    # Anubis Services & Routers Generation
+    # -------------------------------------------------------------------------
     for (root, auth_sub), entries in protected_groups.items():
         safe_root = sanitize_name(root)
         safe_auth = sanitize_name(auth_sub)
@@ -358,7 +451,6 @@ def generate_configs():
                 f"REDIRECT_DOMAINS={redirect_domains_str}",
                 f"COOKIE_PREFIX={safe_root}"
             ],
-            # Minimal labels required for Traefik to discover the Anubis container
             'labels': [
                 "traefik.enable=true",
                 "traefik.docker.network=traefik",
@@ -380,7 +472,7 @@ def generate_configs():
             }
         }
 
-        # 1. Anubis: Router for IMAGES (Pensive, Happy & Reject)
+        # 1. Anubis: Router for Images
         assets_router_name = f"anubis-assets-img-{safe_root}-{safe_auth}"
         traefik_dynamic_conf['http']['routers'][assets_router_name] = {
             'rule': f"Host(`{auth_sub}.{root}`) && (Path(`/.within.website/x/cmd/anubis/static/img/pensive.webp`) || Path(`/.within.website/x/cmd/anubis/static/img/reject.webp`))",
@@ -394,10 +486,9 @@ def generate_configs():
         # 2. Anubis: Router for CSS
         css_router_name = f"anubis-assets-css-{safe_root}-{safe_auth}"
         traefik_dynamic_conf['http']['routers'][css_router_name] = {
-            # Capture the exact path of the Anubis CSS
             'rule': f"Host(`{auth_sub}.{root}`) && Path(`/.within.website/x/xess/xess.min.css`)",
             'entryPoints': ["websecure"],
-            'service': "anubis-assets@docker", # Same Nginx container
+            'service': "anubis-assets@docker", 
             'priority': 2000, 
             'tls': {'certResolver': 'le', 'domains': [domain_to_cert_def.get(f"{auth_sub}.{root}", {})]},
             'middlewares': ["security-headers", "anubis-css-replace", "global-compress"]
@@ -430,104 +521,6 @@ def generate_configs():
         yaml.dump(traefik_dynamic_conf, f, Dumper=IndentDumper, default_flow_style=False, sort_keys=False)
 
     print("    ✅ Traefik dynamic configuration generated successfully.")
-
-def process_router(entry, http_section, domain_to_cert_def):
-    domain = entry['domain']
-    service = entry['service']
-    anubis_sub = entry['anubis_sub']
-    extra = entry['extra']
-    root = entry['root']
-
-    safe_domain = sanitize_name(domain)
-    router_name = f"router-{safe_domain}"
-
-    mw_list = ['crowdsec-check', 'security-headers']
-
-    if 'rate' in extra or 'burst' in extra:
-        custom_rl_name = f"rl-{safe_domain}"
-        avg = extra.get('rate', G_RATE_AVG)
-        burst = extra.get('burst', G_RATE_BURST)
-        http_section['middlewares'][custom_rl_name] = {
-            'rateLimit': {'average': avg, 'burst': burst}
-        }
-        mw_list.append(custom_rl_name)
-    else:
-        mw_list.append('global-ratelimit')
-
-    if 'concurrency' in extra:
-        custom_conc_name = f"conc-{safe_domain}"
-        http_section['middlewares'][custom_conc_name] = {
-            'inFlightReq': {'amount': extra['concurrency']}
-        }
-        mw_list.append(custom_conc_name)
-    else:
-        mw_list.append('global-concurrency')
-    mw_list.append('global-buffering')
-    mw_list.append('global-compress')
-
-    if anubis_sub:
-        safe_root = sanitize_name(root)
-        safe_auth = sanitize_name(anubis_sub)
-        mw_auth_name = f"anubis-mw-{safe_root}-{safe_auth}"
-        mw_list.append(mw_auth_name)
-
-    # ### REDIRECTION MIDDLEWARE ###
-    redirection = entry.get('redirection')
-    if redirection:
-        redirect_mw_name = f"redirect-{safe_domain}"
-        
-        # Normalize target to have protocol
-        target = redirection
-        if not target.startswith("http"):
-            target = f"https://{target}"
-            
-        http_section['middlewares'][redirect_mw_name] = {
-            'redirectRegex': {
-                'regex': f"^https?://{domain}/(.*)",
-                'replacement': f"{target}/${{1}}",
-                'permanent': True
-            }
-        }
-        # Add to the middleware chain
-        mw_list.append(redirect_mw_name)
-
-    if service == 'apache-host':
-        mw_list.append('apache-forward-headers')
-
-    if service == 'apache-host':
-        target_service = 'apache-host-8080@file'
-    else:
-        target_service = f"{service}@docker"
-
-    # Router config
-    router_conf = {
-        'rule': f"Host(`{domain}`)",
-        'entryPoints': ["websecure"],
-        'service': target_service,
-        'tls': {'certResolver': 'le'},
-        'middlewares': mw_list
-    }
-    
-    # Inject TLS domains if we have a specific batch for this domain
-    if domain in domain_to_cert_def:
-        router_conf['tls']['domains'] = [domain_to_cert_def[domain]]
-
-    http_section['routers'][router_name] = router_conf
-
-    # ### PATH BLOCKING ROUTER (PER-DOMAIN) ###
-    # We create a specific router for blocked paths to ensure it works correctly
-    # with TLS SNI matching and has higher priority than the main router.
-    if BLOCKED_PATHS:
-        block_router_name = f"blocker-{safe_domain}"
-        paths_rule = " || ".join([f"PathRegexp(`.*{p}.*`)" for p in BLOCKED_PATHS])
-        http_section['routers'][block_router_name] = {
-            'rule': f"Host(`{domain}`) && ({paths_rule})",
-            'entryPoints': ["websecure"],
-            'service': "api@internal",
-            'priority': 11000,
-            'tls': router_conf.get('tls', {}),
-            'middlewares': ["block-unwanted-paths"]
-        }
 
 def generate_policy_file():
     input_policy = 'config/anubis/botPolicy.yaml'
