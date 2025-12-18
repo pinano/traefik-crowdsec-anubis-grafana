@@ -173,24 +173,24 @@ fi
 # PHASE 4: Generate Configuration Files
 # =============================================================================
 
-# Generate traefik-generated.yml from template
-echo "🔧 Generating traefik-generated.yml from template..."
-if [ -f "./config/traefik/traefik.yml.template" ]; then
+# Generate traefik-generated.yaml from template
+echo "🔧 Generating traefik-generated.yaml from template..."
+if [ -f "./config/traefik/traefik.yaml.template" ]; then
     sed -e "s|ACME_EMAIL_PLACEHOLDER|${ACME_EMAIL}|g" \
         -e "s|ACME_CASERVER_PLACEHOLDER|${ACME_CA_SERVER}|g" \
         -e "s|TRAEFIK_TIMEOUT_ACTIVE_PLACEHOLDER|${TRAEFIK_TIMEOUT_ACTIVE:-60}s|g" \
         -e "s|TRAEFIK_TIMEOUT_IDLE_PLACEHOLDER|${TRAEFIK_TIMEOUT_IDLE:-90}s|g" \
-        ./config/traefik/traefik.yml.template > ./config/traefik/traefik-generated.yml
-    echo "   ✅ traefik-generated.yml generated."
+        ./config/traefik/traefik.yaml.template > ./config/traefik/traefik-generated.yaml
+    echo "   ✅ traefik-generated.yaml generated."
 else
-    echo "❌ Error: config/traefik/traefik.yml.template not found!"
+    echo "❌ Error: config/traefik/traefik.yaml.template not found!"
     exit 1
 fi
 
 # Calculate hash of the generated config to force restart on changes
 # relying on Docker Compose to detect env var changes
-if [ -f "./config/traefik/traefik-generated.yml" ]; then
-    TRAEFIK_CONFIG_HASH=$(python3 -c "import hashlib; print(hashlib.sha1(open('./config/traefik/traefik-generated.yml', 'rb').read()).hexdigest())")
+if [ -f "./config/traefik/traefik-generated.yaml" ]; then
+    TRAEFIK_CONFIG_HASH=$(python3 -c "import hashlib; print(hashlib.sha1(open('./config/traefik/traefik-generated.yaml', 'rb').read()).hexdigest())")
     export TRAEFIK_CONFIG_HASH
     echo "   #️⃣  Traefik Config Hash: $TRAEFIK_CONFIG_HASH"
 fi
@@ -218,15 +218,15 @@ fi
 # PHASE 6: Build Compose File List
 # =============================================================================
 
-COMPOSE_FILES="-f docker-compose-traefik-crowdsec-redis.yml \
-               -f docker-compose-tools.yml \
-               -f docker-compose-anubis-generated.yml \
-               -f docker-compose-grafana-loki-alloy.yml"
+COMPOSE_FILES="-f docker-compose-traefik-crowdsec-redis.yaml \
+               -f docker-compose-tools.yaml \
+               -f docker-compose-anubis-generated.yaml \
+               -f docker-compose-grafana-loki-alloy.yaml"
 
 # Include Apache host logs for legacy installations
 if [ -d "/var/log/apache2" ]; then
-    COMPOSE_FILES="$COMPOSE_FILES -f docker-compose-apache-logs.yml"
-    echo "   📋 Apache logs detected, including docker-compose-apache-logs.yml"
+    COMPOSE_FILES="$COMPOSE_FILES -f docker-compose-apache-logs.yaml"
+    echo "   📋 Apache logs detected, including docker-compose-apache-logs.yaml"
 fi
 
 # =============================================================================

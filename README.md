@@ -231,7 +231,7 @@ A lightweight utility service that monitors the stack and sends Telegram alerts.
 ### Auxiliary Tools
 
 - **Dozzle**: Real-time log viewer for all containers (`https://dozzle.<domain>`).
-- **ctop**: Interactive container monitoring (run manually with `docker compose -f docker-compose-tools.yml run --rm ctop`).
+- **ctop**: Interactive container monitoring (run manually with `docker compose -f docker-compose-tools.yaml run --rm ctop`).
 - **Anubis-Assets**: Nginx server for local Anubis static assets.
 
 ---
@@ -266,15 +266,15 @@ A lightweight utility service that monitors the stack and sends Telegram alerts.
 │   │   ├── check-crowdsec.sh
 │   │   └── check-dns.sh
 │   └── traefik/                           # Traefik configuration
-│       ├── traefik.yml.template           # Static config template
+│       ├── traefik.yaml.template           # Static config template
 │       └── dynamic-config/                # Generated routers/middlewares
 │
 └── Docker Compose Files:
-    ├── docker-compose-traefik-crowdsec-redis.yml   # Core infrastructure
-    ├── docker-compose-tools.yml                     # Tools & monitoring
-    ├── docker-compose-grafana-loki-alloy.yml        # Observability stack
-    ├── docker-compose-anubis-base.yml               # Anubis template
-    └── docker-compose-anubis-generated.yml          # Auto-generated Anubis instances
+    ├── docker-compose-traefik-crowdsec-redis.yaml   # Core infrastructure
+    ├── docker-compose-tools.yaml                     # Tools & monitoring
+    ├── docker-compose-grafana-loki-alloy.yaml        # Observability stack
+    ├── docker-compose-anubis-base.yaml               # Anubis template
+    └── docker-compose-anubis-generated.yaml          # Auto-generated Anubis instances
 ```
 
 ---
@@ -341,7 +341,7 @@ cp domains.csv.dist domains.csv
 This script:
 1. Synchronizes environment: Compares `.env` with `.env.dist`. It appends any missing variables from the template while preserving your current values and custom additions.
 2. Auto-Initialize: Runs `./initialize-env.sh` if the `.env` file is completely missing.
-3. Generates `traefik-generated.yml` from template
+3. Generates `traefik-generated.yaml` from template
 4. Runs `generate-config.py` to create routes
 5. Creates required networks
 6. Boots CrowdSec/Redis first (security layer)
@@ -438,7 +438,7 @@ Legacy applications or slow backends may require adjusted timeouts. We provide t
 |---------|-------------|
 | `./start.sh` | Deploy/update the stack |
 | `./stop.sh` | Stop all containers |
-| `docker compose -f docker-compose-tools.yml run --rm ctop` | Interactive container monitor |
+| `docker compose -f docker-compose-tools.yaml run --rm ctop` | Interactive container monitor |
 
 ### Security Operations (CrowdSec)
 

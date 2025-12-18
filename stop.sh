@@ -20,14 +20,14 @@ set +a
 # =============================================================================
 # Must match the same files used in start.sh to ensure all containers are stopped.
 
-COMPOSE_FILES="-f docker-compose-traefik-crowdsec-redis.yml \
-               -f docker-compose-tools.yml \
-               -f docker-compose-anubis-generated.yml \
-               -f docker-compose-grafana-loki-alloy.yml"
+COMPOSE_FILES="-f docker-compose-traefik-crowdsec-redis.yaml \
+               -f docker-compose-tools.yaml \
+               -f docker-compose-anubis-generated.yaml \
+               -f docker-compose-grafana-loki-alloy.yaml"
 
 # Include Apache host logs for legacy installations (same condition as start.sh)
 if [ -d "/var/log/apache2" ]; then
-    COMPOSE_FILES="$COMPOSE_FILES -f docker-compose-apache-logs.yml"
+    COMPOSE_FILES="$COMPOSE_FILES -f docker-compose-apache-logs.yaml"
 fi
 
 # =============================================================================

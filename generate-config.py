@@ -7,9 +7,9 @@ from collections import defaultdict  # for grouping
 
 # ================= CONFIGURATION =================
 INPUT_FILE = 'domains.csv'
-BASE_FILENAME = 'docker-compose-anubis-base.yml'
-OUTPUT_COMPOSE = 'docker-compose-anubis-generated.yml'
-OUTPUT_TRAEFIK = 'config/traefik/dynamic-config/routers-generated.yml'
+BASE_FILENAME = 'docker-compose-anubis-base.yaml'
+OUTPUT_COMPOSE = 'docker-compose-anubis-generated.yaml'
+OUTPUT_TRAEFIK = 'config/traefik/dynamic-config/routers-generated.yaml'
 
 # ============= ENVIRONMENT VARIABLES =============
 CROWDSEC_API_KEY = os.getenv('CROWDSEC_API_KEY')

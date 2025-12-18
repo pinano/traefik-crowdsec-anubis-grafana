@@ -171,7 +171,7 @@ if [[ "$gen_cs" == "y" || "$gen_cs" == "Y" ]]; then
     fi
 
     echo "   🚀 Starting CrowdSec container..."
-    docker compose -f docker-compose-traefik-crowdsec-redis.yml up -d crowdsec
+    docker compose -f docker-compose-traefik-crowdsec-redis.yaml up -d crowdsec
     
     echo "   ⏳ Waiting for CrowdSec API..."
     # Wait loop
@@ -203,7 +203,7 @@ if [[ "$gen_cs" == "y" || "$gen_cs" == "Y" ]]; then
     fi
 
     echo "   🛑 Stopping CrowdSec..."
-    docker compose -f docker-compose-traefik-crowdsec-redis.yml stop crowdsec
+    docker compose -f docker-compose-traefik-crowdsec-redis.yaml stop crowdsec
 fi
 
 echo ""

@@ -5,13 +5,13 @@
 # Domains CSV
 domains.csv
 
-# Docker Compose generated files
-docker-compose-anubis-generated.yml
-
-# Traefik configuration
-config/traefik/acme.json
-config/traefik/traefik-generated.yml
+# Generated configuration files
+docker-compose-anubis-generated.yaml
+config/traefik/traefik-generated.yaml
 config/traefik/dynamic-config/*
+
+# Traefik certificates
+config/traefik/acme.json
 
 # Anubis configuration
 config/anubis/botPolicy-generated.yaml
