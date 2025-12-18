@@ -231,6 +231,17 @@ def generate_configs():
                         'path': '/custom.css'
                     }
                 },
+                # 9. DDOS PROTECTION: BUFFERING
+                # Protects against Slowloris attacks by reading the whole request
+                # before forwarding it to the backend.
+                'global-buffering': {
+                    'buffering': {
+                        'maxRequestBodyBytes': 0, # No limit for body (handled by other layers)
+                        'memRequestBodyBytes': 2097152, # 2MB in memory
+                        'maxResponseBodyBytes': 0,
+                        'memResponseBodyBytes': 2097152 # 2MB in memory
+                    }
+                },
             },
             'routers': {},
             'services': {
@@ -434,7 +445,7 @@ def process_router(entry, http_section, domain_to_cert_def):
         mw_list.append(custom_conc_name)
     else:
         mw_list.append('global-concurrency')
-
+    mw_list.append('global-buffering')
     mw_list.append('global-compress')
 
     if anubis_sub:
