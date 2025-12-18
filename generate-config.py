@@ -280,15 +280,6 @@ def generate_configs():
             }
         }
 
-    # === BLOCKED PATHS MIDDLEWARE ===
-    if BLOCKED_PATHS:
-        # Blocking Middleware (returns 403 by allowing only localhost)
-        traefik_dynamic_conf['http']['middlewares']['block-unwanted-paths'] = {
-            'ipAllowList': {
-                'sourceRange': ['127.0.0.1/32']
-            }
-        }
-
     # =========================================================================
     # TLS GROUPING LOGIC (SAN GROUPING / CHUNKING)
     # =========================================================================
@@ -432,22 +423,6 @@ def generate_configs():
         with open(OUTPUT_COMPOSE, 'w') as f:
             f.write("# NO PROTECTED SERVICES FOUND\n")
         print("    ℹ️ No Anubis protected domains found.")
-
-    # === GLOBAL BLOCKED PATHS ROUTER ===
-    if TRAEFIK_BLOCKED_PATHS:
-        print(f"    🚫 global-blocker: Blocking {len(TRAEFIK_BLOCKED_PATHS)} path patterns.")
-        paths_rule = " || ".join([f"PathRegexp(`.*{p}.*`)" for p in TRAEFIK_BLOCKED_PATHS])
-        traefik_dynamic_conf['http']['routers']['global-blocker'] = {
-            # Catch-all host regex to apply to ALL domains
-            'rule': f"HostRegexp(`{{host:.+}}`) && ({paths_rule})",
-            'entryPoints': ["websecure"],
-            # api@internal is a safe dummy service that returns 404/200, 
-            # but the middleware 'block-unwanted-paths' will enforce 403 before that.
-            'service': "api@internal", 
-            'priority': 20000, # Higher priority than specific domain routers
-            'tls': {'certResolver': 'le'}, # Enable TLS so it acts on HTTPS
-            'middlewares': ["block-unwanted-paths"]
-        }
 
     os.makedirs(os.path.dirname(OUTPUT_TRAEFIK), exist_ok=True)
     with open(OUTPUT_TRAEFIK, 'w') as f:
