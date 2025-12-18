@@ -74,6 +74,7 @@ services:
     user: "root" # Alloy needs root to read logs from other containers in /var/lib/docker
     environment:
       - TZ=${TZ}
+      - DOMAIN=${DOMAIN}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
