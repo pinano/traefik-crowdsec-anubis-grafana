@@ -271,24 +271,13 @@ def generate_configs():
         }
     }
 
-    # === BLOCKED PATHS LOGIC ===
+    # === BLOCKED PATHS MIDDLEWARE ===
     if BLOCKED_PATHS:
-        print(f"    🚫 Configuring block for {len(BLOCKED_PATHS)} paths.")
-        # 1. Blocking Middleware (returns 403 by allowing only localhost)
+        # Blocking Middleware (returns 403 by allowing only localhost)
         traefik_dynamic_conf['http']['middlewares']['block-unwanted-paths'] = {
             'ipAllowList': {
                 'sourceRange': ['127.0.0.1/32']
             }
-        }
-        # 2. High Priority Router to catch these paths
-        # Note: We use PathPrefix to catch the path and everything below it
-        paths_rule = " || ".join([f"PathPrefix(`{p}`)" for p in BLOCKED_PATHS])
-        traefik_dynamic_conf['http']['routers']['block-unwanted-paths-router'] = {
-            'rule': paths_rule,
-            'entryPoints': ["web", "websecure"],
-            'service': "api@internal",
-            'priority': 10000,
-            'middlewares': ["block-unwanted-paths"]
         }
 
     # =========================================================================
@@ -524,6 +513,21 @@ def process_router(entry, http_section, domain_to_cert_def):
         router_conf['tls']['domains'] = [domain_to_cert_def[domain]]
 
     http_section['routers'][router_name] = router_conf
+
+    # ### PATH BLOCKING ROUTER (PER-DOMAIN) ###
+    # We create a specific router for blocked paths to ensure it works correctly
+    # with TLS SNI matching and has higher priority than the main router.
+    if BLOCKED_PATHS:
+        block_router_name = f"blocker-{safe_domain}"
+        paths_rule = " || ".join([f"PathPrefix(`{p}`)" for p in BLOCKED_PATHS])
+        http_section['routers'][block_router_name] = {
+            'rule': f"Host(`{domain}`) && ({paths_rule})",
+            'entryPoints': ["websecure"],
+            'service': "api@internal",
+            'priority': 11000,
+            'tls': router_conf.get('tls', {}),
+            'middlewares': ["block-unwanted-paths"]
+        }
 
 def generate_policy_file():
     input_policy = 'config/anubis/botPolicy.yaml'
