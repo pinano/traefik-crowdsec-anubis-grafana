@@ -14,8 +14,14 @@ OUTPUT_TRAEFIK = 'config/traefik/dynamic-config/routers-generated.yaml'
 # ============= ENVIRONMENT VARIABLES =============
 CROWDSEC_API_KEY = os.getenv('CROWDSEC_API_KEY')
 REDIS_PASSWORD = os.getenv('REDIS_PASSWORD')
-BLOCKED_PATHS_STR = os.getenv('TRAEFIK_BLOCKED_PATHS', '')
-BLOCKED_PATHS = [p.strip() for p in BLOCKED_PATHS_STR.split(',') if p.strip()]
+BLOCKED_PATHS_STR = os.getenv('TRAEFIK_BLOCKED_PATHS', '').strip()
+
+# Robust stripping of surrounding quotes from the whole string
+if (BLOCKED_PATHS_STR.startswith('"') and BLOCKED_PATHS_STR.endswith('"')) or \
+   (BLOCKED_PATHS_STR.startswith("'") and BLOCKED_PATHS_STR.endswith("'")):
+    BLOCKED_PATHS_STR = BLOCKED_PATHS_STR[1:-1]
+
+BLOCKED_PATHS = [p.strip().strip('"').strip("'") for p in BLOCKED_PATHS_STR.split(',') if p.strip()]
 
 # TLS Chunking Limit (Let's Encrypt max is 100, we use a smaller amount for safety)
 TLS_BATCH_SIZE = 90
