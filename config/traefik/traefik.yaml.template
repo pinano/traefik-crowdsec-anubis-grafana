@@ -73,10 +73,20 @@ accessLog:
   # Memory buffer so as not to hammer the disk with each line (batch writing)
   bufferingSize: 1000
 
-    # 2. Status Code Filter (Success + Errors)
+  filters:
+    # 1. Code Filter:
+    # We are interested in successes (2xx) and errors (4xx, 5xx).
+    # Optional: You could remove 200-299 if you only wanted to see attacks,
+    # but CrowdSec sometimes needs to see legitimate traffic for its heuristics.
     statusCodes:
       - "200-299"
       - "400-599"
+
+    # 2. THE "NOISE-CANCELLING" FILTER
+    # If Traefik serves something in less than 10ms, it is a static (img, css) or cache.
+    # It adds no security value -> Not logged.
+    # If it takes longer, it is your backend processing or a slow attack -> Logged.
+    #minDuration: "10ms"
 
     # 3. Retries:
     # If Traefik fails to connect to a backend but retries and succeeds,
