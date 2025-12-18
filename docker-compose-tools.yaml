@@ -15,6 +15,11 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
+    deploy:
+      resources:
+        limits:
+          cpus: 0.10
+          memory: 32M
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"
@@ -105,13 +110,14 @@ services:
     image: nginx:alpine3.23-slim
     container_name: anubis-assets
     restart: unless-stopped
+    stop_grace_period: 20s
     volumes:
       - ./config/anubis/assets:/usr/share/nginx/html:ro
     deploy:
       resources:
         limits:
           cpus: 0.10
-          memory: 16M
+          memory: 32M
     networks:
       - traefik
     labels:

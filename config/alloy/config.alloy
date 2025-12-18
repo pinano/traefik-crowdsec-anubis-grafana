@@ -21,6 +21,12 @@ discovery.relabel "docker_logs" {
         regex         = "/(.*)"
         target_label  = "container"
     }
+    
+    rule {
+        source_labels = ["__meta_docker_container_name"]
+        regex         = "/(.*)"
+        target_label  = "job"
+    }
 }
 
 // 4. Log Ingestion (Input)
@@ -33,9 +39,10 @@ loki.source.docker "default" {
 // 5. Log Processing (Pipelines)
 loki.process "pipelines" {
     
-    // 5.1 Drop noise: Remove self-monitoring logs
+    // 5.1 Drop noise: Remove self-monitoring logs and tools
     stage.drop {
-        expression = ".*(alloy|loki|grafana|alloy).*"
+        expression = ".*(alloy|loki|grafana|dozzle|watchdog).*"
+        source     = "container"
     }
 
     // ============================================
@@ -58,10 +65,11 @@ loki.process "pipelines" {
         
         stage.labels {
             values = {
-                status = "status",
-                method = "method",
-                host   = "host",
-                router = "router",
+                status   = "status",
+                method   = "method",
+                host     = "host",
+                router   = "router",
+                log_type = "access",
             }
         }
     }
@@ -88,9 +96,10 @@ loki.process "pipelines" {
 
         stage.labels {
             values = {
-                status = "status",
-                method = "method",
-                host   = "host",
+                status   = "status",
+                method   = "method",
+                host     = "host",
+                log_type = "access",
             }
         }
 
@@ -123,10 +132,11 @@ loki.process "pipelines" {
 
         stage.labels {
             values = {
-                level  = "level",
-                host   = "host",
-                method = "method",
-                msg    = "msg",
+                level    = "level",
+                host     = "host",
+                method   = "method",
+                msg      = "msg",
+                log_type = "error",
             }
         }
 
@@ -170,17 +180,18 @@ loki.process "apache_host" {
             job       = "apache-host",
             source    = "file",
             container = "apache-host",
+            instance  = sys.env("DOMAIN"),
         }
     }
 
     // Extract vhost from filename (e.g., example.com-access.log)
     stage.regex {
-        expression = ".*/(?P<vhost>[^/]+?)[-_]?(access|error)\\.log$"
+        expression = ".*/(?P<host>[^/]+?)[-_]?(access|error)\\.log$"
         source     = "filename"
     }
     stage.labels {
         values = {
-            vhost = "",
+            host = "",
         }
     }
 

@@ -1,8 +1,23 @@
+# Environment variables
 .env
 .env.save
+
+# Domains CSV
 domains.csv
-docker-compose-anubis-generated.yml
-config/traefik/acme.json
-config/traefik/traefik-generated.yml
+
+# Generated configuration files
+docker-compose-anubis-generated.yaml
+config/traefik/traefik-generated.yaml
 config/traefik/dynamic-config/*
+
+# Traefik certificates
+config/traefik/acme.json
+
+# Anubis configuration
 config/anubis/botPolicy-generated.yaml
+
+# Anubis custom assets (only .dist defaults are tracked)
+config/anubis/assets/custom.css
+config/anubis/assets/static/img/happy.webp
+config/anubis/assets/static/img/pensive.webp
+config/anubis/assets/static/img/reject.webp

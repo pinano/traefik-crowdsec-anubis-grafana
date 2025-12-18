@@ -20,6 +20,10 @@ services:
       - /etc/timezone:/etc/timezone:ro
     networks:
       - traefik
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"
@@ -56,7 +60,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 1G
     # Log rotation for Loki itself (Meta-logs)
     logging:
       driver: "json-file"
@@ -74,6 +78,7 @@ services:
     user: "root" # Alloy needs root to read logs from other containers in /var/lib/docker
     environment:
       - TZ=${TZ}
+      - DOMAIN=${DOMAIN}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
@@ -85,6 +90,10 @@ services:
     command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
     networks:
       - traefik
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     logging:
       driver: "json-file"
       options:

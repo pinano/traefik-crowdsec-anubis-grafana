@@ -17,9 +17,9 @@ entryPoints:
     # prevent Slowloris type attacks
     transport:
       respondingTimeouts:
-        readTimeout: "10s"
-        writeTimeout: "10s"
-        idleTimeout: "30s"
+        readTimeout: "TRAEFIK_TIMEOUT_ACTIVE_PLACEHOLDER"
+        writeTimeout: "TRAEFIK_TIMEOUT_ACTIVE_PLACEHOLDER"
+        idleTimeout: "TRAEFIK_TIMEOUT_IDLE_PLACEHOLDER"
 
   websecure:
     address: ":443"
@@ -31,9 +31,9 @@ entryPoints:
     # prevent Slowloris type attacks
     transport:
       respondingTimeouts:
-        readTimeout: "10s"
-        writeTimeout: "10s"
-        idleTimeout: "30s"
+        readTimeout: "TRAEFIK_TIMEOUT_ACTIVE_PLACEHOLDER"
+        writeTimeout: "TRAEFIK_TIMEOUT_ACTIVE_PLACEHOLDER"
+        idleTimeout: "TRAEFIK_TIMEOUT_IDLE_PLACEHOLDER"
 
   mariadb:
     address: ":3306"

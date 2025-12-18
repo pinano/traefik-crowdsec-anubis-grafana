@@ -91,13 +91,98 @@ Traefik serves as the ingress controller and the first line of defense.
 - **Bouncer Integration**: Uses the CrowdSec Traefik Bouncer plugin to enforce IP bans at the edge.
 - **Dynamic Configuration**: Reloads rules on-the-fly without downtime.
 
+### The Golden Chain (Middleware Pipeline)
+
+Every request entering the stack passes through a sequential chain of middlewares designed to filter, protect, and optimize traffic before it reaches your applications.
+
+| Order | Middleware | Purpose | Security Benefit |
+|:---:|:---|:---|:---|
+| 1 | **CrowdSec Check** | Consults the local CrowdSec database for the client IP. | **Instant Mitigation**: Blocks known malicious IPs (botnets, scanners) at the entry point. |
+| 2 | **Security Headers** | Injects recommended browser security headers (HSTS, XSS, Frame-Options). | **Client Hardening**: Protects users from clickjacking and protocol downgrade attacks. |
+| 3 | **Global Buffering** | Reads the entire request into memory before passing it to the backend. | **Slowloris Defense**: Prevents attackers from exhausting server sockets by sending data very slowly. |
+| 4 | **Rate Limiting** | Throttles requests based on average and burst thresholds (global or per-domain). | **Flood Protection**: Mitigates automated scraping and brute-force attempts. |
+| 5 | **Concurrency** | Limits the number of simultaneous active connections per client. | **Resource Preservation**: Ensures one heavy/malicious user cannot consume all backend worker threads. |
+| 6 | **ForwardAuth (Anubis)** | (Optional) Intercepts requests to protected routes to verify or challenge the session. | **Bot Defense**: Forces suspicious or unauthenticated traffic to solve a Proof-of-Work challenge. |
+| 7 | **Compression** | Dynamically compresses response bodies (Gzip) for supported clients. | **Performance**: Reduces bandwidth usage and improves load times for end-users. |
+
+#### Specialized Middlewares
+
+- **`apache-forward-headers`**: Injects `X-Forwarded-Proto: https` headers. Critical for legacy apps like WordPress to detect they are behind an SSL proxy.
+- **`redirect-regex`**: Handles 301/302 redirections defined in `domains.csv` with optimized regex matching.
+- **`anubis-assets-stripper`**: Internal helper to clean request paths for Anubis static assets, ensuring the backend receives clean URIs.
+
 ### CrowdSec (IPS)
 
-CrowdSec analyzes behavior to detect attacks (brute force, scanning, bot spam).
+CrowdSec is a collaborative Intrusion Prevention System that analyzes behavior to detect attacks (brute force, scanning, bot spam).
 
 - **Log Analysis**: Reads logs via the Docker socket, matching patterns against community scenarios.
 - **Community Blocklist**: Automatically shares and receives ban lists from the global network.
-- **Remediation**: Instructs Traefik to ban IPs (403 Forbidden).
+- **Remediation**: Instructs Traefik to ban IPs (403 Forbidden) via the bouncer API.
+
+#### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      CrowdSec Engine                        │
+├─────────────────────────────────────────────────────────────┤
+│  Parsers          │  Scenarios         │  LAPI (REST API)   │
+│  ├─ traefik       │  ├─ http-probing   │  ├─ Decisions DB   │
+│  ├─ nginx         │  ├─ http-crawlers  │  ├─ Bouncer API    │
+│  └─ syslog        │  └─ brute-force    │  └─ Central API    │
+└─────────────────────────────────────────────────────────────┘
+         ▲                    │                    │
+         │ Logs               │ Alerts             ▼
+    ┌────┴────┐          ┌────┴────┐       ┌──────────────┐
+    │ Traefik │          │ Console │       │   Bouncer    │
+    │  Logs   │          │ CrowdSec│       │  (Traefik)   │
+    └─────────┘          └─────────┘       └──────────────┘
+```
+
+#### Key Concepts
+
+| Concept | Description |
+|---------|-------------|
+| **Parser** | Extracts structured data from logs (IP, user-agent, status codes) |
+| **Scenario** | Defines malicious behavior patterns (e.g., 10 failed logins in 1 minute) |
+| **Decision** | The remediation action (ban, captcha, throttle) with duration |
+| **Bouncer** | Component that enforces decisions (Traefik plugin in our case) |
+| **LAPI** | Local API that stores decisions and communicates with bouncers |
+| **CAPI** | Central API for sharing threat intelligence with the community |
+
+#### Installed Collections
+
+This stack comes pre-configured with the following CrowdSec collections:
+
+| Collection | Description |
+|------------|-------------|
+| `crowdsecurity/traefik` | Parsers and scenarios for Traefik access logs |
+| `crowdsecurity/http-cve` | Detection of CVE exploits in HTTP requests |
+| `crowdsecurity/sshd` | SSH brute-force detection |
+| `crowdsecurity/whitelist-good-actors` | Whitelists known good bots (Google, Bing, etc.) |
+| `crowdsecurity/base-http-scenarios` | Common HTTP attack patterns (path traversal, SQL injection) |
+| `crowdsecurity/http-dos` | HTTP flood and DDoS detection |
+
+#### Aggressive Ban Policy
+
+Custom profiles in `config/crowdsec/profiles.yaml` enforce longer ban durations:
+
+| Profile | Trigger | Ban Duration |
+|---------|---------|--------------|
+| Repeat Offender | IP triggers >5 events | **7 days** |
+| Standard Attack | Any IP-based alert | **24 hours** (default is 4h) |
+| Range Attack | Subnet-based alert | **48 hours** |
+
+> [!TIP]
+> You can customize ban durations by editing `config/crowdsec/profiles.yaml`.
+
+#### CrowdSec Console (Optional)
+
+You can enroll your instance in the [CrowdSec Console](https://app.crowdsec.net) to gain:
+- Centralized view of alerts across multiple servers
+- Access to premium blocklists
+- Visual dashboards of attack trends
+
+To enable it, provide your enrollment key during setup (`config/crowdsec/console-enrollment-key` is not used, use the interactive script or `.env`).
 
 ### Anubis (Bot Defense)
 
@@ -106,7 +191,40 @@ Anubis is a specialized "ForwardAuth" middleware for mitigating bots.
 - **Mechanism**: When a user accesses a protected route without a valid session, Anubis intercepts the request.
 - **Challenge**: Presents a cryptographic Proof-of-Work (PoW) challenge the client must solve.
 - **Isolation**: One Anubis instance is deployed per TLD to respect "Same-Site" cookie policies.
-- **Customization**: Modify assets in `config/anubis/assets/` (images: `pensive.webp`, `happy.webp`, `reject.webp`; styles: `custom.css`).
+
+#### Custom Assets
+
+Anubis supports custom styling and images. The project includes default assets (with `.dist` extension) that are automatically used if you don't provide custom versions.
+
+**Asset files:**
+
+| File | Location | Description |
+|------|----------|-------------|
+| `custom.css` | `config/anubis/assets/` | Custom stylesheet for the challenge page |
+| `happy.webp` | `config/anubis/assets/static/img/` | Image shown on successful challenge |
+| `pensive.webp` | `config/anubis/assets/static/img/` | Image shown while solving challenge |
+| `reject.webp` | `config/anubis/assets/static/img/` | Image shown on failed challenge |
+
+**How it works:**
+
+1. Default assets are stored with `.dist` extension (e.g., `custom.css.dist`)
+2. When `start.sh` runs, it checks for each asset file
+3. If a custom version exists (without `.dist`), it uses your custom file
+4. If no custom version exists, it copies the default `.dist` file
+
+**To customize:**
+
+```bash
+# Example: Create custom CSS
+cp config/anubis/assets/custom.css.dist config/anubis/assets/custom.css
+# Edit config/anubis/assets/custom.css with your changes
+
+# Example: Use custom images
+cp /path/to/your/happy.webp config/anubis/assets/static/img/happy.webp
+```
+
+> [!TIP]
+> Your custom assets are git-ignored, so they won't be overwritten by project updates.
 
 ### Redis (State Management)
 
@@ -134,7 +252,7 @@ A lightweight utility service that monitors the stack and sends Telegram alerts.
 ### Auxiliary Tools
 
 - **Dozzle**: Real-time log viewer for all containers (`https://dozzle.<domain>`).
-- **ctop**: Interactive container monitoring (run manually with `docker compose -f docker-compose-tools.yml run --rm ctop`).
+- **ctop**: Interactive container monitoring (run manually with `docker compose -f docker-compose-tools.yaml run --rm ctop`).
 - **Anubis-Assets**: Nginx server for local Anubis static assets.
 
 ---
@@ -169,15 +287,15 @@ A lightweight utility service that monitors the stack and sends Telegram alerts.
 │   │   ├── check-crowdsec.sh
 │   │   └── check-dns.sh
 │   └── traefik/                           # Traefik configuration
-│       ├── traefik.yml.template           # Static config template
+│       ├── traefik.yaml.template           # Static config template
 │       └── dynamic-config/                # Generated routers/middlewares
 │
 └── Docker Compose Files:
-    ├── docker-compose-traefik-crowdsec-redis.yml   # Core infrastructure
-    ├── docker-compose-tools.yml                     # Tools & monitoring
-    ├── docker-compose-grafana-loki-alloy.yml        # Observability stack
-    ├── docker-compose-anubis-base.yml               # Anubis template
-    └── docker-compose-anubis-generated.yml          # Auto-generated Anubis instances
+    ├── docker-compose-traefik-crowdsec-redis.yaml   # Core infrastructure
+    ├── docker-compose-tools.yaml                     # Tools & monitoring
+    ├── docker-compose-grafana-loki-alloy.yaml        # Observability stack
+    ├── docker-compose-anubis-base.yaml               # Anubis template
+    └── docker-compose-anubis-generated.yaml          # Auto-generated Anubis instances
 ```
 
 ---
@@ -205,6 +323,9 @@ Run the interactive setup wizard:
 chmod +x initialize-env.sh
 ./initialize-env.sh
 ```
+
+> [!NOTE]
+> **Auto-Initialization**: If you run `./start.sh` without a `.env` file, the system will automatically launch this wizard for you.
 
 The wizard will prompt for:
 - **Admin credentials**: Applied to Grafana (plaintext) and hashed (bcrypt) for Traefik/Dozzle dashboards.
@@ -239,13 +360,15 @@ cp domains.csv.dist domains.csv
 ```
 
 This script:
-1. Generates `traefik-generated.yml` from template
-2. Runs `generate-config.py` to create routes
-3. Creates required networks
-4. Boots CrowdSec/Redis first (security layer)
-5. Waits for CrowdSec health check
-6. Registers the bouncer API key
-7. Deploys all remaining services
+1. Synchronizes environment: Compares `.env` with `.env.dist`. It appends any missing variables from the template while preserving your current values and custom additions.
+2. Auto-Initialize: Runs `./initialize-env.sh` if the `.env` file is completely missing.
+3. Generates `traefik-generated.yaml` from template
+4. Runs `generate-config.py` to create routes
+5. Creates required networks
+6. Boots CrowdSec/Redis first (security layer)
+7. Waits for CrowdSec health check
+8. Registers the bouncer API key
+9. Deploys all remaining services
 
 ---
 
@@ -281,6 +404,7 @@ This script:
 |----------|-------------|---------|
 | `CROWDSEC_API_KEY` | Bouncer API key | Auto-generated |
 | `CROWDSEC_UPDATE_INTERVAL` | Blocklist refresh interval (seconds) | `60` |
+| `CROWDSEC_ENROLLMENT_KEY` | Optional key to connect instance to CrowdSec Console | - |
 
 #### Traefik
 
@@ -294,6 +418,19 @@ This script:
 | `ACME_EMAIL` | Let's Encrypt contact email | - |
 | `ACME_ENV_TYPE` | `staging` or `production` | `staging` |
 | `TRAEFIK_DASHBOARD_AUTH` | Basic auth for dashboard (htpasswd format) | - |
+
+#### Traefik Timeouts
+
+Legacy applications or slow backends may require adjusted timeouts. We provide two variables to control the entire pipeline (**Client** ↔ **Traefik** ↔ **Backend**).
+
+| Variable | Default | Function |
+|----------|---------|----------|
+| `TRAEFIK_TIMEOUT_ACTIVE` | `60` | **Active Connection Limit** (Seconds).<br>Controls `readTimeout`, `writeTimeout` (EntryPoints) and `responseHeaderTimeout` (Transport).<br><br>• **readTimeout**: Max time to read the entire request (headers + body) from the client.<br>• **writeTimeout**: Max time to write the response to the client. This is the effective "Time To First Byte" limit for your apps.<br>• **responseHeaderTimeout**: Max time Traefik waits for the backend to send response headers. |
+| `TRAEFIK_TIMEOUT_IDLE` | `90` | **Idle Connection Buffer** (Seconds).<br>Controls `idleTimeout` (EntryPoints) and `idleConnTimeout` (Transport).<br><br>It is recommended to keep this value **higher** than the active timeout to avoid race conditions where a connection is closed just as a new request arrives.<br><br>• **idleTimeout**: Max time to keep an inactive connection open (Keep-Alive) waiting for a new request.<br>• **idleConnTimeout**: Max time an idle connection to the backend is kept open for reuse. |
+
+> [!IMPORTANT]
+> **Synchronization**: These variables update the configuration at **both ends** of the proxy.
+> If your application takes 70 seconds to respond, you must increase **`TRAEFIK_TIMEOUT_ACTIVE`** to at least 75s. Setting only one side (e.g., Transport) would be useless if the other side (EntryPoint) cuts the connection at 60s.
 
 #### Grafana
 
@@ -322,13 +459,26 @@ This script:
 |---------|-------------|
 | `./start.sh` | Deploy/update the stack |
 | `./stop.sh` | Stop all containers |
-| `docker compose -f docker-compose-tools.yml run --rm ctop` | Interactive container monitor |
+| `docker compose -f docker-compose-tools.yaml run --rm ctop` | Interactive container monitor |
 
 ### Security Operations (CrowdSec)
+
+All CrowdSec commands use `cscli` (CrowdSec CLI) inside the container:
+
+```bash
+docker exec crowdsec cscli <command>
+```
+
+#### Decision Management (Bans)
 
 **Ban an IP:**
 ```bash
 docker exec crowdsec cscli decisions add --ip <IP> --duration 24h --reason "Manual Ban"
+```
+
+**Ban an IP range (CIDR):**
+```bash
+docker exec crowdsec cscli decisions add --range 192.168.1.0/24 --duration 24h --reason "Subnet ban"
 ```
 
 **Unban an IP:**
@@ -341,10 +491,121 @@ docker exec crowdsec cscli decisions delete --ip <IP>
 docker exec crowdsec cscli decisions list
 ```
 
+**List bans with details (JSON):**
+```bash
+docker exec crowdsec cscli decisions list -o json
+```
+
+#### Metrics & Statistics
+
+**View real-time metrics:**
+```bash
+docker exec crowdsec cscli metrics
+```
+
+This shows:
+- Parsed log lines per source
+- Active scenarios and their triggers
+- Bouncer API requests
+- Decision counts (bans, captchas)
+
+**View metrics in Prometheus format:**
+```bash
+docker exec crowdsec cscli metrics -o json
+```
+
+#### Alerts & Attack History
+
+**List recent alerts:**
+```bash
+docker exec crowdsec cscli alerts list
+```
+
+**View detailed alert information:**
+```bash
+docker exec crowdsec cscli alerts inspect <ALERT_ID>
+```
+
+**Show alerts from the last hour:**
+```bash
+docker exec crowdsec cscli alerts list --since 1h
+```
+
+#### Scenario & Parser Management
+
+**List installed scenarios:**
+```bash
+docker exec crowdsec cscli scenarios list
+```
+
+**List installed parsers:**
+```bash
+docker exec crowdsec cscli parsers list
+```
+
+**List installed collections:**
+```bash
+docker exec crowdsec cscli collections list
+```
+
+#### Hub Management (Install/Update Components)
+
+**Update the hub index:**
+```bash
+docker exec crowdsec cscli hub update
+```
+
+**Upgrade all installed components:**
+```bash
+docker exec crowdsec cscli hub upgrade
+```
+
+**Install a new collection (e.g., for WordPress):**
+```bash
+docker exec crowdsec cscli collections install crowdsecurity/wordpress
+```
+
+**Search for available scenarios:**
+```bash
+docker exec crowdsec cscli hub list -a | grep <keyword>
+```
+
+#### Bouncer Management
+
 **Check bouncer status:**
 ```bash
 docker exec crowdsec cscli bouncers list
 ```
+
+**Delete a bouncer:**
+```bash
+docker exec crowdsec cscli bouncers delete <bouncer_name>
+```
+
+**Add a new bouncer with specific key:**
+```bash
+docker exec crowdsec cscli bouncers add <name> --key <API_KEY>
+```
+
+#### Diagnostic Commands
+
+**Check CrowdSec health:**
+```bash
+docker exec crowdsec cscli lapi status
+```
+
+**Validate configuration:**
+```bash
+docker exec crowdsec cscli config show
+```
+
+**Test log parsing (dry-run):**
+```bash
+docker exec crowdsec cscli explain --file /var/log/traefik/access.log --type traefik
+```
+
+> [!TIP]
+> Use `docker exec crowdsec cscli <command> --help` for detailed options on any command.
 
 ### Monitoring Dashboards
 

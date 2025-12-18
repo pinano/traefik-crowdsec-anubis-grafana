@@ -5,6 +5,17 @@
 
 set -e
 
+# =============================================================================
+# TERMINAL RESTORATION
+# =============================================================================
+
+cleanup() {
+    tput cnorm  # Restore cursor
+    stty echo   # Ensure echo is back
+}
+
+trap cleanup EXIT INT TERM
+
 DIST_FILE=".env.dist"
 ENV_FILE=".env"
 
@@ -104,9 +115,22 @@ fi
 
 prompt_val "CROWDSEC_UPDATE_INTERVAL" "CrowdSec update interval (seconds)"
 
+echo ""
+echo "👉 CrowdSec Console Enrollment (optional)"
+echo "   Get your key from https://app.crowdsec.net"
+read -p "   Enter enrollment key (leave empty to skip): " cs_enroll_key
+if [ -n "$cs_enroll_key" ]; then
+    replace_val "CROWDSEC_ENROLLMENT_KEY" "$cs_enroll_key"
+    echo "   ✅ Set CROWDSEC_ENROLLMENT_KEY"
+else
+    echo "   ⏭️ Skipping console enrollment"
+fi
+
 prompt_val "GLOBAL_RATE_AVG" "Traefik default rate limit (requests/sec)"
 prompt_val "GLOBAL_RATE_BURST" "Traefik default burst limit"
 prompt_val "GLOBAL_CONCURRENCY" "Traefik global concurrency"
+prompt_val "TRAEFIK_TIMEOUT_ACTIVE" "Traefik active timeout (read/write/header) in seconds"
+prompt_val "TRAEFIK_TIMEOUT_IDLE" "Traefik idle timeout in seconds"
 prompt_val "HSTS_MAX_AGE" "HSTS max age (seconds)"
 
 prompt_val "GF_ADMIN_USER" "Admin User (Grafana, Traefik, Dozzle)"
@@ -158,7 +182,7 @@ if [[ "$gen_cs" == "y" || "$gen_cs" == "Y" ]]; then
     fi
 
     echo "   🚀 Starting CrowdSec container..."
-    docker compose -f docker-compose-traefik-crowdsec-redis.yml up -d crowdsec
+    docker compose -f docker-compose-traefik-crowdsec-redis.yaml up -d crowdsec
     
     echo "   ⏳ Waiting for CrowdSec API..."
     # Wait loop
@@ -190,7 +214,7 @@ if [[ "$gen_cs" == "y" || "$gen_cs" == "Y" ]]; then
     fi
 
     echo "   🛑 Stopping CrowdSec..."
-    docker compose -f docker-compose-traefik-crowdsec-redis.yml stop crowdsec
+    docker compose -f docker-compose-traefik-crowdsec-redis.yaml stop crowdsec
 fi
 
 echo ""

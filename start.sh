@@ -1,128 +1,313 @@
 #!/bin/bash
 
-# start.sh
+# =============================================================================
+# start.sh - Stack Deployment Script
+# =============================================================================
 # Loads configuration, prepares networks, and deploys the stack safely,
 # ensuring security components (CrowdSec/Redis) are operational first.
+# =============================================================================
 
-# Load variables from .env by automatically exporting them
+set -e  # Exit on any error
+
+# =============================================================================
+# TERMINAL RESTORATION
+# =============================================================================
+# Ensures the cursor is restored and echo is enabled if the script is interrupted.
+
+cleanup() {
+    tput cnorm  # Restore cursor
+    stty echo   # Ensure echo is back
+}
+
+trap cleanup EXIT INT TERM
+
+# Ensures .env exists and is up to date with .env.dist structure.
+
+DIST_FILE=".env.dist"
+ENV_FILE=".env"
+
+# 1. Check if .env exists, if not, initialize
+if [ ! -f "$ENV_FILE" ]; then
+    echo "⚠️  $ENV_FILE not found. Running initialization..."
+    if [ -f "./initialize-env.sh" ]; then
+        chmod +x ./initialize-env.sh
+        ./initialize-env.sh
+        exit 0
+    else
+        echo "❌ Error: initialize-env.sh not found. Please create $ENV_FILE manually."
+        exit 1
+    fi
+fi
+
+# 2. Sync variables from .env.dist to .env, preserving order
+echo "🔄 Synchronizing $ENV_FILE with $DIST_FILE..."
+TEMP_ENV=$(mktemp)
+ADDED_VARS=0
+cp "$ENV_FILE" "${ENV_FILE}.bak"
+
+# Process all lines from .env.dist to maintain its structure
+while IFS= read -r line || [ -n "$line" ]; do
+    # Preserve comments and empty lines
+    if [[ "$line" =~ ^# ]] || [[ -z "$line" ]]; then
+        echo "$line" >> "$TEMP_ENV"
+        continue
+    fi
+
+    # Extract variable name (part before =)
+    VAR_NAME=$(echo "$line" | cut -d'=' -f1)
+    
+    # Check if variable exists in current .env
+    if grep -q "^${VAR_NAME}=" "$ENV_FILE"; then
+        # Use existing value from .env (take the first occurrence)
+        grep "^${VAR_NAME}=" "$ENV_FILE" | head -n 1 >> "$TEMP_ENV"
+    else
+        # Use default value from .env.dist
+        echo "$line" >> "$TEMP_ENV"
+        echo "   ➕ Added variable: $VAR_NAME"
+        ADDED_VARS=$((ADDED_VARS + 1))
+    fi
+done < "$DIST_FILE"
+
+# Append any custom variables from .env that are NOT in .env.dist
+EXTRA_VARS=0
+while IFS= read -r line || [ -n "$line" ]; do
+    if [[ "$line" =~ ^# ]] || [[ -z "$line" ]]; then continue; fi
+    VAR_NAME=$(echo "$line" | cut -d'=' -f1)
+    if ! grep -q "^${VAR_NAME}=" "$DIST_FILE"; then
+        if [ $EXTRA_VARS -eq 0 ]; then
+            echo "" >> "$TEMP_ENV"
+            echo "# --- Custom variables (not in .env.dist) ---" >> "$TEMP_ENV"
+        fi
+        echo "$line" >> "$TEMP_ENV"
+        EXTRA_VARS=$((EXTRA_VARS + 1))
+    fi
+done < "$ENV_FILE"
+
+mv "$TEMP_ENV" "$ENV_FILE"
+
+if [ $ADDED_VARS -gt 0 ]; then
+    echo "   ✅ Added $ADDED_VARS new variables from .env.dist."
+fi
+if [ $EXTRA_VARS -gt 0 ]; then
+    echo "   ℹ️  Preserved $EXTRA_VARS custom variables."
+fi
+
+# Load variables
 set -a
 source .env
 set +a
 
-# If Traefik's acme.json doesn't exist, create it empty first
+# =============================================================================
+# PHASE 1: Prepare Anubis Assets
+# =============================================================================
+# Copy default assets (.dist files) if user hasn't provided custom ones.
+# This allows customization while maintaining defaults in version control.
+
+echo "🎨 Checking Anubis assets..."
+
+ANUBIS_ASSETS_DIR="./config/anubis/assets"
+ANUBIS_ASSETS_IMG_DIR="$ANUBIS_ASSETS_DIR/static/img"
+
+# Copy default CSS if custom doesn't exist
+if [ ! -f "$ANUBIS_ASSETS_DIR/custom.css" ]; then
+    if [ -f "$ANUBIS_ASSETS_DIR/custom.css.dist" ]; then
+        cp "$ANUBIS_ASSETS_DIR/custom.css.dist" "$ANUBIS_ASSETS_DIR/custom.css"
+        echo "   ✅ Copied default custom.css"
+    fi
+else
+    echo "   ℹ️ Using custom custom.css"
+fi
+
+# Copy default images if custom versions don't exist
+for img in happy.webp pensive.webp reject.webp; do
+    if [ ! -f "$ANUBIS_ASSETS_IMG_DIR/$img" ]; then
+        if [ -f "$ANUBIS_ASSETS_IMG_DIR/$img.dist" ]; then
+            cp "$ANUBIS_ASSETS_IMG_DIR/$img.dist" "$ANUBIS_ASSETS_IMG_DIR/$img"
+            echo "   ✅ Copied default $img"
+        fi
+    else
+        echo "   ℹ️ Using custom $img"
+    fi
+done
+
+# =============================================================================
+# PHASE 2: Prepare Traefik Certificate Storage
+# =============================================================================
+# Create acme.json with restrictive permissions if it doesn't exist.
+# This file stores Let's Encrypt certificates and must be chmod 600.
+
+echo "🔐 Checking Traefik certificate storage..."
 if [ ! -f ./config/traefik/acme.json ]; then
     touch ./config/traefik/acme.json
-    # Set restrictive permissions (rw for owner, nothing for others)
     chmod 600 ./config/traefik/acme.json
+    echo "   ✅ Created acme.json with secure permissions."
+else
+    echo "   ✅ acme.json already exists."
 fi
 
-# Logic to set ACME_CA_SERVER based on ACME_ENV_TYPE
-# PRIORITY: ACME_ENV_TYPE > ACME_CA_SERVER (from .env)
-# This ensures that if the user sets ACME_ENV_TYPE, it is respected, 
-# even if an old ACME_CA_SERVER variable remains in the .env file.
+# =============================================================================
+# PHASE 3: Configure ACME Environment
+# =============================================================================
+# Priority: ACME_ENV_TYPE > ACME_CA_SERVER (from .env)
+# This ensures ACME_ENV_TYPE is respected even if an old ACME_CA_SERVER
+# variable remains in the .env file.
 
+echo "🔒 Configuring ACME environment..."
 if [ -n "$ACME_ENV_TYPE" ]; then
-    if [ "$ACME_ENV_TYPE" = "staging" ]; then
-        export ACME_CA_SERVER="https://acme-staging-v02.api.letsencrypt.org/directory"
-        echo "⚠️  Traefik configured for Let's Encrypt STAGING environment (via ACME_ENV_TYPE)."
-    elif [ "$ACME_ENV_TYPE" = "production" ]; then
-        export ACME_CA_SERVER="https://acme-v02.api.letsencrypt.org/directory"
-        echo "🔒 Traefik configured for Let's Encrypt PRODUCTION environment (via ACME_ENV_TYPE)."
-    else
-        # If set but unknown value, fall back to what might be in ACME_CA_SERVER or default
-        echo "⚠️  Unknown ACME_ENV_TYPE: '$ACME_ENV_TYPE'. Ignoring."
-    fi
+    case "$ACME_ENV_TYPE" in
+        staging)
+            export ACME_CA_SERVER="https://acme-staging-v02.api.letsencrypt.org/directory"
+            echo "   ⚠️ Let's Encrypt STAGING environment."
+            ;;
+        production)
+            export ACME_CA_SERVER="https://acme-v02.api.letsencrypt.org/directory"
+            echo "   ✅ Let's Encrypt PRODUCTION environment."
+            ;;
+        *)
+            echo "   ⚠️ Unknown ACME_ENV_TYPE: '$ACME_ENV_TYPE'. Ignoring."
+            ;;
+    esac
 fi
 
-# If ACME_CA_SERVER is still empty (ACME_ENV_TYPE was not set or invalid, and no ACME_CA_SERVER in .env),
-# default to Staging.
+# Default to staging if ACME_CA_SERVER is still empty
 if [ -z "$ACME_CA_SERVER" ]; then
-     export ACME_CA_SERVER="https://acme-staging-v02.api.letsencrypt.org/directory"
-     echo "⚠️ Traefik configured for Let's Encrypt STAGING environment (Default)."
+    export ACME_CA_SERVER="https://acme-staging-v02.api.letsencrypt.org/directory"
+    echo "   ⚠️ Let's Encrypt STAGING environment (default)."
 elif [ -z "$ACME_ENV_TYPE" ]; then
-     # Only show this message if we are using the manual override (ACME_ENV_TYPE is empty)
-     echo "🔧 Using custom ACME_CA_SERVER from .env: $ACME_CA_SERVER"
+    # Only show this if using manual override (ACME_ENV_TYPE is empty)
+    echo "   🔧 Using custom ACME_CA_SERVER from .env."
 fi
 
-# Generate traefik-generated.yml from template
-echo "🔧 Generating traefik-generated.yml from template..."
-if [ -f "./config/traefik/traefik.yml.template" ]; then
+# =============================================================================
+# PHASE 4: Generate Configuration Files
+# =============================================================================
+
+# Generate traefik-generated.yaml from template
+echo "🔧 Generating traefik-generated.yaml from template..."
+if [ -f "./config/traefik/traefik.yaml.template" ]; then
     sed -e "s|ACME_EMAIL_PLACEHOLDER|${ACME_EMAIL}|g" \
         -e "s|ACME_CASERVER_PLACEHOLDER|${ACME_CA_SERVER}|g" \
-        ./config/traefik/traefik.yml.template > ./config/traefik/traefik-generated.yml
-    echo "✅ traefik-generated.yml generated successfully."
+        -e "s|TRAEFIK_TIMEOUT_ACTIVE_PLACEHOLDER|${TRAEFIK_TIMEOUT_ACTIVE:-60}s|g" \
+        -e "s|TRAEFIK_TIMEOUT_IDLE_PLACEHOLDER|${TRAEFIK_TIMEOUT_IDLE:-90}s|g" \
+        ./config/traefik/traefik.yaml.template > ./config/traefik/traefik-generated.yaml
+    echo "   ✅ traefik-generated.yaml generated."
 else
-    echo "❌ Error: config/traefik/traefik.yml.template not found!"
+    echo "❌ Error: config/traefik/traefik.yaml.template not found!"
     exit 1
 fi
 
-echo "🔧 Generating dynamic configuration with python script..."
+# Calculate hash of the generated config to force restart on changes
+# relying on Docker Compose to detect env var changes
+if [ -f "./config/traefik/traefik-generated.yaml" ]; then
+    TRAEFIK_CONFIG_HASH=$(python3 -c "import hashlib; print(hashlib.sha1(open('./config/traefik/traefik-generated.yaml', 'rb').read()).hexdigest())")
+    export TRAEFIK_CONFIG_HASH
+    echo "   #️⃣  Traefik Config Hash: $TRAEFIK_CONFIG_HASH"
+fi
+
+# Generate dynamic configuration with Python script
+echo "🔧 Generating dynamic configuration..."
 python3 generate-config.py
-echo "✅ Configuration generated."
+echo "   ✅ Dynamic configuration generated."
 
-# 0. NETWORK PREPARATION
-echo "🌐 Checking for isolated network 'anubis-backend'..."
+# =============================================================================
+# PHASE 5: Prepare Docker Networks
+# =============================================================================
+# Create isolated internal network for Anubis backend communication.
+# --internal flag ensures no external host traffic can reach this network.
 
-# Use 'inspect' instead of 'ls' to ensure EXACT match
+echo "🌐 Checking Docker networks..."
 if ! docker network inspect anubis-backend >/dev/null 2>&1; then
-    echo "    Creating anubis-backend network (internal)..."
-    # --internal ensures no external host traffic can reach this network
     docker network create --internal anubis-backend
+    echo "   ✅ Created anubis-backend network (internal)."
 else
-    echo "   Network already exists correctly."
+    echo "   ✅ anubis-backend network already exists."
 fi
 
-# Define the compose files to avoid repeating the list and potential errors
-COMPOSE_FILES="-f docker-compose-traefik-crowdsec-redis.yml \
-               -f docker-compose-tools.yml \
-               -f docker-compose-anubis-generated.yml \
-               -f docker-compose-grafana-loki-alloy.yml"
+# =============================================================================
+# PHASE 6: Build Compose File List
+# =============================================================================
 
-# Optional: Include Apache host logs if the directory exists (legacy installations)
+COMPOSE_FILES="-f docker-compose-traefik-crowdsec-redis.yaml \
+               -f docker-compose-tools.yaml \
+               -f docker-compose-anubis-generated.yaml \
+               -f docker-compose-grafana-loki-alloy.yaml"
+
+# Include Apache host logs for legacy installations
 if [ -d "/var/log/apache2" ]; then
-    COMPOSE_FILES="$COMPOSE_FILES -f docker-compose-apache-logs.yml"
-    echo "📋 Apache logs directory detected, including docker-compose-apache-logs.yml"
+    COMPOSE_FILES="$COMPOSE_FILES -f docker-compose-apache-logs.yaml"
+    echo "   📋 Apache logs detected, including docker-compose-apache-logs.yaml"
 fi
 
-# 1. SECURE BOOT PHASE: CrowdSec + Redis
-echo "🛡️ Booting up security layer (CrowdSec)..."
-# Start only the security/persistence services first
+# =============================================================================
+# PHASE 7: Boot Security Layer First
+# =============================================================================
+# Start CrowdSec and Redis before other services to ensure the security
+# layer is ready when Traefik starts.
+
+echo "🛡️  Booting security layer (CrowdSec + Redis)..."
 docker compose $COMPOSE_FILES up -d crowdsec redis
 
-# 2. SMART WAIT (Health Check)
-# Instead of sleeping blindly, we check Docker's health status for CrowdSec
-echo "⏳ Waiting for CrowdSec API to be ready..."
+# Wait for CrowdSec to be healthy (smart wait instead of blind sleep)
+echo -n "   ⏳ Waiting for CrowdSec API"
 timeout=60
 while [ "$(docker inspect --format='{{.State.Health.Status}}' crowdsec 2>/dev/null)" != "healthy" ]; do
     sleep 2
     echo -n "."
     ((timeout-=2))
     if [ $timeout -le 0 ]; then
-        echo "❌ Timeout waiting for CrowdSec."
+        echo ""
+        echo "   ❌ Timeout waiting for CrowdSec to become healthy."
         exit 1
     fi
 done
-echo "✅ CrowdSec operational."
+echo " ready!"
+echo "   ✅ CrowdSec operational."
 
-# 3. IDENTITY MANAGEMENT (Now it's 100% safe to do it)
+# =============================================================================
+# PHASE 8: Register Bouncer API Key
+# =============================================================================
+# Re-register the bouncer key on each start to ensure consistency.
+# Delete first (silently) in case it already exists, then add fresh.
+
 echo "👮 Synchronizing Bouncer..."
-# Silently delete the bouncer in case it already exists
 docker exec crowdsec cscli bouncers delete traefik-bouncer > /dev/null 2>&1 || true
-# Add the key (which Traefik will use later) using the environment variable
 docker exec crowdsec cscli bouncers add traefik-bouncer --key "${CROWDSEC_API_KEY}" > /dev/null
 
 if [ $? -eq 0 ]; then
-    echo "🔑 Key successfully registered."
+    echo "   🔑 Bouncer key registered successfully."
 else
-    # Changed error message to be more explicit
-    echo "⚠️ Error registering key. Check CrowdSec logs."
+    echo "⚠️ Error registering bouncer key. Check CrowdSec logs."
     exit 1
 fi
 
-# 4. MAIN FLEET DEPLOYMENT
-# Now that the Key exists, Traefik can start and connect immediately
+# =============================================================================
+# PHASE 9: CrowdSec Console Enrollment (Optional)
+# =============================================================================
+# If CROWDSEC_ENROLLMENT_KEY is set, enroll this instance with CrowdSec Console
+# for access to community blocklists and centralized management.
+
+if [ -n "$CROWDSEC_ENROLLMENT_KEY" ]; then
+    echo "🌐 Enrolling in CrowdSec Console..."
+    if docker exec crowdsec cscli console enroll "$CROWDSEC_ENROLLMENT_KEY" --name "$(hostname)" 2>/dev/null; then
+        echo "   ✅ Successfully enrolled in CrowdSec Console."
+    else
+        echo "   ⚠️ Console enrollment failed or already enrolled. Continuing..."
+    fi
+fi
+
+# =============================================================================
+# PHASE 10: Deploy Remaining Services
+# =============================================================================
+# Now that the security layer is ready, deploy everything else.
+# --remove-orphans cleans up any old containers not in current config.
+
 echo "🚀 Deploying Traefik and remaining services..."
-# --remove-orphans ensures any old, unmanaged containers are removed.
 docker compose $COMPOSE_FILES up -d --remove-orphans
 
-echo "✅ Deployment finished with no race conditions."
+# =============================================================================
+# DONE
+# =============================================================================
+
+echo ""
+echo "✅ Deployment complete!"
+echo ""

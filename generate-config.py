@@ -7,9 +7,9 @@ from collections import defaultdict  # for grouping
 
 # ================= CONFIGURATION =================
 INPUT_FILE = 'domains.csv'
-BASE_FILENAME = 'docker-compose-anubis-base.yml'
-OUTPUT_COMPOSE = 'docker-compose-anubis-generated.yml'
-OUTPUT_TRAEFIK = 'config/traefik/dynamic-config/routers-generated.yml'
+BASE_FILENAME = 'docker-compose-anubis-base.yaml'
+OUTPUT_COMPOSE = 'docker-compose-anubis-generated.yaml'
+OUTPUT_TRAEFIK = 'config/traefik/dynamic-config/routers-generated.yaml'
 
 # ============= ENVIRONMENT VARIABLES =============
 CROWDSEC_API_KEY = os.getenv('CROWDSEC_API_KEY')
@@ -23,6 +23,14 @@ try:
     CS_UPDATE_INTERVAL = int(os.getenv('CROWDSEC_UPDATE_INTERVAL', 60))
 except ValueError:
     CS_UPDATE_INTERVAL = 60
+
+# Traefik Timeouts
+try:
+    T_ACTIVE = int(os.getenv('TRAEFIK_TIMEOUT_ACTIVE', 60))
+    T_IDLE = int(os.getenv('TRAEFIK_TIMEOUT_IDLE', 90))
+except ValueError:
+    T_ACTIVE = 60
+    T_IDLE = 90
 
 # Global Rate Limits
 try:
@@ -147,6 +155,17 @@ def generate_configs():
     # Main structure that will contain 'http' and 'tls'
     traefik_dynamic_conf = {
         'http': {
+            # =========================================================================
+            # SERVERS TRANSPORTS (Timeouts for legacy backends)
+            # =========================================================================
+            'serversTransports': {
+                'legacy-transport': {
+                    'forwardingTimeouts': {
+                        'responseHeaderTimeout': f"{T_ACTIVE}s", # Wait T_ACTIVE (default 60s) for the first byte
+                        'idleConnTimeout': f"{T_IDLE}s"          # Keep idle connection a bit longer (default 90s)
+                    }
+                }
+            },
             'middlewares': {
                 # 1. BROWSER SECURITY (PARAMETERIZED HEADERS)
                 'security-headers': {
@@ -205,11 +224,22 @@ def generate_configs():
                         'prefixes': ['/.within.website/x/cmd/anubis']
                     }
                 },
-                # ### NEW CHANGE: Middleware to rewrite CSS path ###
+                # 8. ANUBIS CSS REPLACEMENT
                 # Transforms the unusual Go request into your local file name
                 'anubis-css-replace': {
                     'replacePath': {
                         'path': '/custom.css'
+                    }
+                },
+                # 9. DDOS PROTECTION: BUFFERING
+                # Protects against Slowloris attacks by reading the whole request
+                # before forwarding it to the backend.
+                'global-buffering': {
+                    'buffering': {
+                        'maxRequestBodyBytes': 0, # No limit for body (handled by other layers)
+                        'memRequestBodyBytes': 2097152, # 2MB in memory
+                        'maxResponseBodyBytes': 0,
+                        'memResponseBodyBytes': 2097152 # 2MB in memory
                     }
                 },
             },
@@ -220,6 +250,8 @@ def generate_configs():
                 # by routers if the 'docker_service' column in domains.csv is 'apache-host'.
                 'apache-host-8080': {
                     'loadBalancer': {
+                        # LINK TO THE NEW TRANSPORT
+                        'serversTransport': 'legacy-transport',
                         # Fixed IP used since host.docker.internal failed in the user's Linux environment
                         # NOTE: '172.17.0.1' is the default bridge gateway on Linux. 
                         # For macOS/Windows Docker Desktop, this IP will NOT work (logic requires 'host.docker.internal').
@@ -383,8 +415,6 @@ def generate_configs():
     print("    ✅ Traefik dynamic configuration generated successfully.")
 
 def process_router(entry, http_section, domain_to_cert_def):
-    # (The process_router code remains the same, saving you spam)
-    # ... but make sure to keep it in your original file ...
     domain = entry['domain']
     service = entry['service']
     anubis_sub = entry['anubis_sub']
@@ -415,7 +445,7 @@ def process_router(entry, http_section, domain_to_cert_def):
         mw_list.append(custom_conc_name)
     else:
         mw_list.append('global-concurrency')
-
+    mw_list.append('global-buffering')
     mw_list.append('global-compress')
 
     if anubis_sub:
