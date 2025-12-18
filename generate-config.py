@@ -519,7 +519,7 @@ def process_router(entry, http_section, domain_to_cert_def):
     # with TLS SNI matching and has higher priority than the main router.
     if BLOCKED_PATHS:
         block_router_name = f"blocker-{safe_domain}"
-        paths_rule = " || ".join([f"PathPrefix(`{p}`)" for p in BLOCKED_PATHS])
+        paths_rule = " || ".join([f"PathRegexp(`.*{p}.*`)" for p in BLOCKED_PATHS])
         http_section['routers'][block_router_name] = {
             'rule': f"Host(`{domain}`) && ({paths_rule})",
             'entryPoints': ["websecure"],
