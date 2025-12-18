@@ -45,6 +45,12 @@ services:
       # Middleware: basic auth
       - "traefik.http.routers.traefik.middlewares=auth-middleware"
       - "traefik.http.middlewares.auth-middleware.basicauth.users=${TRAEFIK_DASHBOARD_AUTH}"
+    deploy:
+      resources:
+        reservations:
+          memory: 512M
+        limits:
+          memory: 1G
     logging:
       driver: "json-file"
       options:
@@ -76,6 +82,12 @@ services:
       - traefik
     security_opt:
       - no-new-privileges=true
+    deploy:
+      resources:
+        reservations:
+          memory: 512M
+        limits:
+          memory: 1G
     healthcheck:
       test: [ "CMD", "cscli", "lapi", "status" ]
       interval: 15s
