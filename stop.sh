@@ -15,6 +15,20 @@ set -a
 source .env
 set +a
 
+set -e  # Exit on any error
+
+# =============================================================================
+# TERMINAL RESTORATION
+# =============================================================================
+# Ensures the cursor is restored and echo is enabled if the script is interrupted.
+
+cleanup() {
+    tput cnorm  # Restore cursor
+    stty echo   # Ensure echo is back
+}
+
+trap cleanup EXIT INT TERM
+
 # =============================================================================
 # PHASE 2: Build Compose File List
 # =============================================================================

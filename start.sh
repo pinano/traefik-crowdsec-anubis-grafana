@@ -10,8 +10,17 @@
 set -e  # Exit on any error
 
 # =============================================================================
-# PHASE 0: Environment Setup and Synchronization
+# TERMINAL RESTORATION
 # =============================================================================
+# Ensures the cursor is restored and echo is enabled if the script is interrupted.
+
+cleanup() {
+    tput cnorm  # Restore cursor
+    stty echo   # Ensure echo is back
+}
+
+trap cleanup EXIT INT TERM
+
 # Ensures .env exists and is up to date with .env.dist structure.
 
 DIST_FILE=".env.dist"

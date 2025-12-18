@@ -5,6 +5,17 @@
 
 set -e
 
+# =============================================================================
+# TERMINAL RESTORATION
+# =============================================================================
+
+cleanup() {
+    tput cnorm  # Restore cursor
+    stty echo   # Ensure echo is back
+}
+
+trap cleanup EXIT INT TERM
+
 DIST_FILE=".env.dist"
 ENV_FILE=".env"
 
