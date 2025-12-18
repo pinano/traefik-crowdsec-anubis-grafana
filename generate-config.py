@@ -14,7 +14,14 @@ OUTPUT_TRAEFIK = 'config/traefik/dynamic-config/routers-generated.yaml'
 # ============= ENVIRONMENT VARIABLES =============
 CROWDSEC_API_KEY = os.getenv('CROWDSEC_API_KEY')
 REDIS_PASSWORD = os.getenv('REDIS_PASSWORD')
-TRAEFIK_BLOCKED_PATHS = os.getenv('TRAEFIK_BLOCKED_PATHS', '').split(',')
+BLOCKED_PATHS_STR = os.getenv('TRAEFIK_BLOCKED_PATHS', '').strip()
+
+# Robust stripping of surrounding quotes from the whole string
+if (BLOCKED_PATHS_STR.startswith('"') and BLOCKED_PATHS_STR.endswith('"')) or \
+   (BLOCKED_PATHS_STR.startswith("'") and BLOCKED_PATHS_STR.endswith("'")):
+    BLOCKED_PATHS_STR = BLOCKED_PATHS_STR[1:-1]
+
+BLOCKED_PATHS = [p.strip().strip('"').strip("'") for p in BLOCKED_PATHS_STR.split(',') if p.strip()]
 
 # TLS Chunking Limit (Let's Encrypt max is 100, we use a smaller amount for safety)
 TLS_BATCH_SIZE = 90
@@ -263,6 +270,24 @@ def generate_configs():
             }
         }
     }
+
+    # === BLOCKED PATHS MIDDLEWARE ===
+    if BLOCKED_PATHS:
+        # Blocking Middleware (returns 403 by allowing only localhost)
+        traefik_dynamic_conf['http']['middlewares']['block-unwanted-paths'] = {
+            'ipAllowList': {
+                'sourceRange': ['127.0.0.1/32']
+            }
+        }
+
+    # === BLOCKED PATHS MIDDLEWARE ===
+    if BLOCKED_PATHS:
+        # Blocking Middleware (returns 403 by allowing only localhost)
+        traefik_dynamic_conf['http']['middlewares']['block-unwanted-paths'] = {
+            'ipAllowList': {
+                'sourceRange': ['127.0.0.1/32']
+            }
+        }
 
     # =========================================================================
     # TLS GROUPING LOGIC (SAN GROUPING / CHUNKING)
@@ -513,6 +538,21 @@ def process_router(entry, http_section, domain_to_cert_def):
         router_conf['tls']['domains'] = [domain_to_cert_def[domain]]
 
     http_section['routers'][router_name] = router_conf
+
+    # ### PATH BLOCKING ROUTER (PER-DOMAIN) ###
+    # We create a specific router for blocked paths to ensure it works correctly
+    # with TLS SNI matching and has higher priority than the main router.
+    if BLOCKED_PATHS:
+        block_router_name = f"blocker-{safe_domain}"
+        paths_rule = " || ".join([f"PathRegexp(`.*{p}.*`)" for p in BLOCKED_PATHS])
+        http_section['routers'][block_router_name] = {
+            'rule': f"Host(`{domain}`) && ({paths_rule})",
+            'entryPoints': ["websecure"],
+            'service': "api@internal",
+            'priority': 11000,
+            'tls': router_conf.get('tls', {}),
+            'middlewares': ["block-unwanted-paths"]
+        }
 
 def generate_policy_file():
     input_policy = 'config/anubis/botPolicy.yaml'

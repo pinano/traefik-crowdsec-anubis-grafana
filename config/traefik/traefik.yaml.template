@@ -86,8 +86,7 @@ accessLog:
     # If Traefik serves something in less than 10ms, it is a static (img, css) or cache.
     # It adds no security value -> Not logged.
     # If it takes longer, it is your backend processing or a slow attack -> Logged.
-    # NOTE: Errors (4xx/5xx) are ALWAYS logged, ignore this duration.
-    minDuration: "10ms"
+    #minDuration: "10ms"
 
     # 3. Retries:
     # If Traefik fails to connect to a backend but retries and succeeds,
