@@ -14,6 +14,8 @@ OUTPUT_TRAEFIK = 'config/traefik/dynamic-config/routers-generated.yaml'
 # ============= ENVIRONMENT VARIABLES =============
 CROWDSEC_API_KEY = os.getenv('CROWDSEC_API_KEY')
 REDIS_PASSWORD = os.getenv('REDIS_PASSWORD')
+BLOCKED_PATHS_STR = os.getenv('TRAEFIK_BLOCKED_PATHS', '')
+BLOCKED_PATHS = [p.strip() for p in BLOCKED_PATHS_STR.split(',') if p.strip()]
 
 # TLS Chunking Limit (Let's Encrypt max is 100, we use a smaller amount for safety)
 TLS_BATCH_SIZE = 90
@@ -262,6 +264,26 @@ def generate_configs():
             }
         }
     }
+
+    # === BLOCKED PATHS LOGIC ===
+    if BLOCKED_PATHS:
+        print(f"    🚫 Configuring block for {len(BLOCKED_PATHS)} paths.")
+        # 1. Blocking Middleware (returns 403 by allowing only localhost)
+        traefik_dynamic_conf['http']['middlewares']['block-unwanted-paths'] = {
+            'ipAllowList': {
+                'sourceRange': ['127.0.0.1/32']
+            }
+        }
+        # 2. High Priority Router to catch these paths
+        # Note: We use PathPrefix to catch the path and everything below it
+        paths_rule = " || ".join([f"PathPrefix(`{p}`)" for p in BLOCKED_PATHS])
+        traefik_dynamic_conf['http']['routers']['block-unwanted-paths-router'] = {
+            'rule': paths_rule,
+            'entryPoints': ["web", "websecure"],
+            'service': "api@internal",
+            'priority': 10000,
+            'middlewares': ["block-unwanted-paths"]
+        }
 
     # =========================================================================
     # TLS GROUPING LOGIC (SAN GROUPING / CHUNKING)
