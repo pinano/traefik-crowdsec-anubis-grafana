@@ -51,6 +51,14 @@ fi
 # and no longer exist in the generated docker-compose files.
 
 echo "🛑 Stopping and cleaning the entire fleet..."
+
+# 1. Graceful stop (allow containers to finish tasks)
+# We use || true to ensure 'down' runs even if 'stop' encounters issues
+echo "   ➜ Stopping services gracefully (20s timeout)..."
+docker compose $COMPOSE_FILES stop -t 20 || true
+
+# 2. Complete removal
+echo "   ➜ Removing containers and cleaning orphans..."
 docker compose $COMPOSE_FILES down --remove-orphans
 
 # =============================================================================
