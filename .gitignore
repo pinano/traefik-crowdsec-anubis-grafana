@@ -1,6 +1,7 @@
 # Environment variables
 .env
 .env.save
+.env.bak
 
 # Domains CSV
 domains.csv
