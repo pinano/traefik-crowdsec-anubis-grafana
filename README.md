@@ -405,6 +405,16 @@ This script:
 | `CROWDSEC_API_KEY` | Bouncer API key | Auto-generated |
 | `CROWDSEC_UPDATE_INTERVAL` | Blocklist refresh interval (seconds) | `60` |
 | `CROWDSEC_ENROLLMENT_KEY` | Optional key to connect instance to CrowdSec Console | - |
+| `CROWDSEC_COLLECTIONS` | Space-separated list of CrowdSec collections to load | See [Installed Collections](#installed-collections) |
+
+> [!WARNING]
+> **Changing Collections**: If you modify `CROWDSEC_COLLECTIONS`, you may need to remove CrowdSec's data volumes for the changes to take effect:
+> ```bash
+> docker compose -f docker-compose-traefik-crowdsec-redis.yaml down crowdsec
+> docker volume rm $(docker volume ls -q | grep crowdsec)
+> ./start.sh
+> ```
+> This will reset all CrowdSec state including current bans. Consider exporting decisions first with `docker exec crowdsec cscli decisions list -o json`.
 
 #### Traefik
 

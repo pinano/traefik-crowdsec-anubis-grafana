@@ -126,6 +126,13 @@ else
     echo "   ⏭️ Skipping console enrollment"
 fi
 
+echo ""
+echo "👉 CrowdSec Collections (scenarios/parsers)"
+echo "   Remove 'crowdsecurity/http-dos' if you get too many false positives"
+echo "   ⚠️  If you modify this on an existing installation, you may need to reset CrowdSec volumes:"
+echo "      docker volume rm \$(docker volume ls -q | grep crowdsec)"
+prompt_val "CROWDSEC_COLLECTIONS" "CrowdSec collections to load (space-separated)"
+
 prompt_val "GLOBAL_RATE_AVG" "Traefik default rate limit (requests/sec)"
 prompt_val "GLOBAL_RATE_BURST" "Traefik default burst limit"
 prompt_val "GLOBAL_CONCURRENCY" "Traefik global concurrency"
