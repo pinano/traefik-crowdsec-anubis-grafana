@@ -66,7 +66,7 @@ services:
     restart: unless-stopped
     environment:
       GID: "1000"
-      COLLECTIONS: ${CROWDSEC_COLLECTIONS:-crowdsecurity/traefik crowdsecurity/http-cve crowdsecurity/sshd crowdsecurity/whitelist-good-actors crowdsecurity/base-http-scenarios crowdsecurity/http-dos}
+      COLLECTIONS: ${CROWDSEC_COLLECTIONS}
       TZ: ${TZ}
     volumes:
       - /etc/localtime:/etc/localtime:ro
