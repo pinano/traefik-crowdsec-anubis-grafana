@@ -133,6 +133,12 @@ echo "   ⚠️  If you modify this on an existing installation, you may need to
 echo "      docker volume rm \$(docker volume ls -q | grep crowdsec)"
 prompt_val "CROWDSEC_COLLECTIONS" "CrowdSec collections to load (space-separated)"
 
+echo ""
+echo "👉 CrowdSec IP Whitelist (optional)"
+echo "   Enter IPs/CIDRs to bypass CrowdSec detection (comma-separated)"
+echo "   Example: 192.168.1.1,10.0.0.0/8"
+prompt_val "CROWDSEC_WHITELIST_IPS" "CrowdSec whitelist IPs (leave empty for none)"
+
 prompt_val "GLOBAL_RATE_AVG" "Traefik default rate limit (requests/sec)"
 prompt_val "GLOBAL_RATE_BURST" "Traefik default burst limit"
 prompt_val "GLOBAL_CONCURRENCY" "Traefik global concurrency"

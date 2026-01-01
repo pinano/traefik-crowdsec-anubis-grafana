@@ -274,7 +274,9 @@ A lightweight utility service that monitors the stack and sends Telegram alerts.
 │   ├── anubis/                            # Anubis bot defense
 │   │   └── assets/                        # Static assets (images, CSS)
 │   ├── crowdsec/                          # CrowdSec IPS
-│   │   └── acquis.yaml
+│   │   ├── acquis.yaml
+│   │   ├── profiles.yaml
+│   │   └── parsers/                       # Custom parsers (IP whitelist)
 │   ├── grafana/                           # Grafana datasources
 │   │   └── config.yaml
 │   ├── loki/                              # Loki log storage
@@ -406,6 +408,10 @@ This script:
 | `CROWDSEC_UPDATE_INTERVAL` | Blocklist refresh interval (seconds) | `60` |
 | `CROWDSEC_ENROLLMENT_KEY` | Optional key to connect instance to CrowdSec Console | - |
 | `CROWDSEC_COLLECTIONS` | Space-separated list of CrowdSec collections to load | See [Installed Collections](#installed-collections) |
+| `CROWDSEC_WHITELIST_IPS` | Comma-separated list of trusted IPs/CIDRs to bypass detection | - |
+
+> [!TIP]
+> **IP Whitelisting**: Use `CROWDSEC_WHITELIST_IPS` to prevent false positives from trusted IPs (e.g., office networks, monitoring services). Example: `192.168.1.1,10.0.0.0/8,203.0.113.50`. The whitelist is regenerated on each `./start.sh` run.
 
 > [!WARNING]
 > **Changing Collections**: If you modify `CROWDSEC_COLLECTIONS`, you may need to remove CrowdSec's data volumes for the changes to take effect:
