@@ -2,10 +2,12 @@
 
 # DNS Check Script - Verifies all domains in domains.csv point to the host IP
 # Sends Telegram alert if any domain has mismatched DNS
+# Includes double-check mechanism to reduce false positives
 
 # Configuration
 DOMAINS_FILE="/domains.csv"
 DNS_CHECK_INTERVAL=${DNS_CHECK_INTERVAL:-21600}
+DNS_RECHECK_DELAY=${DNS_RECHECK_DELAY:-10}  # Seconds to wait before double-checking failed domains
 TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN}"
 TELEGRAM_RECIPIENT_ID="${TELEGRAM_RECIPIENT_ID}"
 TRAEFIK_LISTEN_IP="${TRAEFIK_LISTEN_IP}"
@@ -14,6 +16,7 @@ TRAEFIK_LISTEN_IP="${TRAEFIK_LISTEN_IP}"
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
+CYAN='\033[0;36m'
 NC='\033[0m'
 
 echo "🔍 Starting DNS verification check..."
@@ -25,6 +28,22 @@ send_telegram() {
         -d chat_id="${TELEGRAM_RECIPIENT_ID}" \
         -d text="🌐 *DNS ALERT* [${SERVER_DOMAIN}] 🌐%0A%0A${MSG}" \
         -d parse_mode="Markdown" > /dev/null
+}
+
+# Function to check a single domain's DNS
+# Returns: 0 if OK, 1 if no A record, 2 if IP mismatch
+# Sets RESOLVED_IP variable with the resolved IP
+check_domain_dns() {
+    local domain="$1"
+    RESOLVED_IP=$(dig +short A "$domain" 2>/dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+    
+    if [ -z "$RESOLVED_IP" ]; then
+        return 1  # No A record
+    elif [ "$RESOLVED_IP" != "$HOST_IP" ]; then
+        return 2  # IP mismatch
+    else
+        return 0  # OK
+    fi
 }
 
 # Verify requirements
@@ -59,44 +78,87 @@ else
     echo "🌐 Using configured IP: $HOST_IP"
 fi
 
-# Counters
+# Counters and lists
 TOTAL=0
-ERRORS=0
-MISMATCHED_DOMAINS=""
+FAILED_DOMAINS=""  # Domains that failed initial check (for double-check)
+FAILED_REASONS=""  # Parallel list of failure reasons
 
-# Read domains from CSV (first column, skip comments and empty lines)
+# First pass: Read domains from CSV and check each one
+echo ""
+echo "📋 First pass: Initial DNS check..."
 while IFS=, read -r domain rest || [ -n "$domain" ]; do
     # Skip empty lines and comments
     domain=$(echo "$domain" | xargs)
     case "$domain" in
-        ""|\#*) continue ;;
+        ""|#*) continue ;;
     esac
 
     TOTAL=$((TOTAL + 1))
     
-    # Resolve DNS A record
-    RESOLVED_IP=$(dig +short A "$domain" 2>/dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+    check_domain_dns "$domain"
+    result=$?
     
-    if [ -z "$RESOLVED_IP" ]; then
-        echo -e "${YELLOW}[WARN] $domain - No A record found${NC}"
-        ERRORS=$((ERRORS + 1))
-        MISMATCHED_DOMAINS="${MISMATCHED_DOMAINS}• *${domain}*: No A record found%0A"
-    elif [ "$RESOLVED_IP" != "$HOST_IP" ]; then
-        echo -e "${RED}[FAIL] $domain -> $RESOLVED_IP (expected: $HOST_IP)${NC}"
-        ERRORS=$((ERRORS + 1))
-        MISMATCHED_DOMAINS="${MISMATCHED_DOMAINS}• *${domain}*: Points to \`${RESOLVED_IP}\` instead of \`${HOST_IP}\`%0A"
+    if [ $result -eq 1 ]; then
+        echo -e "${YELLOW}[WARN] $domain - No A record found (will recheck)${NC}"
+        FAILED_DOMAINS="${FAILED_DOMAINS}${domain}|"
+        FAILED_REASONS="${FAILED_REASONS}no_record|"
+    elif [ $result -eq 2 ]; then
+        echo -e "${YELLOW}[WARN] $domain -> $RESOLVED_IP (expected: $HOST_IP) (will recheck)${NC}"
+        FAILED_DOMAINS="${FAILED_DOMAINS}${domain}|"
+        FAILED_REASONS="${FAILED_REASONS}mismatch:${RESOLVED_IP}|"
     else
         echo -e "${GREEN}[OK] $domain -> $RESOLVED_IP${NC}"
     fi
 done < "$DOMAINS_FILE"
 
-# Send alert if there are mismatches
+# Second pass: Double-check failed domains after a delay
+ERRORS=0
+MISMATCHED_DOMAINS=""
+
+if [ -n "$FAILED_DOMAINS" ]; then
+    echo ""
+    echo -e "${CYAN}⏳ Waiting ${DNS_RECHECK_DELAY} seconds before double-checking failed domains...${NC}"
+    sleep "$DNS_RECHECK_DELAY"
+    
+    echo ""
+    echo "📋 Second pass: Double-checking failed domains..."
+    
+    # Parse the failed domains list
+    echo "$FAILED_DOMAINS" | tr '|' '\n' | while read -r domain; do
+        [ -z "$domain" ] && continue
+        
+        check_domain_dns "$domain"
+        result=$?
+        
+        if [ $result -eq 1 ]; then
+            echo -e "${RED}[FAIL] $domain - No A record found (confirmed)${NC}"
+            # Write to temp file since we're in a subshell
+            echo "• *${domain}*: No A record found%0A" >> /tmp/dns_errors.txt
+        elif [ $result -eq 2 ]; then
+            echo -e "${RED}[FAIL] $domain -> $RESOLVED_IP (expected: $HOST_IP) (confirmed)${NC}"
+            echo "• *${domain}*: Points to \`${RESOLVED_IP}\` instead of \`${HOST_IP}\`%0A" >> /tmp/dns_errors.txt
+        else
+            echo -e "${GREEN}[OK] $domain -> $RESOLVED_IP (recovered)${NC}"
+        fi
+    done
+    
+    # Read errors from temp file
+    if [ -f /tmp/dns_errors.txt ]; then
+        MISMATCHED_DOMAINS=$(cat /tmp/dns_errors.txt)
+        ERRORS=$(wc -l < /tmp/dns_errors.txt | tr -d ' ')
+        rm -f /tmp/dns_errors.txt
+    fi
+fi
+
+# Send alert if there are confirmed mismatches
 if [ $ERRORS -gt 0 ]; then
-    MESSAGE="Found *${ERRORS}* domain(s) with DNS issues:%0A%0A${MISMATCHED_DOMAINS}%0A👉 *Action Required:* Update DNS records to point to \`${HOST_IP}\`"
+    MESSAGE="Found *${ERRORS}* domain(s) with DNS issues (confirmed after double-check):%0A%0A${MISMATCHED_DOMAINS}%0A👉 *Action Required:* Update DNS records to point to \`${HOST_IP}\`"
     send_telegram "$MESSAGE"
-    echo -e "${RED}⚠️ DNS check completed with $ERRORS error(s). Alert sent.${NC}"
+    echo ""
+    echo -e "${RED}⚠️ DNS check completed with $ERRORS confirmed error(s). Alert sent.${NC}"
 else
+    echo ""
     echo -e "${GREEN}✅ DNS check completed. All $TOTAL domains point correctly to $HOST_IP${NC}"
 fi
 
-echo "📊 Summary: $TOTAL domains checked, $ERRORS with issues."
+echo "📊 Summary: $TOTAL domains checked, $ERRORS with confirmed issues."
