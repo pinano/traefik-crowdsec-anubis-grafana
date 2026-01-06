@@ -97,6 +97,18 @@ set -a
 source .env
 set +a
 
+# Normalize DISABLE_CROWDSEC to lowercase
+DISABLE_CROWDSEC=$(echo "${DISABLE_CROWDSEC:-false}" | tr '[:upper:]' '[:lower:]')
+
+# Build Compose command with or without CrowdSec profile
+COMPOSE_CMD="docker compose"
+if [[ "$DISABLE_CROWDSEC" != "true" ]]; then
+    COMPOSE_CMD="docker compose --profile crowdsec"
+    echo "🛡️  CrowdSec firewall is ENABLED."
+else
+    echo "⚠️  CrowdSec firewall is DISABLED."
+fi
+
 # =============================================================================
 # PHASE 1: Prepare Anubis Assets
 # =============================================================================
@@ -218,7 +230,7 @@ echo "   ✅ Dynamic configuration generated."
 echo "🛡️  Checking CrowdSec IP whitelist..."
 WHITELIST_FILE="./config/crowdsec/parsers/ip-whitelist.yaml"
 
-if [ -n "$CROWDSEC_WHITELIST_IPS" ]; then
+if [[ "$DISABLE_CROWDSEC" != "true" ]] && [ -n "$CROWDSEC_WHITELIST_IPS" ]; then
     echo "   📋 Generating whitelist from CROWDSEC_WHITELIST_IPS..."
     
     # Build the YAML whitelist file
@@ -295,55 +307,61 @@ fi
 # Start CrowdSec and Redis before other services to ensure the security
 # layer is ready when Traefik starts.
 
-echo "🛡️  Booting security layer (CrowdSec + Redis)..."
-docker compose $COMPOSE_FILES up -d crowdsec redis
+if [[ "$DISABLE_CROWDSEC" != "true" ]]; then
+    echo "🛡️  Booting security layer (CrowdSec + Redis)..."
+    $COMPOSE_CMD $COMPOSE_FILES up -d crowdsec redis
 
-# Wait for CrowdSec to be healthy (smart wait instead of blind sleep)
-echo -n "   ⏳ Waiting for CrowdSec API"
-timeout=60
-while [ "$(docker inspect --format='{{.State.Health.Status}}' crowdsec 2>/dev/null)" != "healthy" ]; do
-    sleep 2
-    echo -n "."
-    ((timeout-=2))
-    if [ $timeout -le 0 ]; then
-        echo ""
-        echo "   ❌ Timeout waiting for CrowdSec to become healthy."
+    # Wait for CrowdSec to be healthy (smart wait instead of blind sleep)
+    echo -n "   ⏳ Waiting for CrowdSec API"
+    timeout=60
+    while [ "$(docker inspect --format='{{.State.Health.Status}}' crowdsec 2>/dev/null)" != "healthy" ]; do
+        sleep 2
+        echo -n "."
+        ((timeout-=2))
+        if [ $timeout -le 0 ]; then
+            echo ""
+            echo "   ❌ Timeout waiting for CrowdSec to become healthy."
+            exit 1
+        fi
+    done
+    echo " ready!"
+    echo "   ✅ CrowdSec operational."
+
+    # =============================================================================
+    # PHASE 8: Register Bouncer API Key
+    # =============================================================================
+    # Re-register the bouncer key on each start to ensure consistency.
+    # Delete first (silently) in case it already exists, then add fresh.
+
+    echo "👮 Synchronizing Bouncer..."
+    docker exec crowdsec cscli bouncers delete traefik-bouncer > /dev/null 2>&1 || true
+    docker exec crowdsec cscli bouncers add traefik-bouncer --key "${CROWDSEC_API_KEY}" > /dev/null
+
+    if [ $? -eq 0 ]; then
+        echo "   🔑 Bouncer key registered successfully."
+    else
+        echo "⚠️ Error registering bouncer key. Check CrowdSec logs."
         exit 1
     fi
-done
-echo " ready!"
-echo "   ✅ CrowdSec operational."
 
-# =============================================================================
-# PHASE 8: Register Bouncer API Key
-# =============================================================================
-# Re-register the bouncer key on each start to ensure consistency.
-# Delete first (silently) in case it already exists, then add fresh.
+    # =============================================================================
+    # PHASE 9: CrowdSec Console Enrollment (Optional)
+    # =============================================================================
+    # If CROWDSEC_ENROLLMENT_KEY is set, enroll this instance with CrowdSec Console
+    # for access to community blocklists and centralized management.
 
-echo "👮 Synchronizing Bouncer..."
-docker exec crowdsec cscli bouncers delete traefik-bouncer > /dev/null 2>&1 || true
-docker exec crowdsec cscli bouncers add traefik-bouncer --key "${CROWDSEC_API_KEY}" > /dev/null
-
-if [ $? -eq 0 ]; then
-    echo "   🔑 Bouncer key registered successfully."
-else
-    echo "⚠️ Error registering bouncer key. Check CrowdSec logs."
-    exit 1
-fi
-
-# =============================================================================
-# PHASE 9: CrowdSec Console Enrollment (Optional)
-# =============================================================================
-# If CROWDSEC_ENROLLMENT_KEY is set, enroll this instance with CrowdSec Console
-# for access to community blocklists and centralized management.
-
-if [ -n "$CROWDSEC_ENROLLMENT_KEY" ]; then
-    echo "🌐 Enrolling in CrowdSec Console..."
-    if docker exec crowdsec cscli console enroll "$CROWDSEC_ENROLLMENT_KEY" --name "$(hostname)" 2>/dev/null; then
-        echo "   ✅ Successfully enrolled in CrowdSec Console."
-    else
-        echo "   ⚠️ Console enrollment failed or already enrolled. Continuing..."
+    if [ -n "$CROWDSEC_ENROLLMENT_KEY" ]; then
+        echo "🌐 Enrolling in CrowdSec Console..."
+        if docker exec crowdsec cscli console enroll "$CROWDSEC_ENROLLMENT_KEY" --name "$(hostname)" 2>/dev/null; then
+            echo "   ✅ Successfully enrolled in CrowdSec Console."
+        else
+            echo "   ⚠️ Console enrollment failed or already enrolled. Continuing..."
+        fi
     fi
+else
+    echo "🛡️  Booting Redis (CrowdSec is disabled)..."
+    $COMPOSE_CMD $COMPOSE_FILES up -d redis
+    echo "   ✅ Redis operational."
 fi
 
 # =============================================================================
@@ -353,7 +371,7 @@ fi
 # --remove-orphans cleans up any old containers not in current config.
 
 echo "🚀 Deploying Traefik and remaining services..."
-docker compose $COMPOSE_FILES up -d --remove-orphans
+$COMPOSE_CMD $COMPOSE_FILES up -d --remove-orphans
 
 # =============================================================================
 # DONE

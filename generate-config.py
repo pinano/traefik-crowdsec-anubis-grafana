@@ -20,6 +20,7 @@ OUTPUT_TRAEFIK = 'config/traefik/dynamic-config/routers-generated.yaml'
 
 CROWDSEC_API_KEY = os.getenv('CROWDSEC_API_KEY')
 REDIS_PASSWORD = os.getenv('REDIS_PASSWORD')
+DISABLE_CROWDSEC = os.getenv('DISABLE_CROWDSEC', 'false').lower() == 'true'
 
 # Blocked Paths (Comma-separated list of regex patterns)
 BLOCKED_PATHS_STR = os.getenv('TRAEFIK_BLOCKED_PATHS', '').strip()
@@ -98,7 +99,10 @@ def process_router(entry, http_section, domain_to_cert_def):
     safe_domain = sanitize_name(domain)
     router_name = f"router-{safe_domain}"
 
-    mw_list = ['crowdsec-check', 'security-headers']
+    mw_list = []
+    if not DISABLE_CROWDSEC:
+        mw_list.append('crowdsec-check')
+    mw_list.append('security-headers')
 
     if 'rate' in extra or 'burst' in extra:
         custom_rl_name = f"rl-{safe_domain}"
@@ -290,19 +294,6 @@ def generate_configs():
                         'customFrameOptionsValue': 'SAMEORIGIN'
                     }
                 },
-                # 2. CrowdSec API Check Plugin
-                'crowdsec-check': {
-                    'plugin': {
-                        'crowdsec': {
-                            'enabled': True,
-                            'crowdsecLapiScheme': 'http',
-                            'crowdsecLapiHost': 'crowdsec:8080',
-                            'crowdsecLapiKey': CROWDSEC_API_KEY,
-                            'crowdsecMode': 'stream',
-                            'updateIntervalSeconds': CS_UPDATE_INTERVAL
-                        }
-                    }
-                },
                 # 3. Global Compression
                 'global-compress': {
                     'compress': {'minResponseBodyBytes': 1024}
@@ -371,6 +362,21 @@ def generate_configs():
         traefik_dynamic_conf['http']['middlewares']['block-unwanted-paths'] = {
             'ipAllowList': {
                 'sourceRange': ['127.0.0.1/32']
+            }
+        }
+
+    # 10. CrowdSec API Check Plugin (Only if enabled)
+    if not DISABLE_CROWDSEC:
+        traefik_dynamic_conf['http']['middlewares']['crowdsec-check'] = {
+            'plugin': {
+                'crowdsec': {
+                    'enabled': True,
+                    'crowdsecLapiScheme': 'http',
+                    'crowdsecLapiHost': 'crowdsec:8080',
+                    'crowdsecLapiKey': CROWDSEC_API_KEY,
+                    'crowdsecMode': 'stream',
+                    'updateIntervalSeconds': CS_UPDATE_INTERVAL
+                }
             }
         }
 

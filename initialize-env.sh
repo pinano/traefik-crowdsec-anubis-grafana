@@ -116,6 +116,16 @@ fi
 prompt_val "CROWDSEC_UPDATE_INTERVAL" "CrowdSec update interval (seconds)"
 
 echo ""
+read -p "👉 Disable CrowdSec Firewall completely? (y/N): " disable_cs
+if [[ "$disable_cs" == "y" || "$disable_cs" == "Y" ]]; then
+    replace_val "DISABLE_CROWDSEC" "true"
+    echo "   ✅ CrowdSec DISABLED"
+else
+    replace_val "DISABLE_CROWDSEC" "false"
+    echo "   ✅ CrowdSec ENABLED"
+fi
+
+echo ""
 echo "👉 CrowdSec Console Enrollment (optional)"
 echo "   Get your key from https://app.crowdsec.net"
 read -p "   Enter enrollment key (leave empty to skip): " cs_enroll_key
@@ -185,9 +195,11 @@ else
 fi
 
 # 3. CROWDSEC_API_KEY
-echo ""
-read -p "👉 Generate NEW CrowdSec API Key (requires starting docker)? (y/N): " gen_cs
-if [[ "$gen_cs" == "y" || "$gen_cs" == "Y" ]]; then
+DISABLE_CS=$(grep "^DISABLE_CROWDSEC=" "$ENV_FILE" | cut -d'=' -f2-)
+if [[ "$DISABLE_CS" != "true" ]]; then
+    echo ""
+    read -p "👉 Generate NEW CrowdSec API Key (requires starting docker)? (y/N): " gen_cs
+    if [[ "$gen_cs" == "y" || "$gen_cs" == "Y" ]]; then
     # Ensure network exists
     if ! docker network inspect traefik >/dev/null 2>&1; then
         echo "   🌐 Creating required 'traefik' network..."
@@ -228,6 +240,10 @@ if [[ "$gen_cs" == "y" || "$gen_cs" == "Y" ]]; then
 
     echo "   🛑 Stopping CrowdSec..."
     docker compose -f docker-compose-traefik-crowdsec-redis.yaml stop crowdsec
+    fi
+else
+    echo ""
+    echo "   ⏭️ Skipping CrowdSec API Key generation (CrowdSec is disabled)."
 fi
 
 echo ""
