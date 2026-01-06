@@ -65,12 +65,16 @@ services:
           echo 'Cert check: sleeping for 24h...';
           sleep 86400;
         done) &
-        # Start CrowdSec check loop in background
-        (while true; do
-          sh /check-crowdsec.sh;
-          echo \"CrowdSec check: sleeping for \$${CROWDSEC_CHECK_INTERVAL:-3600}s...\";
-          sleep \$${CROWDSEC_CHECK_INTERVAL:-3600};
-        done) &
+        # Start CrowdSec check loop in background (if enabled)
+        (if [ \"\$${DISABLE_CROWDSEC}\" != \"true\" ]; then
+          while true; do
+            sh /check-crowdsec.sh;
+            echo \"CrowdSec check: sleeping for \$${CROWDSEC_CHECK_INTERVAL:-3600}s...\";
+            sleep \$${CROWDSEC_CHECK_INTERVAL:-3600};
+          done
+        else
+          echo 'CrowdSec check DISABLED.';
+        fi) &
         # Start DNS check loop in foreground
         while true; do
           sh /check-dns.sh;
@@ -96,6 +100,7 @@ services:
       - DNS_CHECK_INTERVAL=${DNS_CHECK_INTERVAL:-21600}
       - CROWDSEC_CHECK_INTERVAL=${CROWDSEC_CHECK_INTERVAL:-3600}
       - CROWDSEC_CONTAINER=crowdsec
+      - DISABLE_CROWDSEC=${DISABLE_CROWDSEC:-false}
     deploy:
       resources:
         limits:
