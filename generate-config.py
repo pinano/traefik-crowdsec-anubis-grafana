@@ -25,6 +25,9 @@ CROWDSEC_DISABLE = os.getenv('CROWDSEC_DISABLE', 'false').lower() == 'true'
 # Blocked Paths (Comma-separated list of regex patterns)
 BLOCKED_PATHS_STR = os.getenv('TRAEFIK_BLOCKED_PATHS', '').strip()
 
+# Frame Ancestors (for iframes)
+FRAME_ANCESTORS = os.getenv('TRAEFIK_FRAME_ANCESTORS', '').strip()
+
 # Robust stripping of surrounding quotes
 if (BLOCKED_PATHS_STR.startswith('"') and BLOCKED_PATHS_STR.endswith('"')) or \
    (BLOCKED_PATHS_STR.startswith("'") and BLOCKED_PATHS_STR.endswith("'")):
@@ -284,14 +287,15 @@ def generate_configs():
                 # 1. Browser Security (Parameterized Headers)
                 'security-headers': {
                     'headers': {
-                        'frameDeny': True,
+                        'frameDeny': not bool(FRAME_ANCESTORS),
                         'sslRedirect': True,
                         'browserXssFilter': True,
                         'contentTypeNosniff': True,
                         'stsIncludeSubdomains': True,
                         'stsPreload': True,
                         'stsSeconds': HSTS_SECONDS,
-                        'customFrameOptionsValue': 'SAMEORIGIN'
+                        'customFrameOptionsValue': 'SAMEORIGIN' if not FRAME_ANCESTORS else '',
+                        'contentSecurityPolicy': f"frame-ancestors 'self' {FRAME_ANCESTORS.replace(',', ' ')}" if FRAME_ANCESTORS else None
                     }
                 },
                 # 3. Global Compression

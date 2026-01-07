@@ -405,7 +405,8 @@ This script:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `CROWDSEC_API_KEY` | Bouncer API key | Auto-generated |
-| `CROWDSEC_UPDATE_INTERVAL` | Blocklist refresh interval (seconds) | `60` |
+| `CROWDSEC_DISABLE` | Set to `true` to completely disable the CrowdSec firewall plugin | `false` |
+| `CROWDSEC_UPDATE_INTERVAL` | Blocklist refresh interval from LAPI (seconds) | `60` |
 | `CROWDSEC_ENROLLMENT_KEY` | Optional key to connect instance to CrowdSec Console | - |
 | `CROWDSEC_COLLECTIONS` | Space-separated list of CrowdSec collections to load | See [Installed Collections](#installed-collections) |
 | `CROWDSEC_WHITELIST_IPS` | Comma-separated list of trusted IPs/CIDRs to bypass detection | - |
@@ -432,8 +433,11 @@ This script:
 | `GLOBAL_CONCURRENCY` | Default concurrent connections | `25` |
 | `HSTS_MAX_AGE` | HSTS header duration (seconds) | `31536000` |
 | `ACME_EMAIL` | Let's Encrypt contact email | - |
-| `ACME_ENV_TYPE` | `staging` or `production` | `staging` |
+| `ACME_ENV_TYPE` | `staging` or `production` (ignored if `ACME_CA_SERVER` is set) | `staging` |
+| `ACME_CA_SERVER` | Optional direct URL override for the ACME server | - |
 | `TRAEFIK_DASHBOARD_AUTH` | Basic auth for dashboard (htpasswd format) | - |
+| `TRAEFIK_BLOCKED_PATHS` | Comma-separated list of path prefixes to block globally (regex supported) | - |
+| `TRAEFIK_FRAME_ANCESTORS` | Comma-separated list of domains allowed to embed this site in an iframe | - |
 
 #### Traefik Timeouts
 
