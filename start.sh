@@ -97,12 +97,12 @@ set -a
 source .env
 set +a
 
-# Normalize DISABLE_CROWDSEC to lowercase
-DISABLE_CROWDSEC=$(echo "${DISABLE_CROWDSEC:-false}" | tr '[:upper:]' '[:lower:]')
+# Normalize CROWDSEC_DISABLE to lowercase
+CROWDSEC_DISABLE=$(echo "${CROWDSEC_DISABLE:-false}" | tr '[:upper:]' '[:lower:]')
 
 # Build Compose command with or without CrowdSec profile
 COMPOSE_CMD="docker compose"
-if [[ "$DISABLE_CROWDSEC" != "true" ]]; then
+if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
     COMPOSE_CMD="docker compose --profile crowdsec"
     echo "🛡️  CrowdSec firewall is ENABLED."
 else
@@ -230,7 +230,7 @@ echo "   ✅ Dynamic configuration generated."
 echo "🛡️  Checking CrowdSec IP whitelist..."
 WHITELIST_FILE="./config/crowdsec/parsers/ip-whitelist.yaml"
 
-if [[ "$DISABLE_CROWDSEC" != "true" ]] && [ -n "$CROWDSEC_WHITELIST_IPS" ]; then
+if [[ "$CROWDSEC_DISABLE" != "true" ]] && [ -n "$CROWDSEC_WHITELIST_IPS" ]; then
     echo "   📋 Generating whitelist from CROWDSEC_WHITELIST_IPS..."
     
     # Build the YAML whitelist file
@@ -307,7 +307,7 @@ fi
 # Start CrowdSec and Redis before other services to ensure the security
 # layer is ready when Traefik starts.
 
-if [[ "$DISABLE_CROWDSEC" != "true" ]]; then
+if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
     echo "🛡️  Booting security layer (CrowdSec + Redis)..."
     $COMPOSE_CMD $COMPOSE_FILES up -d crowdsec redis
 

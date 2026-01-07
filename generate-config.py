@@ -20,7 +20,7 @@ OUTPUT_TRAEFIK = 'config/traefik/dynamic-config/routers-generated.yaml'
 
 CROWDSEC_API_KEY = os.getenv('CROWDSEC_API_KEY')
 REDIS_PASSWORD = os.getenv('REDIS_PASSWORD')
-DISABLE_CROWDSEC = os.getenv('DISABLE_CROWDSEC', 'false').lower() == 'true'
+CROWDSEC_DISABLE = os.getenv('CROWDSEC_DISABLE', 'false').lower() == 'true'
 
 # Blocked Paths (Comma-separated list of regex patterns)
 BLOCKED_PATHS_STR = os.getenv('TRAEFIK_BLOCKED_PATHS', '').strip()
@@ -100,7 +100,7 @@ def process_router(entry, http_section, domain_to_cert_def):
     router_name = f"router-{safe_domain}"
 
     mw_list = []
-    if not DISABLE_CROWDSEC:
+    if not CROWDSEC_DISABLE:
         mw_list.append('crowdsec-check')
     mw_list.append('security-headers')
 
@@ -366,7 +366,7 @@ def generate_configs():
         }
 
     # 10. CrowdSec API Check Plugin (Only if enabled)
-    if not DISABLE_CROWDSEC:
+    if not CROWDSEC_DISABLE:
         traefik_dynamic_conf['http']['middlewares']['crowdsec-check'] = {
             'plugin': {
                 'crowdsec': {
