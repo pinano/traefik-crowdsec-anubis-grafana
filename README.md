@@ -428,12 +428,12 @@ This script:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `TRAEFIK_LISTEN_IP` | IP to bind ports 80/443 | `0.0.0.0` |
-| `GLOBAL_RATE_AVG` | Default rate limit (req/s) | `60` |
-| `GLOBAL_RATE_BURST` | Default burst size | `120` |
-| `GLOBAL_CONCURRENCY` | Default concurrent connections | `25` |
-| `HSTS_MAX_AGE` | HSTS header duration (seconds) | `31536000` |
-| `ACME_EMAIL` | Let's Encrypt contact email | - |
-| `ACME_ENV_TYPE` | `staging` or `production` (ignored if `ACME_CA_SERVER` is set) | `staging` |
+| `TRAEFIK_GLOBAL_RATE_AVG` | Default rate limit (req/s) | `60` |
+| `TRAEFIK_GLOBAL_RATE_BURST` | Default burst size | `120` |
+| `TRAEFIK_GLOBAL_CONCURRENCY` | Default concurrent connections | `25` |
+| `TRAEFIK_HSTS_MAX_AGE` | HSTS header duration (seconds) | `31536000` |
+| `TRAEFIK_ACME_EMAIL` | Let's Encrypt contact email | - |
+| `TRAEFIK_ACME_ENV_TYPE` | `staging` or `production` (ignored if `ACME_CA_SERVER` is set) | `staging` |
 | `ACME_CA_SERVER` | Optional direct URL override for the ACME server | - |
 | `TRAEFIK_DASHBOARD_AUTH` | Basic auth for dashboard (htpasswd format) | - |
 | `TRAEFIK_BLOCKED_PATHS` | Comma-separated list of path prefixes to block globally (regex supported) | - |
@@ -806,7 +806,7 @@ COMPOSE_FILES="$COMPOSE_FILES -f docker-compose-apache-logs.yml"
 
 - Check Traefik logs: `docker logs traefik`.
 - Verify ACME email is correct in `.env`.
-- For testing, use `ACME_ENV_TYPE=staging` to avoid rate limits.
+- For testing, use `TRAEFIK_ACME_ENV_TYPE=staging` to avoid rate limits.
 
 ---
 

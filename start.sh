@@ -160,13 +160,13 @@ fi
 # =============================================================================
 # PHASE 3: Configure ACME Environment
 # =============================================================================
-# Priority: ACME_ENV_TYPE > ACME_CA_SERVER (from .env)
-# This ensures ACME_ENV_TYPE is respected even if an old ACME_CA_SERVER
+# Priority: TRAEFIK_ACME_ENV_TYPE > ACME_CA_SERVER (from .env)
+# This ensures TRAEFIK_ACME_ENV_TYPE is respected even if an old ACME_CA_SERVER
 # variable remains in the .env file.
 
 echo "🔒 Configuring ACME environment..."
-if [ -n "$ACME_ENV_TYPE" ]; then
-    case "$ACME_ENV_TYPE" in
+if [ -n "$TRAEFIK_ACME_ENV_TYPE" ]; then
+    case "$TRAEFIK_ACME_ENV_TYPE" in
         staging)
             export ACME_CA_SERVER="https://acme-staging-v02.api.letsencrypt.org/directory"
             echo "   ⚠️ Let's Encrypt STAGING environment."
@@ -176,7 +176,7 @@ if [ -n "$ACME_ENV_TYPE" ]; then
             echo "   ✅ Let's Encrypt PRODUCTION environment."
             ;;
         *)
-            echo "   ⚠️ Unknown ACME_ENV_TYPE: '$ACME_ENV_TYPE'. Ignoring."
+            echo "   ⚠️ Unknown TRAEFIK_ACME_ENV_TYPE: '$TRAEFIK_ACME_ENV_TYPE'. Ignoring."
             ;;
     esac
 fi
@@ -185,8 +185,8 @@ fi
 if [ -z "$ACME_CA_SERVER" ]; then
     export ACME_CA_SERVER="https://acme-staging-v02.api.letsencrypt.org/directory"
     echo "   ⚠️ Let's Encrypt STAGING environment (default)."
-elif [ -z "$ACME_ENV_TYPE" ]; then
-    # Only show this if using manual override (ACME_ENV_TYPE is empty)
+elif [ -z "$TRAEFIK_ACME_ENV_TYPE" ]; then
+    # Only show this if using manual override (TRAEFIK_ACME_ENV_TYPE is empty)
     echo "   🔧 Using custom ACME_CA_SERVER from .env."
 fi
 
@@ -197,7 +197,7 @@ fi
 # Generate traefik-generated.yaml from template
 echo "🔧 Generating traefik-generated.yaml from template..."
 if [ -f "./config/traefik/traefik.yaml.template" ]; then
-    sed -e "s|ACME_EMAIL_PLACEHOLDER|${ACME_EMAIL}|g" \
+    sed -e "s|ACME_EMAIL_PLACEHOLDER|${TRAEFIK_ACME_EMAIL}|g" \
         -e "s|ACME_CASERVER_PLACEHOLDER|${ACME_CA_SERVER}|g" \
         -e "s|TRAEFIK_TIMEOUT_ACTIVE_PLACEHOLDER|${TRAEFIK_TIMEOUT_ACTIVE:-60}s|g" \
         -e "s|TRAEFIK_TIMEOUT_IDLE_PLACEHOLDER|${TRAEFIK_TIMEOUT_IDLE:-90}s|g" \

@@ -43,10 +43,10 @@ try:
     CS_UPDATE_INTERVAL = int(os.getenv('CROWDSEC_UPDATE_INTERVAL', 60))
     T_ACTIVE = int(os.getenv('TRAEFIK_TIMEOUT_ACTIVE', 60))
     T_IDLE = int(os.getenv('TRAEFIK_TIMEOUT_IDLE', 90))
-    G_RATE_AVG = int(os.getenv('GLOBAL_RATE_AVG', 60))
-    G_RATE_BURST = int(os.getenv('GLOBAL_RATE_BURST', 120))
-    G_CONCURRENCY = int(os.getenv('GLOBAL_CONCURRENCY', 25))
-    HSTS_SECONDS = int(os.getenv('HSTS_MAX_AGE', 31536000))
+    G_RATE_AVG = int(os.getenv('TRAEFIK_GLOBAL_RATE_AVG', 60))
+    G_RATE_BURST = int(os.getenv('TRAEFIK_GLOBAL_RATE_BURST', 120))
+    G_CONCURRENCY = int(os.getenv('TRAEFIK_GLOBAL_CONCURRENCY', 25))
+    HSTS_SECONDS = int(os.getenv('TRAEFIK_HSTS_MAX_AGE', 31536000))
 except ValueError:
     # Fallback defaults if parsing fails
     CS_UPDATE_INTERVAL = 60
