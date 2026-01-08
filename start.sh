@@ -124,7 +124,7 @@ if [ "$CURRENT_TRAEFIK_SYNC" != "$TRAEFIK_ADMIN_CREDS_SYNC" ]; then
     T_HASH=$(docker run --rm httpd:alpine htpasswd -Bbn "$TRAEFIK_ADMIN_USER" "$TRAEFIK_ADMIN_PASSWORD")
     update_env_var "TRAEFIK_DASHBOARD_AUTH" "'$T_HASH'"
     update_env_var "TRAEFIK_ADMIN_CREDS_SYNC" "$CURRENT_TRAEFIK_SYNC"
-    export TRAEFIK_DASHBOARD_AUTH="'$T_HASH'"
+    export TRAEFIK_DASHBOARD_AUTH="$T_HASH"
     SYNC_NEEDED=$((SYNC_NEEDED + 1))
 fi
 
@@ -135,12 +135,15 @@ if [ "$CURRENT_DOZZLE_SYNC" != "$DOZZLE_ADMIN_CREDS_SYNC" ]; then
     D_HASH=$(docker run --rm httpd:alpine htpasswd -Bbn "$DOZZLE_ADMIN_USER" "$DOZZLE_ADMIN_PASSWORD")
     update_env_var "DOZZLE_DASHBOARD_AUTH" "'$D_HASH'"
     update_env_var "DOZZLE_ADMIN_CREDS_SYNC" "$CURRENT_DOZZLE_SYNC"
-    export DOZZLE_DASHBOARD_AUTH="'$D_HASH'"
+    export DOZZLE_DASHBOARD_AUTH="$D_HASH"
     SYNC_NEEDED=$((SYNC_NEEDED + 1))
 fi
 
 if [ $SYNC_NEEDED -gt 0 ]; then
-    echo "   ✅ Authentication hashes synchronized in .env."
+    echo "   ✅ Authentication hashes synchronized in .env. Re-loading environment..."
+    set -a
+    source .env
+    set +a
 else
     echo "   ✅ Admin credentials are in sync."
 fi
