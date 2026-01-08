@@ -163,7 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 closeModalBtn.style.display = 'block';
                 eventSource.close();
             } else {
-                logContainer.textContent += event.data;
+                logContainer.textContent += event.data + '\n';
                 logContainer.parentElement.scrollTop = logContainer.parentElement.scrollHeight;
             }
         };
