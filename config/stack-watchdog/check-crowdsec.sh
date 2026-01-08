@@ -32,12 +32,29 @@ if [ ! -S /var/run/docker.sock ]; then
     exit 1
 fi
 
-# Check if CrowdSec container is running
-CONTAINER_STATUS=$(docker inspect -f '{{.State.Status}}' "$CROWDSEC_CONTAINER" 2>/dev/null)
+# Check if CrowdSec container is running (with retries for robustness)
+MAX_RETRIES=3
+RETRY_COUNT=0
+CONTAINER_STATUS=""
+
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    CONTAINER_STATUS=$(docker inspect -f '{{.State.Status}}' "$CROWDSEC_CONTAINER" 2>/dev/null)
+    EXIT_CODE=$?
+    
+    if [ $EXIT_CODE -eq 0 ] && [ -n "$CONTAINER_STATUS" ]; then
+        break
+    fi
+    
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+        echo -e "${YELLOW}⚠️ Warning: CrowdSec container check failed (Attempt $RETRY_COUNT/$MAX_RETRIES). Retrying in 2s...${NC}"
+        sleep 2
+    fi
+done
 
 if [ -z "$CONTAINER_STATUS" ]; then
-    echo -e "${RED}❌ CrowdSec container '$CROWDSEC_CONTAINER' not found!${NC}"
-    send_telegram "CrowdSec container \`${CROWDSEC_CONTAINER}\` not found!%0A👉 *Action Required:* Check if the container exists and is properly configured."
+    echo -e "${RED}❌ CrowdSec container '$CROWDSEC_CONTAINER' not found or Docker API error after $MAX_RETRIES attempts!${NC}"
+    send_telegram "CrowdSec container \`${CROWDSEC_CONTAINER}\` not found or Docker API error!%0A👉 *Action Required:* Check if the container exists and is properly configured."
     exit 1
 fi
 
