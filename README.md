@@ -345,8 +345,6 @@ cp domains.csv.dist domains.csv
 
 **Columns:**
 
-**Columns Detailed:**
-
 | Column | Description | Mandatory |
 |:---|:---|:---:|
 | **domain** | The full public FQDN (e.g., `shop.example.com`). | Yes |
@@ -478,7 +476,7 @@ Legacy applications or slow backends may require adjusted timeouts. We provide t
 > **Synchronization**: These variables update the configuration at **both ends** of the proxy.
 > If your application takes 70 seconds to respond, you must increase **`TRAEFIK_TIMEOUT_ACTIVE`** to at least 75s. Setting only one side (e.g., Transport) would be useless if the other side (EntryPoint) cuts the connection at 60s.
 
-#### Grafana
+#### Authentication
 
 | Variable | Description | Default |
 |----------|-------------|---------|
@@ -824,7 +822,6 @@ COMPOSE_FILES="$COMPOSE_FILES -f docker-compose-apache-logs.yml"
 
 - **Same-Site**: Chrome and modern browsers require HTTPS for `SameSite=None` cookies. Anubis handles this, but ensure you are accessing via HTTPS.
 - **Root Domain Mismatch**: Ensure `DOMAINS.CSV` uses the correct `anubis_sub`. If you protect `a.com` but your auth subdomain is `auth.b.com`, the cookie will be rejected.
-  ```
 
 ### Anubis Cookie Loops
 
