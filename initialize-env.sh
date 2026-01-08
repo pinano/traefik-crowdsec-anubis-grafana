@@ -184,7 +184,7 @@ read -p "   User [${TR_USER}]: " gr_user
 replace_val "GRAFANA_ADMIN_USER" "$gr_user"
 
 read -p "   Password [${TR_PASS}]: " gr_pass
-[z "$gr_pass" ] && gr_pass="$TR_PASS"
+[ -z "$gr_pass" ] && gr_pass="$TR_PASS"
 replace_val "GRAFANA_ADMIN_PASSWORD" "$gr_pass"
 
 # --- DOMAIN MANAGER CREDENTIALS ---
@@ -215,6 +215,14 @@ if [[ "$gen_anubis" == "y" || "$gen_anubis" == "Y" || -z "$gen_anubis" ]]; then
     NEW_KEY=$(openssl rand -hex 32)
     replace_val "ANUBIS_REDIS_PRIVATE_KEY" "$NEW_KEY"
     echo "   ✅ Generated ANUBIS_REDIS_PRIVATE_KEY"
+fi
+
+# 1B. DOMAIN_MANAGER_SECRET_KEY
+read -p "👉 Generate random Secret Key for Domain Manager? (Y/n): " gen_dm_key
+if [[ "$gen_dm_key" == "y" || "$gen_dm_key" == "Y" || -z "$gen_dm_key" ]]; then
+    NEW_DM_KEY=$(openssl rand -hex 32)
+    replace_val "DOMAIN_MANAGER_SECRET_KEY" "$NEW_DM_KEY"
+    echo "   ✅ Generated DOMAIN_MANAGER_SECRET_KEY"
 fi
 
 # 2. TRAEFIK & DOZZLE DASHBOARD AUTH (Auto-generated)
