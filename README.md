@@ -98,8 +98,8 @@ Every request entering the stack passes through a sequential chain of middleware
 | Order | Middleware | Purpose | Security Benefit |
 |:---:|:---|:---|:---|
 | 1 | **CrowdSec Check** | Consults the local CrowdSec database for the client IP. | **Instant Mitigation**: Blocks known malicious IPs (botnets, scanners) at the entry point. |
-| 2 | **Security Headers** | Injects recommended browser security headers (HSTS, XSS, Frame-Options). | **Client Hardening**: Protects users from clickjacking and protocol downgrade attacks. |
-| 3 | **Global Buffering** | Reads the entire request into memory before passing it to the backend. | **Slowloris Defense**: Prevents attackers from exhausting server sockets by sending data very slowly. |
+| 2 | **Global Buffering** | Reads the entire request into memory before passing it to the backend. | **Slowloris Defense**: Prevents attackers from exhausting server sockets by sending data very slowly. Prioritized to protect resources ASAP. |
+| 3 | **Security Headers** | Injects recommended browser security headers (HSTS, XSS, Frame-Options). | **Client Hardening**: Protects users from clickjacking and protocol downgrade attacks. |
 | 4 | **Rate Limiting** | Throttles requests based on average and burst thresholds (global or per-domain). | **Flood Protection**: Mitigates automated scraping and brute-force attempts. |
 | 5 | **Concurrency** | Limits the number of simultaneous active connections per client. | **Resource Preservation**: Ensures one heavy/malicious user cannot consume all backend worker threads. |
 | 6 | **ForwardAuth (Anubis)** | (Optional) Intercepts requests to protected routes to verify or challenge the session. | **Bot Defense**: Forces suspicious or unauthenticated traffic to solve a Proof-of-Work challenge. |
@@ -345,15 +345,20 @@ cp domains.csv.dist domains.csv
 
 **Columns:**
 
-| Column | Description | Example |
-|--------|-------------|---------|
-| `domain` | Public FQDN | `app.example.com` |
-| `redirection` | (Optional) 301 redirect target | `www.example.com` |
-| `service` | Docker container name or `apache-host` | `wordpress` |
-| `anubis_subdomain` | Subdomain for auth portal | `auth` → `auth.example.com` |
-| `rate_limit` | Requests/second (average) | `50` |
-| `burst` | Maximum burst size | `100` |
-| `concurrency` | Max simultaneous connections | `20` |
+**Columns Detailed:**
+
+| Column | Description | Mandatory |
+|:---|:---|:---:|
+| **domain** | The full public FQDN (e.g., `shop.example.com`). | Yes |
+| **redirection** | Target for 301/302 redirect. Leave empty for direct service access. | No |
+| **service** | Docker service name (as defined in Compose) or `apache-host` for legacy host backends. | Yes |
+| **anubis_sub** | The subdomain part of the auth portal (e.g., `auth`). Note: One Anubis instance is generated per root TLD. | No |
+| **rate_limit** | Avg requests per second. Falls back to `TRAEFIK_GLOBAL_RATE_AVG`. | No |
+| **burst** | Peak requests allowed. Falls back to `TRAEFIK_GLOBAL_RATE_BURST`. | No |
+| **concurrency** | Active connections per client. Falls back to `TRAEFIK_GLOBAL_CONCURRENCY`. | No |
+
+> [!IMPORTANT]
+> **Domain Grouping**: Anubis instances are grouped by root domain. If you protect `a.com` and `sub.a.com` with anubis_sub `auth`, they will share the same `auth.a.com` portal and session cookie.
 
 ### 4. Deployment
 
@@ -371,6 +376,27 @@ This script:
 7. Waits for CrowdSec health check
 8. Registers the bouncer API key
 9. Deploys all remaining services
+
+---
+
+### 5. Smart Credentials & Auto-Sync
+
+The stack uses independent credentials for each managed dashboard to follow the principle of least privilege.
+
+#### Separate Services
+- **Traefik Dashboard**: Hashed basic auth.
+- **Dozzle Log Viewer**: Hashed basic auth.
+- **Grafana**: Plaintext environment variables (managed internally by Grafana).
+
+#### How Synchronization Works
+To simplify manual management, we've implemented an **Auto-Sync Mechanism**:
+1. **Manual Edit**: You can change the `_ADMIN_USER` or `_ADMIN_PASSWORD` directly in the `.env` file.
+2. **Detection**: Upon running `./start.sh`, the script calculates a SHA1 checksum of your credentials.
+3. **Regeneration**: If the checksum differs from the stored sync variable (indicating a manual change), the script automatically regenerates the `htpasswd` bcrypt hash via a temporary Docker container and updates your `.env` file.
+4. **Immediate Update**: The new credentials are provided to Docker Compose in the same session, ensuring they take effect immediately.
+
+> [!TIP]
+> This means you don't need to manually run `htpasswd` or use an external generator when rotating passwords. Just update `.env` and run `./start.sh`.
 
 ---
 
@@ -786,18 +812,18 @@ COMPOSE_FILES="$COMPOSE_FILES -f docker-compose-apache-logs.yml"
 
 ### 502 Bad Gateway
 
-- Verify the `service` name in `domains.csv` matches the container name.
-- Ensure the backend container is on the `traefik` network.
-- Check container logs: `docker logs <container_name>`.
+- **Naming**: Verify the `service` name in `domains.csv` matches the container `container_name` or `service` key.
+- **Network**: Ensure the backend container is on the `traefik` network (`external: true`).
+- **Internal Ports**: If your service listens on a non-standard port (not 80), you must add individual Traefik labels for `loadbalancer.server.port`.
 
-### CrowdSec Connection Refused
+### Credentials sync failed
 
-- Verify `CROWDSEC_API_KEY` matches the registered bouncer.
-- Check bouncer status: `docker exec crowdsec cscli bouncers list`.
-- Regenerate key if needed:
-  ```bash
-  docker exec crowdsec cscli bouncers delete traefik-bouncer
-  docker exec crowdsec cscli bouncers add traefik-bouncer
+- If your `.env` gets corrupted, delete the `_ADMIN_CREDS_SYNC` variables and the `_DASHBOARD_AUTH` hashes. Run `./start.sh` and the system will attempt to repair/regenerate them based on your `_USER` and `_PASSWORD` variables.
+
+### Anubis Cookie Issues
+
+- **Same-Site**: Chrome and modern browsers require HTTPS for `SameSite=None` cookies. Anubis handles this, but ensure you are accessing via HTTPS.
+- **Root Domain Mismatch**: Ensure `DOMAINS.CSV` uses the correct `anubis_sub`. If you protect `a.com` but your auth subdomain is `auth.b.com`, the cookie will be rejected.
   ```
 
 ### Anubis Cookie Loops
