@@ -24,9 +24,10 @@ echo "🔍 Starting DNS verification check..."
 # Function to send Telegram alert
 send_telegram() {
     MSG="$1"
+    # Use backticks instead of square brackets for SERVER_DOMAIN to avoid Markdown parsing issues
     curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
         -d chat_id="${TELEGRAM_RECIPIENT_ID}" \
-        -d text="🌐 *DNS ALERT* [${SERVER_DOMAIN}] 🌐%0A%0A${MSG}" \
+        -d text="🌐 *DNS ALERT* [\`${SERVER_DOMAIN}\`] 🌐%0A%0A${MSG}" \
         -d parse_mode="Markdown" > /dev/null
 }
 

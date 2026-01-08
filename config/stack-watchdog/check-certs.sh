@@ -16,10 +16,10 @@ echo "🔍 Starting certificate audit on $ACME_FILE..."
 # Function to send alert
 send_telegram() {
     MSG="$1"
-    # Ensure curl is available or handle failure silently
+    # Use backticks instead of square brackets for SERVER_DOMAIN to avoid Markdown parsing issues
     curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
         -d chat_id="${TELEGRAM_RECIPIENT_ID}" \
-        -d text="⚠️ *SSL ALERT* [${SERVER_DOMAIN}] ⚠️%0A%0A${MSG}" \
+        -d text="⚠️ *SSL ALERT* [\`${SERVER_DOMAIN}\`] ⚠️%0A%0A${MSG}" \
         -d parse_mode="Markdown" > /dev/null
 }
 

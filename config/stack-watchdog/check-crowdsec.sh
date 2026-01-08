@@ -20,9 +20,10 @@ echo "🛡️ Starting CrowdSec health check..."
 # Function to send Telegram alert
 send_telegram() {
     MSG="$1"
+    # Use backticks instead of square brackets for SERVER_DOMAIN to avoid Markdown parsing issues
     curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
         -d chat_id="${TELEGRAM_RECIPIENT_ID}" \
-        -d text="🛡️ *CROWDSEC ALERT* [${SERVER_DOMAIN}] 🛡️%0A%0A${MSG}" \
+        -d text="🛡️ *CROWDSEC ALERT* [\`${SERVER_DOMAIN}\`] 🛡️%0A%0A${MSG}" \
         -d parse_mode="Markdown" > /dev/null
 }
 
@@ -89,36 +90,73 @@ if [ "$BOUNCER_COUNT" = "0" ] || [ -z "$BOUNCER_COUNT" ]; then
 else
     echo -e "${GREEN}✅ $BOUNCER_COUNT bouncer(s) registered${NC}"
     
-    # Check each bouncer's last heartbeat
-    STALE_BOUNCERS=""
     CURRENT_TIME=$(date +%s)
+    STALE_THRESHOLD=600 # 10 minutes (to avoid false positives with Traefik plugins)
+    PRUNE_THRESHOLD=172800 # 48 hours (to cleanup very old stale entries)
     
-    # Parse bouncers and check for stale connections (no heartbeat in 5 minutes)
-    echo "$BOUNCERS" | jq -r '.[] | "\(.name)|\(.last_pull)"' 2>/dev/null | while IFS='|' read -r name last_pull; do
+    # Use a temp directory to group bouncers
+    GROUP_DIR="/tmp/crowdsec_bouncers"
+    rm -rf "$GROUP_DIR" && mkdir -p "$GROUP_DIR"
+    
+    # Process bouncers and group them by base name
+    echo "$BOUNCERS" | jq -r '.[] | "\(.name)|\(.last_pull)"' 2>/dev/null | while IFS='|' read -r full_name last_pull; do
+        # Extract base name (e.g., traefik-bouncer from traefik-bouncer@172.19.0.6)
+        base_name=$(echo "$full_name" | cut -d'@' -f1)
+        
+        IS_STALE=1
+        IS_REALLY_OLD=0
+        
         if [ -n "$last_pull" ] && [ "$last_pull" != "null" ]; then
-            # Convert last_pull to timestamp (format: 2024-01-01T12:00:00Z)
             LAST_PULL_TS=$(date -d "$last_pull" +%s 2>/dev/null)
             if [ -n "$LAST_PULL_TS" ]; then
                 DIFF=$((CURRENT_TIME - LAST_PULL_TS))
-                if [ $DIFF -gt 300 ]; then
-                    MINUTES=$((DIFF / 60))
-                    echo -e "${YELLOW}⚠️ Bouncer '$name' last pull was $MINUTES minutes ago${NC}"
-                    echo "$name:$MINUTES" >> /tmp/stale_bouncers.txt
-                else
-                    echo -e "${GREEN}  → Bouncer '$name' is active (last pull: ${DIFF}s ago)${NC}"
+                [ $DIFF -le $STALE_THRESHOLD ] && IS_STALE=0
+                [ $DIFF -gt $PRUNE_THRESHOLD ] && IS_REALLY_OLD=1
+                
+                # Auto-prune very old bouncers to keep the list clean
+                if [ $IS_REALLY_OLD -eq 1 ]; then
+                    echo -e "${YELLOW}🧹 Auto-pruning very old bouncer: $full_name (last pull: $((DIFF / 3600))h ago)${NC}"
+                    docker exec "$CROWDSEC_CONTAINER" cscli bouncers delete "$full_name" > /dev/null 2>&1
+                    continue # Don't account for pruned bouncers in group status
                 fi
             fi
         fi
+        
+        # Record status for the group
+        if [ $IS_STALE -eq 0 ]; then
+            touch "$GROUP_DIR/${base_name}.active"
+        else
+            echo "$full_name" >> "$GROUP_DIR/${base_name}.stale_list"
+        fi
     done
     
-    # Check if we found stale bouncers
-    if [ -f /tmp/stale_bouncers.txt ]; then
-        STALE_LIST=$(cat /tmp/stale_bouncers.txt | while IFS=':' read -r name minutes; do
-            echo "• *$name*: last pull was ${minutes} minutes ago"
-        done)
-        send_telegram "Some bouncers appear to be stale:%0A%0A${STALE_LIST}%0A%0A👉 *Action Required:* Check bouncer connectivity."
-        rm -f /tmp/stale_bouncers.txt
+    # Evaluate groups and build alert message
+    STALE_ALERTS=""
+    for group_file in "$GROUP_DIR"/*.stale_list; do
+        [ ! -f "$group_file" ] && continue
+        
+        base_name=$(basename "$group_file" .stale_list)
+        
+        # Only alert if there are NO active instances in this group
+        if [ ! -f "$GROUP_DIR/${base_name}.active" ]; then
+            while read -r name; do
+                # Find the specific minutes for this name to include in alert
+                last_pull=$(echo "$BOUNCERS" | jq -r ".[] | select(.name==\"$name\") | .last_pull")
+                LAST_PULL_TS=$(date -d "$last_pull" +%s 2>/dev/null)
+                MINUTES=$(((CURRENT_TIME - LAST_PULL_TS) / 60))
+                STALE_ALERTS="${STALE_ALERTS}• *$name*: last pull was $MINUTES minutes ago%0A"
+                echo -e "${YELLOW}⚠️ Bouncer '$name' is STALE (Group '$base_name' has NO active instances)${NC}"
+            done < "$group_file"
+        else
+            echo -e "${GREEN}✅ Group '$base_name' is active (some instances are stale but at least one is healthy)${NC}"
+        fi
+    done
+    
+    if [ -n "$STALE_ALERTS" ]; then
+        send_telegram "Some bouncers appear to be stale:%0A%0A${STALE_ALERTS}%0A👉 *Action Required:* Check bouncer connectivity."
     fi
+    
+    rm -rf "$GROUP_DIR"
 fi
 
 # Get current ban statistics
