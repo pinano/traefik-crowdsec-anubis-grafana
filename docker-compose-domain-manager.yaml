@@ -13,7 +13,7 @@ services:
       - TZ=${TZ}
     volumes:
       - ./domains.csv:/data/domains.csv
-      - ./.env:/app/.env:ro
+      - ./.env:/app/.env
       - ./.env.dist:/app/.env.dist:ro
       - ./start.sh:/app/start.sh:ro
       - ./generate-config.py:/app/generate-config.py:ro
