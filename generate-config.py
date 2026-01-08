@@ -105,6 +105,10 @@ def process_router(entry, http_section, domain_to_cert_def):
     mw_list = []
     if not CROWDSEC_DISABLE:
         mw_list.append('crowdsec-check')
+    
+    # Protecting against Slowloris ASAP
+    mw_list.append('global-buffering')
+    
     mw_list.append('security-headers')
 
     if 'rate' in extra or 'burst' in extra:
@@ -126,14 +130,15 @@ def process_router(entry, http_section, domain_to_cert_def):
         mw_list.append(custom_conc_name)
     else:
         mw_list.append('global-concurrency')
-    mw_list.append('global-buffering')
-    mw_list.append('global-compress')
 
     if anubis_sub:
         safe_root = sanitize_name(root)
         safe_auth = sanitize_name(anubis_sub)
         mw_auth_name = f"anubis-mw-{safe_root}-{safe_auth}"
         mw_list.append(mw_auth_name)
+
+    # Compression and Protocol headers last
+    mw_list.append('global-compress')
 
     # -------------------------------------------------------------------------
     # Redirection Middleware

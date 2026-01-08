@@ -90,7 +90,7 @@ while IFS=, read -r domain rest || [ -n "$domain" ]; do
     # Skip empty lines and comments
     domain=$(echo "$domain" | xargs)
     case "$domain" in
-        ""|#*) continue ;;
+        ""|"#"*) continue ;;
     esac
 
     TOTAL=$((TOTAL + 1))

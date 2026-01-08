@@ -186,7 +186,7 @@ for img in happy.webp pensive.webp reject.webp; do
             echo "   ✅ Copied default $img"
         fi
     else
-        echo "   ℹ️ Using custom $img"
+        echo "   ℹ️  Using custom $img"
     fi
 done
 
@@ -250,7 +250,7 @@ if [ -f "./config/traefik/traefik.yaml.template" ]; then
         -e "s|TRAEFIK_TIMEOUT_ACTIVE_PLACEHOLDER|${TRAEFIK_TIMEOUT_ACTIVE:-60}s|g" \
         -e "s|TRAEFIK_TIMEOUT_IDLE_PLACEHOLDER|${TRAEFIK_TIMEOUT_IDLE:-90}s|g" \
         ./config/traefik/traefik.yaml.template > ./config/traefik/traefik-generated.yaml
-    echo "   ✅ traefik-generated.yaml generated."
+    echo "   ✅ traefik-generated.yaml produced."
 else
     echo "❌ Error: config/traefik/traefik.yaml.template not found!"
     exit 1
