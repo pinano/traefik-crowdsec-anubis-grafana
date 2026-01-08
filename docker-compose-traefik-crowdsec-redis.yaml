@@ -40,8 +40,8 @@ services:
       - "traefik.http.routers.traefik.service=api@internal"
       - "traefik.http.routers.traefik.tls.certresolver=le"
       # Middleware: basic auth
-      - "traefik.http.routers.traefik.middlewares=auth-middleware"
-      - "traefik.http.middlewares.auth-middleware.basicauth.users=${TRAEFIK_DASHBOARD_AUTH}"
+      - "traefik.http.routers.traefik.middlewares=traefik-auth-middleware"
+      - "traefik.http.middlewares.traefik-auth-middleware.basicauth.users=${TRAEFIK_DASHBOARD_AUTH}"
     deploy:
       resources:
         reservations:

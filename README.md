@@ -456,7 +456,11 @@ Legacy applications or slow backends may require adjusted timeouts. We provide t
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `GRAFANA_ADMIN_USER` | Grafana admin username | - |
+| `TRAEFIK_ADMIN_USER` | Traefik dashboard username | `admin` |
+| `TRAEFIK_ADMIN_PASSWORD` | Traefik dashboard password | - |
+| `DOZZLE_ADMIN_USER` | Dozzle admin username | `admin` |
+| `DOZZLE_ADMIN_PASSWORD` | Dozzle admin password | - |
+| `GRAFANA_ADMIN_USER` | Grafana admin username | `admin` |
 | `GRAFANA_ADMIN_PASSWORD` | Grafana admin password | - |
 
 #### Stack-Watchdog Alerts

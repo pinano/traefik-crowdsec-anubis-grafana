@@ -158,8 +158,34 @@ prompt_val "TRAEFIK_BLOCKED_PATHS" "Global Blocked Paths (e.g. /wp-admin/,/admin
 prompt_val "TRAEFIK_HSTS_MAX_AGE" "HSTS max age (seconds)"
 prompt_val "TRAEFIK_FRAME_ANCESTORS" "Allowed Iframe Ancestors (e.g. https://my-other-web.com)"
 
-prompt_val "GRAFANA_ADMIN_USER" "Admin User (Grafana, Traefik, Dozzle)"
-prompt_val "GRAFANA_ADMIN_PASSWORD" "Admin Password (Grafana, Traefik, Dozzle)"
+prompt_val "TRAEFIK_ADMIN_USER" "Traefik Admin User"
+prompt_val "TRAEFIK_ADMIN_PASSWORD" "Traefik Admin Password"
+
+# Smart defaults for other services
+TR_USER=$(grep "^TRAEFIK_ADMIN_USER=" "$ENV_FILE" | cut -d'=' -f2-)
+TR_PASS=$(grep "^TRAEFIK_ADMIN_PASSWORD=" "$ENV_FILE" | cut -d'=' -f2-)
+
+# --- DOZZLE CREDENTIALS ---
+echo ""
+echo "👉 Dozzle Admin Credentials (leave empty to use Traefik's)"
+read -p "   User [${TR_USER}]: " dz_user
+[ -z "$dz_user" ] && dz_user="$TR_USER"
+replace_val "DOZZLE_ADMIN_USER" "$dz_user"
+
+read -p "   Password [${TR_PASS}]: " dz_pass
+[ -z "$dz_pass" ] && dz_pass="$TR_PASS"
+replace_val "DOZZLE_ADMIN_PASSWORD" "$dz_pass"
+
+# --- GRAFANA CREDENTIALS ---
+echo ""
+echo "👉 Grafana Admin Credentials (leave empty to use Traefik's)"
+read -p "   User [${TR_USER}]: " gr_user
+[ -z "$gr_user" ] && gr_user="$TR_USER"
+replace_val "GRAFANA_ADMIN_USER" "$gr_user"
+
+read -p "   Password [${TR_PASS}]: " gr_pass
+[ -z "$gr_pass" ] && gr_pass="$TR_PASS"
+replace_val "GRAFANA_ADMIN_PASSWORD" "$gr_pass"
 
 prompt_val "WATCHDOG_TELEGRAM_BOT_TOKEN" "Telegram Bot Token (for Let's Encrypt renewal alerts)"
 prompt_val "WATCHDOG_TELEGRAM_RECIPIENT_ID" "Telegram Chat/Group ID (for Let's Encrypt renewal alerts)"
@@ -180,22 +206,27 @@ if [[ "$gen_anubis" == "y" || "$gen_anubis" == "Y" || -z "$gen_anubis" ]]; then
     echo "   ✅ Generated ANUBIS_REDIS_PRIVATE_KEY"
 fi
 
-# 2. TRAEFIK/DOZZLE DASHBOARD AUTH (Auto-generated from above)
+# 2. TRAEFIK & DOZZLE DASHBOARD AUTH (Auto-generated)
 echo ""
-echo "� Generating Traefik/Dozzle Auth Hash from Admin credentials..."
-# Read values directly from the .env file (handled by prompt_val earlier)
-ADM_USER=$(grep "^GRAFANA_ADMIN_USER=" "$ENV_FILE" | cut -d'=' -f2-)
-ADM_PASS=$(grep "^GRAFANA_ADMIN_PASSWORD=" "$ENV_FILE" | cut -d'=' -f2-)
+echo "🔐 Generating Authentication Hashes..."
+# Traefik
+T_USER=$(grep "^TRAEFIK_ADMIN_USER=" "$ENV_FILE" | cut -d'=' -f2-)
+T_PASS=$(grep "^TRAEFIK_ADMIN_PASSWORD=" "$ENV_FILE" | cut -d'=' -f2-)
+if [ -n "$T_USER" ] && [ -n "$T_PASS" ]; then
+    echo "   ⏳ Hashing Traefik credentials..."
+    T_HASH=$(docker run --rm httpd:alpine htpasswd -Bbn "$T_USER" "$T_PASS")
+    replace_val "TRAEFIK_DASHBOARD_AUTH" "'$T_HASH'"
+    echo "   ✅ Updated TRAEFIK_DASHBOARD_AUTH"
+fi
 
-if [ -n "$ADM_USER" ] && [ -n "$ADM_PASS" ]; then
-    echo "   ⏳ Hashing compatible with htpasswd..."
-    # Run docker to generate hash consistently
-    HASH=$(docker run --rm httpd:alpine htpasswd -Bbn "$ADM_USER" "$ADM_PASS")
-    # Wrap in single quotes to handle special chars in hash
-    replace_val "TRAEFIK_DASHBOARD_AUTH" "'$HASH'"
-    echo "   ✅ Updated TRAEFIK_DASHBOARD_AUTH hash"
-else
-    echo "   ⚠️  Skipping hash generation: GRAFANA_ADMIN_USER or GRAFANA_ADMIN_PASSWORD not set."
+# Dozzle
+D_USER=$(grep "^DOZZLE_ADMIN_USER=" "$ENV_FILE" | cut -d'=' -f2-)
+D_PASS=$(grep "^DOZZLE_ADMIN_PASSWORD=" "$ENV_FILE" | cut -d'=' -f2-)
+if [ -n "$D_USER" ] && [ -n "$D_PASS" ]; then
+    echo "   ⏳ Hashing Dozzle credentials..."
+    D_HASH=$(docker run --rm httpd:alpine htpasswd -Bbn "$D_USER" "$D_PASS")
+    replace_val "DOZZLE_DASHBOARD_AUTH" "'$D_HASH'"
+    echo "   ✅ Updated DOZZLE_DASHBOARD_AUTH"
 fi
 
 # 3. CROWDSEC_API_KEY
