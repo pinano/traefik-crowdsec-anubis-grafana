@@ -7,6 +7,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchInput = document.getElementById('search-input');
     const sortableHeaders = document.querySelectorAll('th.sortable');
 
+    // Modal elements
+    const restartModal = document.getElementById('restart-modal');
+    const logContainer = document.getElementById('log-container');
+    const closeModalBtn = document.getElementById('close-modal-btn');
+
     let allDomains = [];
     let currentSort = { column: null, direction: 'asc' };
 
@@ -41,7 +46,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 let valA = a[currentSort.column] || '';
                 let valB = b[currentSort.column] || '';
 
-                // Try numeric sort if both are numbers
                 if (!isNaN(valA) && !isNaN(valB) && valA !== '' && valB !== '') {
                     return currentSort.direction === 'asc' ? valA - valB : valB - valA;
                 }
@@ -78,18 +82,9 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
 
         tr.querySelector('.remove-row-btn').addEventListener('click', () => {
-            // Find in allDomains and remove
             const domainVal = tr.querySelector('[data-key="domain"]').value;
             allDomains = allDomains.filter(d => d.domain !== domainVal || domainVal === '');
             tr.remove();
-        });
-
-        // Update local state on change
-        tr.querySelectorAll('.data-input').forEach(input => {
-            input.addEventListener('change', () => {
-                // This is a bit tricky with filtering/sorting. 
-                // For simplicity, we just sync UI to allDomains on SAVE.
-            });
         });
 
         domainsBody.appendChild(tr);
@@ -126,28 +121,50 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    restartBtn.addEventListener('click', async () => {
-        if (!confirm('Are you sure you want to restart the stack? This may take a few moments.')) return;
-        try {
-            const response = await fetch('/api/restart', { method: 'POST' });
-            if (response.ok) {
-                showToast('Stack restart initiated');
+    restartBtn.addEventListener('click', () => {
+        if (!confirm('Are you sure you want to restart the stack? This will interrupt connections briefly.')) return;
+
+        // Show modal and start stream
+        restartModal.classList.add('show');
+        logContainer.textContent = 'Connecting to restart stream...\n';
+        closeModalBtn.style.display = 'none';
+
+        const eventSource = new EventSource('/api/restart-stream');
+
+        eventSource.onmessage = (event) => {
+            if (event.data.trim() === "[Process finished with code 0]") {
+                logContainer.textContent += '\n✅ Restart completed successfully.\n';
+                closeModalBtn.style.display = 'block';
+                eventSource.close();
+            } else if (event.data.includes("[Process finished with code")) {
+                logContainer.textContent += `\n❌ ${event.data}\n`;
+                closeModalBtn.style.display = 'block';
+                eventSource.close();
             } else {
-                showToast('Error restarting the stack', 'danger');
+                logContainer.textContent += event.data;
+                // Auto-scroll to bottom
+                logContainer.parentElement.scrollTop = logContainer.parentElement.scrollHeight;
             }
-        } catch (error) {
-            showToast('Network error', 'danger');
-        }
+        };
+
+        eventSource.onerror = (error) => {
+            logContainer.textContent += '\n⚠️ Connection lost (this is normal if the manager container is restarting).\n';
+            closeModalBtn.style.display = 'block';
+            eventSource.close();
+        };
+    });
+
+    closeModalBtn.addEventListener('click', () => {
+        restartModal.classList.remove('show');
     });
 
     addRowBtn.addEventListener('click', () => {
         addRow();
-        // Focus new domain input
         domainsBody.lastElementChild.querySelector('input').focus();
     });
 
     searchInput.addEventListener('input', () => {
-        syncUItoState(); // Keep changes before re-filtering
+        syncUItoState();
         applyFilterAndSort();
     });
 
@@ -161,11 +178,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentSort.direction = 'asc';
             }
 
-            // Update header UI
             sortableHeaders.forEach(h => h.classList.remove('asc', 'desc'));
             header.classList.add(currentSort.direction);
 
-            // Re-render
             syncUItoState();
             applyFilterAndSort();
         });

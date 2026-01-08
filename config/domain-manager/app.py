@@ -2,7 +2,7 @@ import os
 import csv
 import subprocess
 import secrets
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, Response
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', secrets.token_hex(32))
@@ -11,6 +11,7 @@ ADMIN_USER = os.environ.get('DOMAIN_MANAGER_ADMIN_USER', 'admin')
 ADMIN_PASS = os.environ.get('DOMAIN_MANAGER_ADMIN_PASSWORD', 'admin')
 CSV_PATH = '/data/domains.csv'
 START_SCRIPT = '/app/start.sh'
+DOMAIN = os.environ.get('DOMAIN', 'localhost')
 
 def read_csv():
     data = []
@@ -63,8 +64,8 @@ def login():
         if request.form['username'] == ADMIN_USER and request.form['password'] == ADMIN_PASS:
             session['logged_in'] = True
             return redirect(url_for('index'))
-        return render_template('login.html', error='Invalid credentials')
-    return render_template('login.html')
+        return render_template('login.html', error='Invalid credentials', domain=DOMAIN)
+    return render_template('login.html', domain=DOMAIN)
 
 @app.route('/logout')
 def logout():
@@ -75,7 +76,7 @@ def logout():
 def index():
     if not session.get('logged_in'):
         return redirect(url_for('login'))
-    return render_template('index.html')
+    return render_template('index.html', domain=DOMAIN)
 
 @app.route('/api/domains', methods=['GET', 'POST'])
 def api_domains():
@@ -95,12 +96,39 @@ def restart_stack():
     if not session.get('logged_in'):
         return jsonify({'error': 'Unauthorized'}), 401
     
+    # We still keep the old restart for compatibility or simple trigger
     try:
-        # Run start.sh in the background to avoid timeout
-        subprocess.Popen([START_SCRIPT], cwd='/app')
+        subprocess.Popen(['bash', START_SCRIPT], cwd='/app')
         return jsonify({'status': 'success', 'message': 'Stack restart initiated'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/restart-stream')
+def restart_stream():
+    if not session.get('logged_in'):
+        return Response("Unauthorized", status=401)
+
+    def generate():
+        # Using bash explicitly and passing current environment
+        process = subprocess.Popen(
+            ['bash', START_SCRIPT],
+            cwd='/app',
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            env=os.environ.copy()
+        )
+        
+        for line in process.stdout:
+            # SSE format: "data: <content>\n\n"
+            yield f"data: {line}\n\n"
+        
+        process.stdout.close()
+        return_code = process.wait()
+        yield f"data: \n[Process finished with code {return_code}]\n\n"
+
+    return Response(generate(), mimetype='text/event-stream')
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

@@ -15,7 +15,7 @@
     <div class="container">
         <header>
             <div class="logo">
-                <h1>Domain Manager</h1>
+                <h1>domains.{{ domain }}</h1>
                 <p>Manage Stack Domains</p>
             </div>
             <div class="actions">
@@ -67,6 +67,19 @@
                 </button>
             </div>
         </main>
+    </div>
+
+    <!-- Restart Progress Modal -->
+    <div id="restart-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Stack Restart Progress</h2>
+                <button id="close-modal-btn" class="btn btn-secondary btn-sm" style="display: none;">Close</button>
+            </div>
+            <div class="modal-body">
+                <pre id="log-container">Initializing restart stream...</pre>
+            </div>
+        </div>
     </div>
 
     <!-- Notification Toast -->
