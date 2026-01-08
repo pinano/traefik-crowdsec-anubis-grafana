@@ -456,8 +456,8 @@ Legacy applications or slow backends may require adjusted timeouts. We provide t
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `GF_ADMIN_USER` | Grafana admin username | - |
-| `GF_ADMIN_PASSWORD` | Grafana admin password | - |
+| `GRAFANA_ADMIN_USER` | Grafana admin username | - |
+| `GRAFANA_ADMIN_PASSWORD` | Grafana admin password | - |
 
 #### Stack-Watchdog Alerts
 

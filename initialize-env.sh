@@ -158,8 +158,8 @@ prompt_val "TRAEFIK_BLOCKED_PATHS" "Global Blocked Paths (e.g. /wp-admin/,/admin
 prompt_val "TRAEFIK_HSTS_MAX_AGE" "HSTS max age (seconds)"
 prompt_val "TRAEFIK_FRAME_ANCESTORS" "Allowed Iframe Ancestors (e.g. https://my-other-web.com)"
 
-prompt_val "GF_ADMIN_USER" "Admin User (Grafana, Traefik, Dozzle)"
-prompt_val "GF_ADMIN_PASSWORD" "Admin Password (Grafana, Traefik, Dozzle)"
+prompt_val "GRAFANA_ADMIN_USER" "Admin User (Grafana, Traefik, Dozzle)"
+prompt_val "GRAFANA_ADMIN_PASSWORD" "Admin Password (Grafana, Traefik, Dozzle)"
 
 prompt_val "WATCHDOG_TELEGRAM_BOT_TOKEN" "Telegram Bot Token (for Let's Encrypt renewal alerts)"
 prompt_val "WATCHDOG_TELEGRAM_RECIPIENT_ID" "Telegram Chat/Group ID (for Let's Encrypt renewal alerts)"
@@ -184,8 +184,8 @@ fi
 echo ""
 echo "� Generating Traefik/Dozzle Auth Hash from Admin credentials..."
 # Read values directly from the .env file (handled by prompt_val earlier)
-ADM_USER=$(grep "^GF_ADMIN_USER=" "$ENV_FILE" | cut -d'=' -f2-)
-ADM_PASS=$(grep "^GF_ADMIN_PASSWORD=" "$ENV_FILE" | cut -d'=' -f2-)
+ADM_USER=$(grep "^GRAFANA_ADMIN_USER=" "$ENV_FILE" | cut -d'=' -f2-)
+ADM_PASS=$(grep "^GRAFANA_ADMIN_PASSWORD=" "$ENV_FILE" | cut -d'=' -f2-)
 
 if [ -n "$ADM_USER" ] && [ -n "$ADM_PASS" ]; then
     echo "   ⏳ Hashing compatible with htpasswd..."
@@ -195,7 +195,7 @@ if [ -n "$ADM_USER" ] && [ -n "$ADM_PASS" ]; then
     replace_val "TRAEFIK_DASHBOARD_AUTH" "'$HASH'"
     echo "   ✅ Updated TRAEFIK_DASHBOARD_AUTH hash"
 else
-    echo "   ⚠️  Skipping hash generation: GF_ADMIN_USER or GF_ADMIN_PASSWORD not set."
+    echo "   ⚠️  Skipping hash generation: GRAFANA_ADMIN_USER or GRAFANA_ADMIN_PASSWORD not set."
 fi
 
 # 3. CROWDSEC_API_KEY
