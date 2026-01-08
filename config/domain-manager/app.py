@@ -9,8 +9,12 @@ app.secret_key = os.environ.get('FLASK_SECRET_KEY', secrets.token_hex(32))
 
 ADMIN_USER = os.environ.get('DOMAIN_MANAGER_ADMIN_USER', 'admin')
 ADMIN_PASS = os.environ.get('DOMAIN_MANAGER_ADMIN_PASSWORD', 'admin')
-CSV_PATH = './domains.csv'
-START_SCRIPT = './start.sh'
+
+# Mirror the host path inside the container
+BASE_DIR = os.environ.get('APP_PATH_HOST', '/app')
+CSV_PATH = os.path.join(BASE_DIR, 'domains.csv')
+START_SCRIPT = os.path.join(BASE_DIR, 'start.sh')
+
 DOMAIN = os.environ.get('DOMAIN', 'localhost')
 ENV = os.environ.copy()
 ENV['TERM'] = 'xterm'
@@ -100,7 +104,7 @@ def restart_stack():
     
     # We still keep the old restart for compatibility or simple trigger
     try:
-        subprocess.Popen(['bash', START_SCRIPT], cwd=os.getcwd(), env=ENV)
+        subprocess.Popen(['bash', START_SCRIPT], cwd=BASE_DIR, env=ENV)
         return jsonify({'status': 'success', 'message': 'Stack restart initiated'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500

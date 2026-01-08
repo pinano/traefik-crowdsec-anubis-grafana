@@ -12,7 +12,7 @@ services:
       - DOMAIN=${DOMAIN}
       - COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}
       - TZ=${TZ}
-    working_dir: ${APP_PATH_HOST}
+    working_dir: ${APP_PATH_HOST}/config/domain-manager
     volumes:
       - ./domains.csv:${APP_PATH_HOST}/domains.csv
       - ./.env:${APP_PATH_HOST}/.env
