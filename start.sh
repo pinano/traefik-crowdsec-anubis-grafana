@@ -344,7 +344,8 @@ fi
 COMPOSE_FILES="-f docker-compose-traefik-crowdsec-redis.yaml \
                -f docker-compose-tools.yaml \
                -f docker-compose-anubis-generated.yaml \
-               -f docker-compose-grafana-loki-alloy.yaml"
+               -f docker-compose-grafana-loki-alloy.yaml \
+               -f docker-compose-domain-manager.yaml"
 
 # Include Apache host logs for legacy installations
 if [ -d "/var/log/apache2" ]; then

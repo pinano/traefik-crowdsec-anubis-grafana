@@ -1,0 +1,38 @@
+services:
+  domain-manager:
+    build: ./config/domain-manager
+    container_name: domain-manager
+    restart: unless-stopped
+    networks:
+      - traefik
+    environment:
+      - DOMAIN_MANAGER_ADMIN_USER=${DOMAIN_MANAGER_ADMIN_USER}
+      - DOMAIN_MANAGER_ADMIN_PASSWORD=${DOMAIN_MANAGER_ADMIN_PASSWORD}
+      - TZ=${TZ}
+    volumes:
+      - ./domains.csv:/data/domains.csv
+      - ./.env:/app/.env:ro
+      - ./start.sh:/app/start.sh:ro
+      - ./generate-config.py:/app/generate-config.py:ro
+      - ./docker-compose-traefik-crowdsec-redis.yaml:/app/docker-compose-traefik-crowdsec-redis.yaml:ro
+      - ./docker-compose-tools.yaml:/app/docker-compose-tools.yaml:ro
+      - ./docker-compose-anubis-generated.yaml:/app/docker-compose-anubis-generated.yaml:ro
+      - ./docker-compose-grafana-loki-alloy.yaml:/app/docker-compose-grafana-loki-alloy.yaml:ro
+      - ./docker-compose-domain-manager.yaml:/app/docker-compose-domain-manager.yaml:ro
+      - ./config:/app/config:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.domain-manager.rule=Host(`domains.${DOMAIN}`)"
+      - "traefik.http.routers.domain-manager.entrypoints=websecure"
+      - "traefik.http.routers.domain-manager.tls.certresolver=le"
+      - "traefik.http.services.domain-manager.loadbalancer.server.port=5000"
+      # Basic Auth can be added here or handled in-app as requested
+      # - "traefik.http.routers.domain-manager.middlewares=domain-manager-auth"
+      # - "traefik.http.middlewares.domain-manager-auth.basicauth.users=${DOMAIN_MANAGER_DASHBOARD_AUTH}"
+
+networks:
+  traefik:
+    name: traefik
+    external: true

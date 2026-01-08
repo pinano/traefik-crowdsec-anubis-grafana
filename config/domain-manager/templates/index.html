@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Domain Manager</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <h1>Domain Manager</h1>
+                <p>Manage Stack Domains</p>
+            </div>
+            <div class="actions">
+                <button id="save-btn" class="btn btn-primary">Save Changes</button>
+                <button id="restart-btn" class="btn btn-danger">Restart Stack</button>
+                <a href="{{ url_for('logout') }}" class="btn btn-secondary">Logout</a>
+            </div>
+        </header>
+
+        <main>
+            <div class="table-container">
+                <table id="domains-table">
+                    <thead>
+                        <tr>
+                            <th>Domain</th>
+                            <th>Redirection</th>
+                            <th>Docker Service</th>
+                            <th>Anubis Subdomain</th>
+                            <th>Rate</th>
+                            <th>Burst</th>
+                            <th>Concurrency</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="domains-body">
+                        <!-- Data will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+            <div class="table-footer">
+                <button id="add-row-btn" class="btn btn-success">Add Record</button>
+            </div>
+        </main>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast"></div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+
+</html>

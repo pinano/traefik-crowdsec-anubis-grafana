@@ -184,8 +184,19 @@ read -p "   User [${TR_USER}]: " gr_user
 replace_val "GRAFANA_ADMIN_USER" "$gr_user"
 
 read -p "   Password [${TR_PASS}]: " gr_pass
-[ -z "$gr_pass" ] && gr_pass="$TR_PASS"
+[z "$gr_pass" ] && gr_pass="$TR_PASS"
 replace_val "GRAFANA_ADMIN_PASSWORD" "$gr_pass"
+
+# --- DOMAIN MANAGER CREDENTIALS ---
+echo ""
+echo "👉 Domain Manager Admin Credentials (leave empty to use Traefik's)"
+read -p "   User [${TR_USER}]: " dm_user
+[ -z "$dm_user" ] && dm_user="$TR_USER"
+replace_val "DOMAIN_MANAGER_ADMIN_USER" "$dm_user"
+
+read -p "   Password [${TR_PASS}]: " dm_pass
+[ -z "$dm_pass" ] && dm_pass="$TR_PASS"
+replace_val "DOMAIN_MANAGER_ADMIN_PASSWORD" "$dm_pass"
 
 prompt_val "WATCHDOG_TELEGRAM_BOT_TOKEN" "Telegram Bot Token (for Let's Encrypt renewal alerts)"
 prompt_val "WATCHDOG_TELEGRAM_RECIPIENT_ID" "Telegram Chat/Group ID (for Let's Encrypt renewal alerts)"
