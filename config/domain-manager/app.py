@@ -9,7 +9,7 @@ app.secret_key = os.environ.get('FLASK_SECRET_KEY', secrets.token_hex(32))
 
 ADMIN_USER = os.environ.get('DOMAIN_MANAGER_ADMIN_USER', 'admin')
 ADMIN_PASS = os.environ.get('DOMAIN_MANAGER_ADMIN_PASSWORD', 'admin')
-CSV_PATH = '/data/domains.csv'
+CSV_PATH = '/app/domains.csv'
 START_SCRIPT = '/app/start.sh'
 DOMAIN = os.environ.get('DOMAIN', 'localhost')
 ENV = os.environ.copy()

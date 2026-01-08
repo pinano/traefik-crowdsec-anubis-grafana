@@ -145,7 +145,6 @@ th {
     text-transform: uppercase;
     color: var(--text-muted);
     border-bottom: 2px solid var(--border-color);
-    white-space: nowrap;
 }
 
 td {

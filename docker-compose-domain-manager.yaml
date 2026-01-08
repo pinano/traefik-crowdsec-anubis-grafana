@@ -12,7 +12,7 @@ services:
       - DOMAIN=${DOMAIN}
       - TZ=${TZ}
     volumes:
-      - ./domains.csv:/data/domains.csv
+      - ./domains.csv:/app/domains.csv
       - ./.env:/app/.env
       - ./.env.dist:/app/.env.dist:ro
       - ./start.sh:/app/start.sh:ro
