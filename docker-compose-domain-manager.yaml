@@ -19,10 +19,10 @@ services:
       - ./generate-config.py:/app/generate-config.py:ro
       - ./docker-compose-traefik-crowdsec-redis.yaml:/app/docker-compose-traefik-crowdsec-redis.yaml:ro
       - ./docker-compose-tools.yaml:/app/docker-compose-tools.yaml:ro
-      - ./docker-compose-anubis-generated.yaml:/app/docker-compose-anubis-generated.yaml:ro
+      - ./docker-compose-anubis-generated.yaml:/app/docker-compose-anubis-generated.yaml
       - ./docker-compose-grafana-loki-alloy.yaml:/app/docker-compose-grafana-loki-alloy.yaml:ro
       - ./docker-compose-domain-manager.yaml:/app/docker-compose-domain-manager.yaml:ro
-      - ./config:/app/config:ro
+      - ./config:/app/config
       - /var/run/docker.sock:/var/run/docker.sock
     labels:
       - "traefik.enable=true"
