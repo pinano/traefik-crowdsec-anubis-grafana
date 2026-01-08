@@ -12,6 +12,8 @@ ADMIN_PASS = os.environ.get('DOMAIN_MANAGER_ADMIN_PASSWORD', 'admin')
 CSV_PATH = '/data/domains.csv'
 START_SCRIPT = '/app/start.sh'
 DOMAIN = os.environ.get('DOMAIN', 'localhost')
+ENV = os.environ.copy()
+ENV['TERM'] = 'xterm'
 
 def read_csv():
     data = []
@@ -98,7 +100,7 @@ def restart_stack():
     
     # We still keep the old restart for compatibility or simple trigger
     try:
-        subprocess.Popen(['bash', START_SCRIPT], cwd='/app')
+        subprocess.Popen(['bash', START_SCRIPT], cwd='/app', env=ENV)
         return jsonify({'status': 'success', 'message': 'Stack restart initiated'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -117,7 +119,7 @@ def restart_stream():
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,
-            env=os.environ.copy()
+            env=ENV
         )
         
         for line in process.stdout:

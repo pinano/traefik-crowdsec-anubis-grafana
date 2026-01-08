@@ -396,7 +396,7 @@ input:focus {
 }
 
 .modal.modal-sm {
-    max-width: 400px;
+    max-width: 450px;
 }
 
 .modal-header h2 {
@@ -406,6 +406,12 @@ input:focus {
 }
 
 .modal-body {
+    padding: 1.5rem;
+    overflow-y: auto;
+    background-color: var(--card-bg);
+}
+
+.modal-body-console {
     padding: 0;
     overflow: hidden;
     background-color: #0f172a;

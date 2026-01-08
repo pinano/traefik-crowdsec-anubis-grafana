@@ -83,7 +83,8 @@ while IFS= read -r line || [ -n "$line" ]; do
     fi
 done < "$ENV_FILE"
 
-mv "$TEMP_ENV" "$ENV_FILE"
+cat "$TEMP_ENV" > "$ENV_FILE"
+rm "$TEMP_ENV"
 
 if [ $ADDED_VARS -gt 0 ]; then
     echo "   ✅ Added $ADDED_VARS new variables from .env.dist."
