@@ -155,9 +155,15 @@ fi
 CROWDSEC_DISABLE=$(echo "${CROWDSEC_DISABLE:-false}" | tr '[:upper:]' '[:lower:]')
 
 # Build Compose command with or without CrowdSec profile
-COMPOSE_CMD="docker compose"
+# Enforce project name to avoid conflicts when running from within a container
+COMPOSE_BASE="docker compose"
+if [ -n "$COMPOSE_PROJECT_NAME" ]; then
+    COMPOSE_BASE="docker compose -p $COMPOSE_PROJECT_NAME"
+fi
+
+COMPOSE_CMD="$COMPOSE_BASE"
 if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
-    COMPOSE_CMD="docker compose --profile crowdsec"
+    COMPOSE_CMD="$COMPOSE_BASE --profile crowdsec"
     echo "🛡️  CrowdSec firewall is ENABLED."
 else
     echo "⚠️  CrowdSec firewall is DISABLED."
@@ -369,7 +375,8 @@ if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
     # Wait for CrowdSec to be healthy (smart wait instead of blind sleep)
     echo -n "   ⏳ Waiting for CrowdSec API"
     timeout=60
-    while [ "$(docker inspect --format='{{.State.Health.Status}}' crowdsec 2>/dev/null)" != "healthy" ]; do
+    CROWDSEC_ID=$(docker ps -aqf "name=crowdsec" | head -n 1)
+    while [ "$(docker inspect --format='{{.State.Health.Status}}' $CROWDSEC_ID 2>/dev/null)" != "healthy" ]; do
         sleep 2
         echo -n "."
         ((timeout-=2))

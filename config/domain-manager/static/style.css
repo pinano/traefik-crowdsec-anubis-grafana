@@ -297,9 +297,6 @@ input:focus {
     cursor: pointer;
     user-select: none;
     transition: background-color 0.2s;
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
 }
 
 .sortable:hover {
@@ -307,8 +304,11 @@ input:focus {
 }
 
 .sortable i {
+    display: inline-block;
+    vertical-align: middle;
     width: 14px;
     height: 14px;
+    margin-left: 0.35rem;
     opacity: 0.5;
     flex-shrink: 0;
 }

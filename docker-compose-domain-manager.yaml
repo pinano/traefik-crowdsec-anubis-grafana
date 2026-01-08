@@ -10,6 +10,7 @@ services:
       - DOMAIN_MANAGER_ADMIN_PASSWORD=${DOMAIN_MANAGER_ADMIN_PASSWORD}
       - FLASK_SECRET_KEY=${DOMAIN_MANAGER_SECRET_KEY}
       - DOMAIN=${DOMAIN}
+      - COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}
       - TZ=${TZ}
     volumes:
       - ./domains.csv:/app/domains.csv
