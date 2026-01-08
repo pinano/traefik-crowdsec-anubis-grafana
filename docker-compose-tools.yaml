@@ -55,8 +55,8 @@ services:
     container_name: stack-watchdog
     restart: unless-stopped
     # Run all check scripts in parallel with independent intervals
-    # check-certs.sh: every 24h, check-dns.sh: every DNS_CHECK_INTERVAL
-    # check-crowdsec.sh: every CROWDSEC_CHECK_INTERVAL (default 1h)
+    # check-certs.sh: every 24h, check-dns.sh: every WATCHDOG_DNS_CHECK_INTERVAL
+    # check-crowdsec.sh: every WATCHDOG_CROWDSEC_CHECK_INTERVAL (default 1h)
     entrypoint: >
       sh -c "
         # Start certificate check loop in background
@@ -69,8 +69,8 @@ services:
         (if [ \"\$${CROWDSEC_DISABLE}\" != \"true\" ]; then
           while true; do
             sh /check-crowdsec.sh;
-            echo \"CrowdSec check: sleeping for \$${CROWDSEC_CHECK_INTERVAL:-3600}s...\";
-            sleep \$${CROWDSEC_CHECK_INTERVAL:-3600};
+            echo \"CrowdSec check: sleeping for \$${WATCHDOG_CROWDSEC_CHECK_INTERVAL:-3600}s...\";
+            sleep \$${WATCHDOG_CROWDSEC_CHECK_INTERVAL:-3600};
           done
         else
           echo 'CrowdSec check DISABLED.';
@@ -78,8 +78,8 @@ services:
         # Start DNS check loop in foreground
         while true; do
           sh /check-dns.sh;
-          echo \"DNS check: sleeping for \$${DNS_CHECK_INTERVAL:-21600}s...\";
-          sleep \$${DNS_CHECK_INTERVAL:-21600};
+          echo \"DNS check: sleeping for \$${WATCHDOG_DNS_CHECK_INTERVAL:-21600}s...\";
+          sleep \$${WATCHDOG_DNS_CHECK_INTERVAL:-21600};
         done
       "
     volumes:
@@ -91,14 +91,14 @@ services:
       # Docker socket for CrowdSec container inspection
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - TELEGRAM_RECIPIENT_ID=${TELEGRAM_RECIPIENT_ID}
+      - WATCHDOG_TELEGRAM_BOT_TOKEN=${WATCHDOG_TELEGRAM_BOT_TOKEN}
+      - WATCHDOG_TELEGRAM_RECIPIENT_ID=${WATCHDOG_TELEGRAM_RECIPIENT_ID}
       - SERVER_DOMAIN=${DOMAIN} # For customizing the alert message
-      - DAYS_WARNING=${DAYS_WARNING}
+      - WATCHDOG_CERT_DAYS_WARNING=${WATCHDOG_CERT_DAYS_WARNING}
       - TZ=${TZ}
       - TRAEFIK_LISTEN_IP=${TRAEFIK_LISTEN_IP}
-      - DNS_CHECK_INTERVAL=${DNS_CHECK_INTERVAL:-21600}
-      - CROWDSEC_CHECK_INTERVAL=${CROWDSEC_CHECK_INTERVAL:-3600}
+      - WATCHDOG_DNS_CHECK_INTERVAL=${WATCHDOG_DNS_CHECK_INTERVAL:-21600}
+      - WATCHDOG_CROWDSEC_CHECK_INTERVAL=${WATCHDOG_CROWDSEC_CHECK_INTERVAL:-3600}
       - CROWDSEC_CONTAINER=crowdsec
       - CROWDSEC_DISABLE=${CROWDSEC_DISABLE:-false}
     deploy:

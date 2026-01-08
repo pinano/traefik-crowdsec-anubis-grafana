@@ -42,8 +42,8 @@ certificatesResolvers:
   le:
     acme:
       tlsChallenge: {}
-      email: "ACME_EMAIL_PLACEHOLDER"
-      caServer: "ACME_CASERVER_PLACEHOLDER"
+      email: "TRAEFIK_ACME_EMAIL_PLACEHOLDER"
+      caServer: "TRAEFIK_ACME_CASERVER_PLACEHOLDER"
       storage: "/acme.json"
 
 tls:

@@ -160,19 +160,19 @@ fi
 # =============================================================================
 # PHASE 3: Configure ACME Environment
 # =============================================================================
-# Priority: TRAEFIK_ACME_ENV_TYPE > ACME_CA_SERVER (from .env)
-# This ensures TRAEFIK_ACME_ENV_TYPE is respected even if an old ACME_CA_SERVER
+# Priority: TRAEFIK_ACME_ENV_TYPE > TRAEFIK_ACME_CA_SERVER (from .env)
+# This ensures TRAEFIK_ACME_ENV_TYPE is respected even if an old TRAEFIK_ACME_CA_SERVER
 # variable remains in the .env file.
 
 echo "🔒 Configuring ACME environment..."
 if [ -n "$TRAEFIK_ACME_ENV_TYPE" ]; then
     case "$TRAEFIK_ACME_ENV_TYPE" in
         staging)
-            export ACME_CA_SERVER="https://acme-staging-v02.api.letsencrypt.org/directory"
+            export TRAEFIK_ACME_CA_SERVER="https://acme-staging-v02.api.letsencrypt.org/directory"
             echo "   ⚠️ Let's Encrypt STAGING environment."
             ;;
         production)
-            export ACME_CA_SERVER="https://acme-v02.api.letsencrypt.org/directory"
+            export TRAEFIK_ACME_CA_SERVER="https://acme-v02.api.letsencrypt.org/directory"
             echo "   ✅ Let's Encrypt PRODUCTION environment."
             ;;
         *)
@@ -181,13 +181,13 @@ if [ -n "$TRAEFIK_ACME_ENV_TYPE" ]; then
     esac
 fi
 
-# Default to staging if ACME_CA_SERVER is still empty
-if [ -z "$ACME_CA_SERVER" ]; then
-    export ACME_CA_SERVER="https://acme-staging-v02.api.letsencrypt.org/directory"
+# Default to staging if TRAEFIK_ACME_CA_SERVER is still empty
+if [ -z "$TRAEFIK_ACME_CA_SERVER" ]; then
+    export TRAEFIK_ACME_CA_SERVER="https://acme-staging-v02.api.letsencrypt.org/directory"
     echo "   ⚠️ Let's Encrypt STAGING environment (default)."
 elif [ -z "$TRAEFIK_ACME_ENV_TYPE" ]; then
     # Only show this if using manual override (TRAEFIK_ACME_ENV_TYPE is empty)
-    echo "   🔧 Using custom ACME_CA_SERVER from .env."
+    echo "   🔧 Using custom TRAEFIK_ACME_CA_SERVER from .env."
 fi
 
 # =============================================================================
@@ -197,8 +197,8 @@ fi
 # Generate traefik-generated.yaml from template
 echo "🔧 Generating traefik-generated.yaml from template..."
 if [ -f "./config/traefik/traefik.yaml.template" ]; then
-    sed -e "s|ACME_EMAIL_PLACEHOLDER|${TRAEFIK_ACME_EMAIL}|g" \
-        -e "s|ACME_CASERVER_PLACEHOLDER|${ACME_CA_SERVER}|g" \
+    sed -e "s|TRAEFIK_ACME_EMAIL_PLACEHOLDER|${TRAEFIK_ACME_EMAIL}|g" \
+        -e "s|TRAEFIK_ACME_CASERVER_PLACEHOLDER|${TRAEFIK_ACME_CA_SERVER}|g" \
         -e "s|TRAEFIK_TIMEOUT_ACTIVE_PLACEHOLDER|${TRAEFIK_TIMEOUT_ACTIVE:-60}s|g" \
         -e "s|TRAEFIK_TIMEOUT_IDLE_PLACEHOLDER|${TRAEFIK_TIMEOUT_IDLE:-90}s|g" \
         ./config/traefik/traefik.yaml.template > ./config/traefik/traefik-generated.yaml

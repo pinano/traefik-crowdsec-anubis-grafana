@@ -433,8 +433,8 @@ This script:
 | `TRAEFIK_GLOBAL_CONCURRENCY` | Default concurrent connections | `25` |
 | `TRAEFIK_HSTS_MAX_AGE` | HSTS header duration (seconds) | `31536000` |
 | `TRAEFIK_ACME_EMAIL` | Let's Encrypt contact email | - |
-| `TRAEFIK_ACME_ENV_TYPE` | `staging` or `production` (ignored if `ACME_CA_SERVER` is set) | `staging` |
-| `ACME_CA_SERVER` | Optional direct URL override for the ACME server | - |
+| `TRAEFIK_ACME_ENV_TYPE` | `staging` or `production` (ignored if `TRAEFIK_ACME_CA_SERVER` is set) | `staging` |
+| `TRAEFIK_ACME_CA_SERVER` | Optional direct URL override for the ACME server | - |
 | `TRAEFIK_DASHBOARD_AUTH` | Basic auth for dashboard (htpasswd format) | - |
 | `TRAEFIK_BLOCKED_PATHS` | Comma-separated list of path prefixes to block globally (regex supported) | - |
 | `TRAEFIK_FRAME_ANCESTORS` | Comma-separated list of domains allowed to embed this site in an iframe | - |
@@ -463,11 +463,11 @@ Legacy applications or slow backends may require adjusted timeouts. We provide t
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `TELEGRAM_BOT_TOKEN` | Bot token from @BotFather | - |
-| `TELEGRAM_RECIPIENT_ID` | Chat/group ID for alerts | - |
-| `DAYS_WARNING` | Certificate expiration threshold (days) | `10` |
-| `DNS_CHECK_INTERVAL` | DNS verification interval (seconds) | `21600` (6h) |
-| `CROWDSEC_CHECK_INTERVAL` | CrowdSec check interval (seconds) | `3600` (1h) |
+| `WATCHDOG_TELEGRAM_BOT_TOKEN` | Bot token from @BotFather | - |
+| `WATCHDOG_TELEGRAM_RECIPIENT_ID` | Chat/group ID for alerts | - |
+| `WATCHDOG_CERT_DAYS_WARNING` | Certificate expiration threshold (days) | `10` |
+| `WATCHDOG_DNS_CHECK_INTERVAL` | DNS verification interval (seconds) | `21600` (6h) |
+| `WATCHDOG_CROWDSEC_CHECK_INTERVAL` | CrowdSec check interval (seconds) | `3600` (1h) |
 
 ---
 

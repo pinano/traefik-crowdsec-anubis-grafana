@@ -2,9 +2,9 @@
 
 # Configuration
 ACME_FILE="/acme.json"
-DAYS_WARNING=${DAYS_WARNING:-10}
-TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN}"
-TELEGRAM_RECIPIENT_ID="${TELEGRAM_RECIPIENT_ID}"
+WATCHDOG_CERT_DAYS_WARNING=${WATCHDOG_CERT_DAYS_WARNING:-10}
+TELEGRAM_BOT_TOKEN="${WATCHDOG_TELEGRAM_BOT_TOKEN}"
+TELEGRAM_RECIPIENT_ID="${WATCHDOG_TELEGRAM_RECIPIENT_ID}"
 
 # Colors for local logs
 RED='\033[0;31m'
@@ -39,7 +39,7 @@ fi
 CERTS=$(jq -r '.. | .Certificates? | select(. != null) | .[] | .certificate' "$ACME_FILE")
 
 CURRENT_DATE=$(date +%s)
-WARNING_SECONDS=$((DAYS_WARNING * 86400))
+WARNING_SECONDS=$((WATCHDOG_CERT_DAYS_WARNING * 86400))
 
 # Counters
 COUNT=0
@@ -74,7 +74,7 @@ for CERT_B64 in $CERTS; do
         echo -e "${RED}[DANGER] $DOMAIN expires in $DAYS_LEFT days ($END_DATE_STR)${NC}"
         
         # Send Telegram alert
-        MESSAGE="The certificate for *${DOMAIN}* expires in *${DAYS_LEFT} days* (threshold: ${DAYS_WARNING} days).%0AAutomatic renewal has failed or is delayed.%0A👉 *Action Required:* Review Traefik renewal process immediately."
+        MESSAGE="The certificate for *${DOMAIN}* expires in *${DAYS_LEFT} days* (threshold: ${WATCHDOG_CERT_DAYS_WARNING} days).%0AAutomatic renewal has failed or is delayed.%0A👉 *Action Required:* Review Traefik renewal process immediately."
         send_telegram "$MESSAGE"
         ERRORS=$((ERRORS + 1))
     else

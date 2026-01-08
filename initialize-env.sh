@@ -114,7 +114,6 @@ else
 fi
 
 prompt_val "CROWDSEC_UPDATE_INTERVAL" "CrowdSec update interval (seconds)"
-prompt_val "CROWDSEC_CHECK_INTERVAL" "CrowdSec Watchdog check interval (seconds)"
 
 echo ""
 read -p "👉 Disable CrowdSec Firewall completely? (y/N): " disable_cs
@@ -162,9 +161,11 @@ prompt_val "TRAEFIK_FRAME_ANCESTORS" "Allowed Iframe Ancestors (e.g. https://my-
 prompt_val "GF_ADMIN_USER" "Admin User (Grafana, Traefik, Dozzle)"
 prompt_val "GF_ADMIN_PASSWORD" "Admin Password (Grafana, Traefik, Dozzle)"
 
-prompt_val "TELEGRAM_BOT_TOKEN" "Telegram Bot Token (for Let's Encrypt renewal alerts)"
-prompt_val "TELEGRAM_RECIPIENT_ID" "Telegram Chat/Group ID (for Let's Encrypt renewal alerts)"
-prompt_val "DAYS_WARNING" "Days before SSL certificateexpiration to send alert (default: 10)"
+prompt_val "WATCHDOG_TELEGRAM_BOT_TOKEN" "Telegram Bot Token (for Let's Encrypt renewal alerts)"
+prompt_val "WATCHDOG_TELEGRAM_RECIPIENT_ID" "Telegram Chat/Group ID (for Let's Encrypt renewal alerts)"
+prompt_val "WATCHDOG_CERT_DAYS_WARNING" "Days before SSL certificate expiration to send alert (default: 10)"
+prompt_val "WATCHDOG_CROWDSEC_CHECK_INTERVAL" "CrowdSec Watchdog check interval (seconds)"
+prompt_val "WATCHDOG_DNS_CHECK_INTERVAL" "DNS check interval (seconds)"
 
 # --- AUTOMATED GENERATION ---
 
