@@ -13,6 +13,7 @@ services:
     volumes:
       - ./domains.csv:/data/domains.csv
       - ./.env:/app/.env:ro
+      - ./.env.dist:/app/.env.dist:ro
       - ./start.sh:/app/start.sh:ro
       - ./generate-config.py:/app/generate-config.py:ro
       - ./docker-compose-traefik-crowdsec-redis.yaml:/app/docker-compose-traefik-crowdsec-redis.yaml:ro

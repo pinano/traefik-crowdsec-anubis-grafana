@@ -7,13 +7,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchInput = document.getElementById('search-input');
     const sortableHeaders = document.querySelectorAll('th.sortable');
 
-    // Modal elements
+    // Modal elements for Restart
     const restartModal = document.getElementById('restart-modal');
     const logContainer = document.getElementById('log-container');
     const closeModalBtn = document.getElementById('close-modal-btn');
 
+    // Modal elements for Confirmation
+    const confirmModal = document.getElementById('confirm-modal');
+    const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+    const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
+    const confirmMsg = document.getElementById('confirm-msg');
+
     let allDomains = [];
     let currentSort = { column: null, direction: 'asc' };
+    let rowToDelete = null;
 
     function showToast(message, type = 'info') {
         toast.textContent = message;
@@ -82,14 +89,30 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
 
         tr.querySelector('.remove-row-btn').addEventListener('click', () => {
-            const domainVal = tr.querySelector('[data-key="domain"]').value;
-            allDomains = allDomains.filter(d => d.domain !== domainVal || domainVal === '');
-            tr.remove();
+            rowToDelete = tr;
+            const domainVal = tr.querySelector('[data-key="domain"]').value || 'this record';
+            confirmMsg.textContent = `Are you sure you want to delete ${domainVal}?`;
+            confirmModal.classList.add('show');
         });
 
         domainsBody.appendChild(tr);
         if (window.lucide) lucide.createIcons({ root: tr });
     }
+
+    confirmDeleteBtn.addEventListener('click', () => {
+        if (rowToDelete) {
+            const domainVal = rowToDelete.querySelector('[data-key="domain"]').value;
+            allDomains = allDomains.filter(d => d.domain !== domainVal || domainVal === '');
+            rowToDelete.remove();
+            rowToDelete = null;
+        }
+        confirmModal.classList.remove('show');
+    });
+
+    cancelDeleteBtn.addEventListener('click', () => {
+        rowToDelete = null;
+        confirmModal.classList.remove('show');
+    });
 
     function syncUItoState() {
         const rows = Array.from(domainsBody.querySelectorAll('tr'));
@@ -124,7 +147,6 @@ document.addEventListener('DOMContentLoaded', () => {
     restartBtn.addEventListener('click', () => {
         if (!confirm('Are you sure you want to restart the stack? This will interrupt connections briefly.')) return;
 
-        // Show modal and start stream
         restartModal.classList.add('show');
         logContainer.textContent = 'Connecting to restart stream...\n';
         closeModalBtn.style.display = 'none';
@@ -142,7 +164,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 eventSource.close();
             } else {
                 logContainer.textContent += event.data;
-                // Auto-scroll to bottom
                 logContainer.parentElement.scrollTop = logContainer.parentElement.scrollHeight;
             }
         };
@@ -186,6 +207,5 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Initial load
     loadDomains();
 });
