@@ -216,7 +216,9 @@ if [ -n "$T_USER" ] && [ -n "$T_PASS" ]; then
     echo "   ⏳ Hashing Traefik credentials..."
     T_HASH=$(docker run --rm httpd:alpine htpasswd -Bbn "$T_USER" "$T_PASS")
     replace_val "TRAEFIK_DASHBOARD_AUTH" "'$T_HASH'"
-    echo "   ✅ Updated TRAEFIK_DASHBOARD_AUTH"
+    T_SYNC=$(echo -n "${T_USER}:${T_PASS}" | sha1sum | cut -d' ' -f1)
+    replace_val "TRAEFIK_ADMIN_CREDS_SYNC" "$T_SYNC"
+    echo "   ✅ Updated TRAEFIK_DASHBOARD_AUTH and sync check"
 fi
 
 # Dozzle
@@ -226,7 +228,9 @@ if [ -n "$D_USER" ] && [ -n "$D_PASS" ]; then
     echo "   ⏳ Hashing Dozzle credentials..."
     D_HASH=$(docker run --rm httpd:alpine htpasswd -Bbn "$D_USER" "$D_PASS")
     replace_val "DOZZLE_DASHBOARD_AUTH" "'$D_HASH'"
-    echo "   ✅ Updated DOZZLE_DASHBOARD_AUTH"
+    D_SYNC=$(echo -n "${D_USER}:${D_PASS}" | sha1sum | cut -d' ' -f1)
+    replace_val "DOZZLE_ADMIN_CREDS_SYNC" "$D_SYNC"
+    echo "   ✅ Updated DOZZLE_DASHBOARD_AUTH and sync check"
 fi
 
 # 3. CROWDSEC_API_KEY

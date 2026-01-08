@@ -97,6 +97,54 @@ set -a
 source .env
 set +a
 
+# =============================================================================
+# PHASE 0: Synchronize Dashboard Hashes
+# =============================================================================
+# Checks if admin credentials have changed manually in .env and updates hashes.
+
+echo "🔐 Checking admin credentials sync..."
+
+SYNC_NEEDED=0
+
+# Helper to update a variable in .env
+update_env_var() {
+    local var_name=$1
+    local new_val=$2
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i '' "s|^${var_name}=.*|${var_name}=${new_val}|" .env
+    else
+        sed -i "s|^${var_name}=.*|${var_name}=${new_val}|" .env
+    fi
+}
+
+# 1. Traefik Credentials Sync
+CURRENT_TRAEFIK_SYNC=$(echo -n "${TRAEFIK_ADMIN_USER}:${TRAEFIK_ADMIN_PASSWORD}" | sha1sum | cut -d' ' -f1)
+if [ "$CURRENT_TRAEFIK_SYNC" != "$TRAEFIK_ADMIN_CREDS_SYNC" ]; then
+    echo "   🔄 Traefik credentials changed. Regenerating hash..."
+    T_HASH=$(docker run --rm httpd:alpine htpasswd -Bbn "$TRAEFIK_ADMIN_USER" "$TRAEFIK_ADMIN_PASSWORD")
+    update_env_var "TRAEFIK_DASHBOARD_AUTH" "'$T_HASH'"
+    update_env_var "TRAEFIK_ADMIN_CREDS_SYNC" "$CURRENT_TRAEFIK_SYNC"
+    export TRAEFIK_DASHBOARD_AUTH="'$T_HASH'"
+    SYNC_NEEDED=$((SYNC_NEEDED + 1))
+fi
+
+# 2. Dozzle Credentials Sync
+CURRENT_DOZZLE_SYNC=$(echo -n "${DOZZLE_ADMIN_USER}:${DOZZLE_ADMIN_PASSWORD}" | sha1sum | cut -d' ' -f1)
+if [ "$CURRENT_DOZZLE_SYNC" != "$DOZZLE_ADMIN_CREDS_SYNC" ]; then
+    echo "   🔄 Dozzle credentials changed. Regenerating hash..."
+    D_HASH=$(docker run --rm httpd:alpine htpasswd -Bbn "$DOZZLE_ADMIN_USER" "$DOZZLE_ADMIN_PASSWORD")
+    update_env_var "DOZZLE_DASHBOARD_AUTH" "'$D_HASH'"
+    update_env_var "DOZZLE_ADMIN_CREDS_SYNC" "$CURRENT_DOZZLE_SYNC"
+    export DOZZLE_DASHBOARD_AUTH="'$D_HASH'"
+    SYNC_NEEDED=$((SYNC_NEEDED + 1))
+fi
+
+if [ $SYNC_NEEDED -gt 0 ]; then
+    echo "   ✅ Authentication hashes synchronized in .env."
+else
+    echo "   ✅ Admin credentials are in sync."
+fi
+
 # Normalize CROWDSEC_DISABLE to lowercase
 CROWDSEC_DISABLE=$(echo "${CROWDSEC_DISABLE:-false}" | tr '[:upper:]' '[:lower:]')
 
