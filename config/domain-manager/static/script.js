@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const confirmMsg = document.getElementById('confirm-msg');
 
     let allDomains = [];
+    let allServices = [];
     let currentSort = { column: null, direction: 'asc' };
     let rowToDelete = null;
 
@@ -44,14 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadServices() {
         try {
             const response = await fetch('/api/services');
-            const data = await response.json();
-            const datalist = document.getElementById('services-list');
-            datalist.innerHTML = '';
-            data.forEach(service => {
-                const option = document.createElement('option');
-                option.value = service;
-                datalist.appendChild(option);
-            });
+            allServices = await response.json();
         } catch (error) {
             console.error('Error loading services:', error);
         }
@@ -111,7 +105,12 @@ document.addEventListener('DOMContentLoaded', () => {
         tr.innerHTML = `
             <td><input type="text" class="data-input" data-key="domain" value="${data.domain || ''}" placeholder="example.com"></td>
             <td><input type="text" class="data-input" data-key="redirection" value="${data.redirection || ''}" placeholder="www.example.com"></td>
-            <td><input type="text" class="data-input" data-key="docker_service" value="${data.docker_service || ''}" placeholder="my-service" list="services-list"></td>
+            <td>
+                <div class="dropdown-container">
+                    <input type="text" class="data-input service-input" data-key="docker_service" value="${data.docker_service || ''}" placeholder="my-service" autocomplete="off">
+                    <div class="dropdown-menu"></div>
+                </div>
+            </td>
             <td><input type="text" class="data-input" data-key="anubis_subdomain" value="${data.anubis_subdomain || ''}" placeholder="anubis"></td>
             <td><input type="text" class="data-input" data-key="rate" value="${data.rate || ''}" placeholder="50"></td>
             <td><input type="text" class="data-input" data-key="burst" value="${data.burst || ''}" placeholder="100"></td>
@@ -123,14 +122,55 @@ document.addEventListener('DOMContentLoaded', () => {
             </td>
         `;
 
+        // Helper to update truth
+        const updateTruth = (key, value) => {
+            const domainObj = allDomains.find(d => d._id === id);
+            if (domainObj) {
+                domainObj[key] = value.trim();
+            }
+        };
+
         // Reactive update: when any input changes, update the source of truth
         tr.querySelectorAll('.data-input').forEach(input => {
             input.addEventListener('input', (e) => {
-                const domainObj = allDomains.find(d => d._id === id);
-                if (domainObj) {
-                    domainObj[e.target.dataset.key] = e.target.value.trim();
-                }
+                updateTruth(e.target.dataset.key, e.target.value);
             });
+        });
+
+        // Custom Dropdown Logic
+        const serviceInput = tr.querySelector('.service-input');
+        const dropdownMenu = tr.querySelector('.dropdown-menu');
+
+        const renderDropdown = (filter = '') => {
+            const filtered = allServices.filter(s => s.toLowerCase().includes(filter.toLowerCase()));
+            dropdownMenu.innerHTML = '';
+            if (filtered.length === 0) {
+                dropdownMenu.classList.remove('show');
+                return;
+            }
+
+            filtered.forEach(service => {
+                const item = document.createElement('div');
+                item.className = 'dropdown-item';
+                item.textContent = service;
+                item.addEventListener('click', () => {
+                    serviceInput.value = service;
+                    updateTruth('docker_service', service);
+                    dropdownMenu.classList.remove('show');
+                });
+                dropdownMenu.appendChild(item);
+            });
+            dropdownMenu.classList.add('show');
+        };
+
+        serviceInput.addEventListener('focus', () => renderDropdown(serviceInput.value));
+        serviceInput.addEventListener('input', (e) => renderDropdown(e.target.value));
+
+        // Click outside to close
+        document.addEventListener('click', (e) => {
+            if (!tr.contains(e.target)) {
+                dropdownMenu.classList.remove('show');
+            }
         });
 
         tr.querySelector('.remove-row-btn').addEventListener('click', () => {
