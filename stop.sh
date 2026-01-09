@@ -12,8 +12,13 @@
 # Load variables to avoid Docker warnings during the down process.
 
 set -a
-source .env
+# Try to load .env if it exists
+[ -f .env ] && source .env
 set +a
+
+# Default values for critical variables to avoid docker-compose warnings
+export TRAEFIK_CONFIG_HASH=${TRAEFIK_CONFIG_HASH:-""}
+export DOMAIN_MANAGER_PROJECT_NAME=${DOMAIN_MANAGER_PROJECT_NAME:-"stack"}
 
 set -e  # Exit on any error
 
@@ -23,8 +28,10 @@ set -e  # Exit on any error
 # Ensures the cursor is restored and echo is enabled if the script is interrupted.
 
 cleanup() {
-    tput cnorm  # Restore cursor
-    stty echo   # Ensure echo is back
+    if [ -t 0 ]; then
+        tput cnorm  # Restore cursor
+        stty echo   # Ensure echo is back
+    fi
 }
 
 trap cleanup EXIT INT TERM
@@ -37,7 +44,8 @@ trap cleanup EXIT INT TERM
 COMPOSE_FILES="-f docker-compose-traefik-crowdsec-redis.yaml \
                -f docker-compose-tools.yaml \
                -f docker-compose-anubis-generated.yaml \
-               -f docker-compose-grafana-loki-alloy.yaml"
+               -f docker-compose-grafana-loki-alloy.yaml \
+               -f docker-compose-domain-manager.yaml"
 
 # Include Apache host logs for legacy installations (same condition as start.sh)
 if [ -d "/var/log/apache2" ]; then
@@ -52,14 +60,17 @@ fi
 
 echo "🛑 Stopping and cleaning the entire fleet..."
 
+# Enforce project name to avoid missing containers
+COMPOSE_CMD="docker compose -p $DOMAIN_MANAGER_PROJECT_NAME --profile crowdsec"
+
 # 1. Graceful stop (allow containers to finish tasks)
 # We use || true to ensure 'down' runs even if 'stop' encounters issues
 echo "   ➜ Stopping services gracefully (20s timeout)..."
-docker compose --profile crowdsec $COMPOSE_FILES stop -t 20 || true
+$COMPOSE_CMD $COMPOSE_FILES stop -t 20 || true
 
 # 2. Complete removal
 echo "   ➜ Removing containers and cleaning orphans..."
-docker compose --profile crowdsec $COMPOSE_FILES down --remove-orphans
+$COMPOSE_CMD $COMPOSE_FILES down --remove-orphans
 
 # =============================================================================
 # DONE
