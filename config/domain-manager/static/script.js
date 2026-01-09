@@ -23,6 +23,16 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSort = { column: null, direction: 'asc' };
     let rowToDelete = null;
 
+    function getRootDomain(domain) {
+        if (!domain) return '';
+        const parts = domain.split('.');
+        if (parts.length < 2) return domain;
+        // Basic extraction: returns the last two parts (e.g., example.com)
+        // For complex cases (e.g., .co.uk) this might need a more robust TLD list, 
+        // but for this stack's typical usage, this is sufficient and clean.
+        return parts.slice(-2).join('.');
+    }
+
     function showToast(message, type = 'info') {
         toast.textContent = message;
         toast.className = 'toast show';
@@ -34,8 +44,12 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch('/api/domains');
             const data = await response.json();
-            // Assign unique IDs for reactive tracking
-            allDomains = data.map(d => ({ ...d, _id: crypto.randomUUID() }));
+            // Assign unique IDs for reactive tracking and calculate root domain
+            allDomains = data.map(d => ({
+                ...d,
+                _id: crypto.randomUUID(),
+                _root_domain: getRootDomain(d.domain)
+            }));
             applyFilterAndSort();
         } catch (error) {
             showToast('Error loading domains', 'danger');
@@ -95,7 +109,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 anubis_subdomain: data.anubis_subdomain || '',
                 rate: data.rate || '',
                 burst: data.burst || '',
-                concurrency: data.concurrency || ''
+                concurrency: data.concurrency || '',
+                _root_domain: getRootDomain(data.domain || '')
             };
             allDomains.push(newDomain);
         }
@@ -103,6 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const tr = document.createElement('tr');
         tr.dataset.id = id;
         tr.innerHTML = `
+            <td class="root-domain-cell">${data._root_domain || getRootDomain(data.domain) || '-'}</td>
             <td><input type="text" class="data-input" data-key="domain" value="${data.domain || ''}" placeholder="example.com"></td>
             <td><input type="text" class="data-input" data-key="redirection" value="${data.redirection || ''}" placeholder="www.example.com"></td>
             <td>
@@ -127,6 +143,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const domainObj = allDomains.find(d => d._id === id);
             if (domainObj) {
                 domainObj[key] = value.trim();
+                if (key === 'domain') {
+                    domainObj._root_domain = getRootDomain(value.trim());
+                    // Update visual cell immediately
+                    const rootCell = tr.querySelector('.root-domain-cell');
+                    if (rootCell) rootCell.textContent = domainObj._root_domain || '-';
+                }
             }
         };
 
@@ -201,10 +223,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     saveBtn.addEventListener('click', async () => {
-        // Strip internal IDs before saving and filter empty domains
+        // Strip internal IDs and temporary fields before saving and filter empty domains
         const payload = allDomains
             .filter(d => d.domain && d.domain.trim() !== '')
-            .map(({ _id, ...rest }) => rest);
+            .map(({ _id, _root_domain, ...rest }) => rest);
 
         try {
             const response = await fetch('/api/domains', {
