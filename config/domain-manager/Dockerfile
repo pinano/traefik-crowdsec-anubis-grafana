@@ -2,7 +2,7 @@ FROM python:3.11-alpine
 
 WORKDIR /app
 
-RUN pip install --no-cache-dir flask==3.0.0 PyYAML==6.0.1 tldextract==5.1.0
+RUN pip install --no-cache-dir flask==3.0.0 PyYAML==6.0.1 tldextract==5.1.0 gunicorn==21.2.0 gevent==23.9.1
 
 COPY . .
 
@@ -13,4 +13,4 @@ RUN apk add --no-cache docker-cli docker-compose bash ncurses
 
 EXPOSE 5000
 
-CMD ["python", "app.py"]
+CMD ["gunicorn", "--worker-class", "gevent", "--bind", "0.0.0.0:5000", "--workers", "1", "--timeout", "600", "app:app"]
