@@ -37,27 +37,37 @@ fi
 MAX_RETRIES=3
 RETRY_COUNT=0
 CONTAINER_STATUS=""
+REAL_CONTAINER_ID=""
 
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    CONTAINER_STATUS=$(docker inspect -f '{{.State.Status}}' "$CROWDSEC_CONTAINER" 2>/dev/null)
-    EXIT_CODE=$?
+    # Try finding by label first (more robust with dynamic naming)
+    REAL_CONTAINER_ID=$(docker ps -aq --filter "label=com.docker.compose.service=crowdsec" | head -n 1)
     
-    if [ $EXIT_CODE -eq 0 ] && [ -n "$CONTAINER_STATUS" ]; then
+    # If not found by label, fallback to name for custom non-compose setups
+    if [ -z "$REAL_CONTAINER_ID" ]; then
+        REAL_CONTAINER_ID=$(docker ps -aqf "name=$CROWDSEC_CONTAINER" | head -n 1)
+    fi
+
+    if [ -n "$REAL_CONTAINER_ID" ]; then
+        CONTAINER_STATUS=$(docker inspect -f '{{.State.Status}}' "$REAL_CONTAINER_ID" 2>/dev/null)
         break
     fi
     
     RETRY_COUNT=$((RETRY_COUNT + 1))
     if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-        echo -e "${YELLOW}⚠️ Warning: CrowdSec container check failed (Attempt $RETRY_COUNT/$MAX_RETRIES). Retrying in 2s...${NC}"
+        echo -e "${YELLOW}⚠️ Warning: CrowdSec container not found (Attempt $RETRY_COUNT/$MAX_RETRIES). Retrying in 2s...${NC}"
         sleep 2
     fi
 done
 
-if [ -z "$CONTAINER_STATUS" ]; then
-    echo -e "${RED}❌ CrowdSec container '$CROWDSEC_CONTAINER' not found or Docker API error after $MAX_RETRIES attempts!${NC}"
-    send_telegram "CrowdSec container \`${CROWDSEC_CONTAINER}\` not found or Docker API error!%0A👉 *Action Required:* Check if the container exists and is properly configured."
+if [ -z "$REAL_CONTAINER_ID" ] || [ -z "$CONTAINER_STATUS" ]; then
+    echo -e "${RED}❌ CrowdSec container not found or Docker API error after $MAX_RETRIES attempts!${NC}"
+    send_telegram "CrowdSec container not found or Docker API error!%0A👉 *Action Required:* Check if the container exists and is properly configured."
     exit 1
 fi
+
+# Update variable to use the ID for subsequent commands
+CROWDSEC_CONTAINER="$REAL_CONTAINER_ID"
 
 if [ "$CONTAINER_STATUS" != "running" ]; then
     echo -e "${RED}❌ CrowdSec container is not running (status: $CONTAINER_STATUS)${NC}"

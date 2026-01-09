@@ -5,7 +5,6 @@ services:
   # ===========================
   traefik:
     image: traefik:v3.6.4
-    container_name: traefik
     restart: always
     ports:
       - "${TRAEFIK_LISTEN_IP:-0.0.0.0}:80:80"
@@ -59,7 +58,6 @@ services:
   # ===========================
   crowdsec:
     image: crowdsecurity/crowdsec:v1.7.4
-    container_name: crowdsec
     restart: unless-stopped
     profiles:
       - crowdsec
@@ -100,7 +98,6 @@ services:
   # ===========================
   redis:
     image: valkey/valkey:9.0.1-alpine
-    container_name: redis
     restart: unless-stopped
     command: redis-server /redis.conf --requirepass "${REDIS_PASSWORD}"
     environment:

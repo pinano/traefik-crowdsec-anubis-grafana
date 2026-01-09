@@ -5,7 +5,6 @@ services:
   # ===========================
   grafana:
     image: grafana/grafana:12.3.0
-    container_name: grafana
     restart: unless-stopped
     environment:
       - GF_SERVER_ROOT_URL=https://grafana.${DOMAIN}
@@ -44,7 +43,6 @@ services:
   # ===========================
   loki:
     image: grafana/loki:3.6.2
-    container_name: loki
     restart: unless-stopped
     command: -config.file=/etc/loki/local-config.yaml
     volumes:
@@ -73,7 +71,6 @@ services:
   # ===========================
   alloy:
     image: grafana/alloy:v1.12.0
-    container_name: alloy
     restart: unless-stopped
     user: "root" # Alloy needs root to read logs from other containers in /var/lib/docker
     environment:

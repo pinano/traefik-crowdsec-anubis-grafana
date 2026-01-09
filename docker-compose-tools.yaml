@@ -5,7 +5,6 @@ services:
   # ===========================
   dozzle:
     image: amir20/dozzle:latest
-    container_name: dozzle
     restart: always
     networks:
       - traefik
@@ -38,7 +37,6 @@ services:
   # ===========================
   ctop:
     image: quay.io/vektorlab/ctop:latest
-    container_name: ctop
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -51,9 +49,8 @@ services:
   #    - checks DNS records for all domains
   #    - monitors CrowdSec health and bouncer status
   # ===========================
-  stack-watchdog:
-    build: ./config/stack-watchdog
-    container_name: stack-watchdog
+  watchdog:
+    build: ./config/watchdog
     restart: unless-stopped
     # Run all check scripts in parallel with independent intervals
     # check-certs.sh: every 24h, check-dns.sh: every WATCHDOG_DNS_CHECK_INTERVAL
@@ -85,9 +82,9 @@ services:
       "
     volumes:
       - ./config/traefik/acme.json:/acme.json:ro
-      - ./config/stack-watchdog/check-certs.sh:/check-certs.sh:ro
-      - ./config/stack-watchdog/check-dns.sh:/check-dns.sh:ro
-      - ./config/stack-watchdog/check-crowdsec.sh:/check-crowdsec.sh:ro
+      - ./config/watchdog/check-certs.sh:/check-certs.sh:ro
+      - ./config/watchdog/check-dns.sh:/check-dns.sh:ro
+      - ./config/watchdog/check-crowdsec.sh:/check-crowdsec.sh:ro
       - ./domains.csv:/domains.csv:ro
       # Docker socket for CrowdSec container inspection
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -114,7 +111,6 @@ services:
   # ===========================
   anubis-assets:
     image: nginx:alpine3.23-slim
-    container_name: anubis-assets
     restart: unless-stopped
     stop_grace_period: 20s
     volumes:

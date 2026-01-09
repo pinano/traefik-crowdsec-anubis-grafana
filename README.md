@@ -283,7 +283,7 @@ A lightweight utility service that monitors the stack and sends Telegram alerts.
 │   │   └── config.yaml
 │   ├── redis/                             # Redis/Valkey session store
 │   │   └── redis.conf
-│   ├── stack-watchdog/                    # Monitoring scripts
+│   ├── watchdog/                          # Monitoring scripts
 │   │   ├── Dockerfile
 │   │   ├── check-certs.sh
 │   │   ├── check-crowdsec.sh
@@ -665,7 +665,7 @@ docker exec crowdsec cscli explain --file /var/log/traefik/access.log --type tra
 
 ### Stack-Watchdog Alerts
 
-The stack-watchdog sends Telegram notifications for:
+The watchdog sends Telegram notifications for:
 
 - ⚠️ **SSL Alerts**: Certificate expiring within threshold
 - 🌐 **DNS Alerts**: Domain not resolving to expected IP

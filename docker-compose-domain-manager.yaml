@@ -1,7 +1,6 @@
 services:
   domain-manager:
     build: ./config/domain-manager
-    container_name: domain-manager
     restart: unless-stopped
     networks:
       - traefik

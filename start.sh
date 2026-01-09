@@ -408,8 +408,10 @@ if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
     # Wait for CrowdSec to be healthy (smart wait instead of blind sleep)
     echo -n "   ⏳ Waiting for CrowdSec API"
     timeout=60
-    CROWDSEC_ID=$(docker ps -aqf "name=crowdsec" | head -n 1)
-    while [ "$(docker inspect --format='{{.State.Health.Status}}' $CROWDSEC_ID 2>/dev/null)" != "healthy" ]; do
+    # Dynamic lookup to support project prefixes (e.g. stack-crowdsec-1)
+    CROWDSEC_ID=$(docker ps -aq --filter label=com.docker.compose.project=$DOMAIN_MANAGER_PROJECT_NAME --filter label=com.docker.compose.service=crowdsec | head -n 1)
+    
+    while [ -z "$CROWDSEC_ID" ] || [ "$(docker inspect --format='{{.State.Health.Status}}' $CROWDSEC_ID 2>/dev/null)" != "healthy" ]; do
         sleep 2
         echo -n "."
         ((timeout-=2))
@@ -429,8 +431,8 @@ if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
     # Delete first (silently) in case it already exists, then add fresh.
 
     echo "👮 Synchronizing Bouncer..."
-    docker exec crowdsec cscli bouncers delete traefik-bouncer > /dev/null 2>&1 || true
-    docker exec crowdsec cscli bouncers add traefik-bouncer --key "${CROWDSEC_API_KEY}" > /dev/null
+    docker exec "$CROWDSEC_ID" cscli bouncers delete traefik-bouncer > /dev/null 2>&1 || true
+    docker exec "$CROWDSEC_ID" cscli bouncers add traefik-bouncer --key "${CROWDSEC_API_KEY}" > /dev/null
 
     if [ $? -eq 0 ]; then
         echo "   🔑 Bouncer key registered successfully."
@@ -445,9 +447,9 @@ if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
     # If CROWDSEC_ENROLLMENT_KEY is set, enroll this instance with CrowdSec Console
     # for access to community blocklists and centralized management.
 
-    if [ -n "$CROWDSEC_ENROLLMENT_KEY" ]; then
-        echo "🌐 Enrolling in CrowdSec Console..."
-        if docker exec crowdsec cscli console enroll "$CROWDSEC_ENROLLMENT_KEY" --name "$(hostname)" 2>/dev/null; then
+    if [ -n "$CROWDSEC_ENROLLMENT_KEY" ] && [ "$CROWDSEC_ENROLLMENT_KEY" != "REPLACE_ME" ]; then
+        echo "🌐 Enrolling CrowdSec to Console..."
+        if docker exec "$CROWDSEC_ID" cscli console enroll "$CROWDSEC_ENROLLMENT_KEY" --name "$(hostname)" 2>/dev/null; then
             echo "   ✅ Successfully enrolled in CrowdSec Console."
         else
             echo "   ⚠️ Console enrollment failed or already enrolled. Continuing..."
