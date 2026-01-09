@@ -23,7 +23,9 @@ services:
       - ./generate-config.py:${DOMAIN_MANAGER_APP_PATH_HOST}/generate-config.py:ro
       - ./docker-compose-traefik-crowdsec-redis.yaml:${DOMAIN_MANAGER_APP_PATH_HOST}/docker-compose-traefik-crowdsec-redis.yaml:ro
       - ./docker-compose-tools.yaml:${DOMAIN_MANAGER_APP_PATH_HOST}/docker-compose-tools.yaml:ro
+      - ./docker-compose-anubis-base.yaml:${DOMAIN_MANAGER_APP_PATH_HOST}/docker-compose-anubis-base.yaml:ro
       - ./docker-compose-anubis-generated.yaml:${DOMAIN_MANAGER_APP_PATH_HOST}/docker-compose-anubis-generated.yaml
+      - ./docker-compose-apache-logs.yaml:${DOMAIN_MANAGER_APP_PATH_HOST}/docker-compose-apache-logs.yaml:ro
       - ./docker-compose-grafana-loki-alloy.yaml:${DOMAIN_MANAGER_APP_PATH_HOST}/docker-compose-grafana-loki-alloy.yaml:ro
       - ./docker-compose-domain-manager.yaml:${DOMAIN_MANAGER_APP_PATH_HOST}/docker-compose-domain-manager.yaml:ro
       - ./config:${DOMAIN_MANAGER_APP_PATH_HOST}/config
