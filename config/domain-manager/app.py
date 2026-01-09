@@ -200,7 +200,14 @@ def api_services():
                 
             external_services.append(name)
             
-        return jsonify(sorted(list(set(external_services))))
+        final_list = sorted(list(set(external_services)))
+
+        # Append 'apache-host' if legacy installation is detected
+        if os.path.exists("/var/log/apache2"):
+            # Put it at the beginning of the list for easy access if it exists
+            final_list.insert(0, "apache-host")
+            
+        return jsonify(final_list)
     except Exception as e:
         print(f"Error getting external services: {e}")
         return jsonify([])
