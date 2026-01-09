@@ -36,7 +36,7 @@ body {
 }
 
 .container {
-    max-width: 1600px;
+    max-width: 1800px;
     margin: 0 auto;
     padding: 1.5rem;
 }
@@ -147,7 +147,7 @@ table {
 
 th {
     background-color: var(--header-bg);
-    padding: 0.6rem 0.5rem;
+    padding: 0.6rem 0.35rem;
     font-size: 0.7rem;
     font-weight: 700;
     text-transform: uppercase;
@@ -165,13 +165,13 @@ th {
 }
 
 td {
-    padding: 0.4rem 0.5rem;
+    padding: 0.4rem 0.35rem;
     border-bottom: 1px solid var(--border-color);
 }
 
 th:nth-child(1),
 td:nth-child(1) {
-    width: 18%;
+    width: 12%;
 }
 
 th:nth-child(2),
@@ -186,27 +186,32 @@ td:nth-child(3) {
 
 th:nth-child(4),
 td:nth-child(4) {
-    width: 15%;
+    width: 14%;
 }
 
 th:nth-child(5),
 td:nth-child(5) {
-    width: 8%;
+    width: 13%;
 }
 
 th:nth-child(6),
 td:nth-child(6) {
-    width: 8%;
+    width: 7%;
 }
 
 th:nth-child(7),
 td:nth-child(7) {
-    width: 8%;
+    width: 7%;
 }
 
 th:nth-child(8),
 td:nth-child(8) {
-    width: 10%;
+    width: 7%;
+}
+
+th:nth-child(9),
+td:nth-child(9) {
+    width: 12%;
 }
 
 input[type="text"],
