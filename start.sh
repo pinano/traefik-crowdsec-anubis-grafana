@@ -115,11 +115,12 @@ SYNC_NEEDED=0
 update_env_var() {
     local var_name=$1
     local new_val=$2
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        sed -i '' "s|^${var_name}=.*|${var_name}=${new_val}|" .env
-    else
-        sed -i "s|^${var_name}=.*|${var_name}=${new_val}|" .env
-    fi
+    # Use a temporary file and 'cat' to preserve the inode and avoid 'Resource busy' 
+    # errors when the file is mounted into a Docker container.
+    local TMP_ENV=$(mktemp)
+    sed "s|^${var_name}=.*|${var_name}=${new_val}|" "$ENV_FILE" > "$TMP_ENV"
+    cat "$TMP_ENV" > "$ENV_FILE"
+    rm "$TMP_ENV"
 }
 
 # 1. Traefik Credentials Sync

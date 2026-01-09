@@ -63,12 +63,11 @@ prompt_val() {
     if [ -n "$input_val" ]; then
         # Escape special characters for sed (basic)
         local escaped_val=$(echo "$input_val" | sed -e 's/[]\/$*.^[]/\\&/g')
-        # Use a generic separator | to avoid path issues
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-             sed -i '' "s|^${var_name}=.*|${var_name}=${input_val}|" "$ENV_FILE"
-        else
-             sed -i "s|^${var_name}=.*|${var_name}=${input_val}|" "$ENV_FILE"
-        fi
+        # Use a temporary file and 'cat' to preserve the inode
+        local TMP_FILE=$(mktemp)
+        sed "s|^${var_name}=.*|${var_name}=${input_val}|" "$ENV_FILE" > "$TMP_FILE"
+        cat "$TMP_FILE" > "$ENV_FILE"
+        rm "$TMP_FILE"
         echo "   ✅ Set to: $input_val"
     else
         echo "   ⏭️ Keeping default: $display_val"
@@ -79,11 +78,11 @@ prompt_val() {
 replace_val() {
     local var_name=$1
     local new_val=$2
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-         sed -i '' "s|^${var_name}=.*|${var_name}=${new_val}|" "$ENV_FILE"
-    else
-         sed -i "s|^${var_name}=.*|${var_name}=${new_val}|" "$ENV_FILE"
-    fi
+    # Use a temporary file and 'cat' to preserve the inode
+    local TMP_FILE=$(mktemp)
+    sed "s|^${var_name}=.*|${var_name}=${new_val}|" "$ENV_FILE" > "$TMP_FILE"
+    cat "$TMP_FILE" > "$ENV_FILE"
+    rm "$TMP_FILE"
 }
 
 echo ""
