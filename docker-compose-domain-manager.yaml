@@ -11,6 +11,7 @@ services:
       - FLASK_SECRET_KEY=${DOMAIN_MANAGER_SECRET_KEY}
       - DOMAIN=${DOMAIN}
       - COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}
+      - APP_PATH_HOST=${APP_PATH_HOST}
       - TZ=${TZ}
     working_dir: ${APP_PATH_HOST}/config/domain-manager
     volumes:

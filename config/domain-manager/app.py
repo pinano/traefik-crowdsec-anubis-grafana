@@ -11,9 +11,13 @@ ADMIN_USER = os.environ.get('DOMAIN_MANAGER_ADMIN_USER', 'admin')
 ADMIN_PASS = os.environ.get('DOMAIN_MANAGER_ADMIN_PASSWORD', 'admin')
 
 # Mirror the host path inside the container
-BASE_DIR = os.environ.get('APP_PATH_HOST', '/app')
+BASE_DIR = os.environ.get('APP_PATH_HOST', os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 CSV_PATH = os.path.join(BASE_DIR, 'domains.csv')
 START_SCRIPT = os.path.join(BASE_DIR, 'start.sh')
+
+print(f"DEBUG: BASE_DIR={BASE_DIR}")
+print(f"DEBUG: CSV_PATH={CSV_PATH}")
+print(f"DEBUG: START_SCRIPT={START_SCRIPT}")
 
 DOMAIN = os.environ.get('DOMAIN', 'localhost')
 ENV = os.environ.copy()
@@ -118,7 +122,7 @@ def restart_stream():
         # Using bash explicitly and passing current environment
         process = subprocess.Popen(
             ['bash', START_SCRIPT],
-            cwd='/app',
+            cwd=BASE_DIR,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
