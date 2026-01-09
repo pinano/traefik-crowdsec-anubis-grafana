@@ -111,10 +111,8 @@ document.addEventListener('DOMContentLoaded', () => {
         tr.innerHTML = `
             <td><input type="text" class="data-input" data-key="domain" value="${data.domain || ''}" placeholder="example.com"></td>
             <td><input type="text" class="data-input" data-key="redirection" value="${data.redirection || ''}" placeholder="www.example.com"></td>
-            <td><input type="text" class="data-input" data-key="docker_service" value="${data.docker_service || ''}" placeholder="my-service"></td>
-            <td><input type="text" class="data-input" data-key="anubis_subdomain" value="${data.anubis_subdomain || ''}" placeholder="anubis"></td>
             <td><input type="text" class="data-input" data-key="docker_service" value="${data.docker_service || ''}" placeholder="my-service" list="services-list"></td>
-            <td><input type="text" class="data-input" data-key="anubis_subdomain" value="${data.anubis_subdomain || ''}" placeholder="anubis/auth"></td>
+            <td><input type="text" class="data-input" data-key="anubis_subdomain" value="${data.anubis_subdomain || ''}" placeholder="anubis"></td>
             <td><input type="text" class="data-input" data-key="rate" value="${data.rate || ''}" placeholder="50"></td>
             <td><input type="text" class="data-input" data-key="burst" value="${data.burst || ''}" placeholder="100"></td>
             <td><input type="text" class="data-input" data-key="concurrency" value="${data.concurrency || ''}" placeholder="20"></td>
