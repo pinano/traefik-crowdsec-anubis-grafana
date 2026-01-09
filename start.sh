@@ -433,7 +433,16 @@ fi
 # --remove-orphans cleans up any old containers not in current config.
 
 echo "🚀 Deploying Traefik and remaining services..."
-$COMPOSE_CMD $COMPOSE_FILES up -d --remove-orphans
+
+# If running inside domain-manager, exclude it from the 'up' command to avoid killing this script
+if [ -n "$DOMAIN_MANAGER_ADMIN_USER" ]; then
+    echo "   ℹ️  Internal run detected. Excluding domain-manager from self-restart to ensure completion."
+    # Get all services from all compose files, then filter out domain-manager
+    SERVICES=$($COMPOSE_CMD $COMPOSE_FILES ps --services | grep -v "domain-manager" | xargs)
+    $COMPOSE_CMD $COMPOSE_FILES up -d --remove-orphans $SERVICES
+else
+    $COMPOSE_CMD $COMPOSE_FILES up -d --remove-orphans
+fi
 
 # =============================================================================
 # DONE
