@@ -100,16 +100,7 @@ set -a
 source .env
 set +a
 
-# =============================================================================
-# AUTO-CONFIGURATION
-# =============================================================================
-# Calculate the absolute path of the project on the host.
-# This ensures path mirroring works correctly even if the folder is moved.
-
-DETECTED_PATH=$(pwd)
-# Always enforce absolute path to satisfy Docker's working_dir requirement
-export APP_PATH_HOST="$DETECTED_PATH"
-echo "📍 Project path set to: $APP_PATH_HOST"
+# Calculated in Phase 0 after helper functions are defined
 
 # =============================================================================
 # PHASE 0: Synchronize Dashboard Hashes
@@ -161,6 +152,27 @@ if [ $SYNC_NEEDED -gt 0 ]; then
 else
     echo "   ✅ Admin credentials are in sync."
 fi
+
+# =============================================================================
+# AUTO-CONFIGURATION: Absolute Path Mirroring
+# =============================================================================
+# Calculate the absolute path of the project on the host and ensure it is set 
+# in .env. This is critical for Docker's working_dir and volume mirroring.
+
+echo "📍 Configuring project absolute path..."
+# Use realpath if available, otherwise fallback to readlink -f or pwd -P
+if command -v realpath >/dev/null 2>&1; then
+    DETECTED_PATH=$(realpath .)
+elif command -v readlink >/dev/null 2>&1; then
+    DETECTED_PATH=$(readlink -f .)
+else
+    DETECTED_PATH=$(pwd -P)
+fi
+
+# Update .env to ensure Docker Compose picks it up correctly even from the file
+update_env_var "APP_PATH_HOST" "$DETECTED_PATH"
+export APP_PATH_HOST="$DETECTED_PATH"
+echo "   ✅ APP_PATH_HOST set to: $APP_PATH_HOST"
 
 # Normalize CROWDSEC_DISABLE to lowercase
 CROWDSEC_DISABLE=$(echo "${CROWDSEC_DISABLE:-false}" | tr '[:upper:]' '[:lower:]')
