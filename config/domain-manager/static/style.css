@@ -235,7 +235,6 @@ input:focus {
     padding: 2.5rem;
     border-radius: 1rem;
     width: 100%;
-    max-width: 400px;
     border: 1px solid var(--border-color);
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
 }
