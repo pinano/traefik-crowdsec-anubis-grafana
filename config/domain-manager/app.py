@@ -4,9 +4,27 @@ import subprocess
 import secrets
 import re
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, Response
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', secrets.token_hex(32))
+
+# --- Hardened Session Settings ---
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SECURE=True,  # In production via Traefik HTTPS
+    SESSION_COOKIE_SAMESITE='Lax',
+    PERMANENT_SESSION_LIFETIME=1800 # 30 minutes
+)
+
+# --- Rate Limiter Setup ---
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://",
+)
 
 ADMIN_USER = os.environ.get('DOMAIN_MANAGER_ADMIN_USER', 'admin')
 ADMIN_PASS = os.environ.get('DOMAIN_MANAGER_ADMIN_PASSWORD', 'admin')
@@ -49,10 +67,9 @@ def check_csrf():
             return jsonify({'error': 'CSRF token missing or invalid'}), 403
 
 def validate_domain_data(entry):
-    # Basic validation to ensure no malicious content in CSV
-    # We allow alphanumeric, dot, dash, underscore, slash, colon (for ports/protocols)
-    # This is a loose check but prevents completely arbitrary text
-    allowed_pattern = re.compile(r'^[a-zA-Z0-9\.\-\_\:\/]+$')
+    # Strict validation to ensure no malicious content in CSV or shell injection
+    # We restrict characters to alphanumeric, basic domain/path symbols
+    allowed_pattern = re.compile(r'^[a-zA-Z0-9\.\-\_\/]+$')
     
     # Text fields that shouldn't contain weird characters
     fields_to_check = ['domain', 'redirection', 'docker_service', 'anubis_subdomain']
@@ -123,21 +140,21 @@ def write_csv(data):
             ])
 
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")
 def login():
     if request.method == 'POST':
-        # Login is exempt from global CSRF check if handled via form, 
-        # but let's check it if we were enforcing it globally. 
-        # However, check_csrf applies to ALL POSTs. We need to handle login specifically or exempt it.
-        # Since login comes from a form without JS usually, checking 'csrf_token' from form input is standard.
-        # For simplicity here, we assume the global check runs. 
-        # BUT wait, the global check looks for header X-CSRFToken. Forms usually send body.
-        # Let's exempt login from the JSON header check and do form check if needed.
-        pass # The global check will catch this if we don't handle it.
-        # IMPORTANT: We need to exempt login from the global header check or update login.html.
-        # Let's simply modify check_csrf to skip login endpoint.
-        if request.form['username'] == ADMIN_USER and request.form['password'] == ADMIN_PASS:
+        # Simple prevention of empty submissions
+        user = request.form.get('username', '')
+        pw = request.form.get('password', '')
+        
+        if user == ADMIN_USER and pw == ADMIN_PASS:
+            session.clear() # Clear any existing session to prevent fixation
             session['logged_in'] = True
+            session.permanent = True
             return redirect(url_for('index'))
+        
+        # Log failure (useful for external monitoring or security logs)
+        print(f"SECURITY: Failed login attempt for user '{user}' from {request.remote_addr}")
         return render_template('login.html', error='Invalid credentials', domain=DOMAIN)
     return render_template('login.html', domain=DOMAIN)
 
