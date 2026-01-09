@@ -1,14 +1,14 @@
 :root {
-    /* Pastel Palette */
-    --primary-color: #818cf8;
+    /* Pastel Palette (Vivid Mode) */
+    --primary-color: #6366f1;
     /* Soft Indigo */
-    --primary-hover: #6366f1;
-    --danger-color: #fca5a5;
+    --primary-hover: #818cf8;
+    --danger-color: #f87171;
     /* Soft Rose */
-    --danger-hover: #f87171;
-    --success-color: #6ee7b7;
+    --danger-hover: #fca5a5;
+    --success-color: #34d399;
     /* Soft Emerald */
-    --success-hover: #34d399;
+    --success-hover: #6ee7b7;
 
     --bg-color: #f8fafc;
     /* Slate 50 */
@@ -314,6 +314,12 @@ input:focus {
     cursor: pointer;
     user-select: none;
     transition: background-color 0.2s;
+}
+
+.th-content {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .sortable:hover {

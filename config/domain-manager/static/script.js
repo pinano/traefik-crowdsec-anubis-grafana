@@ -194,7 +194,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         eventSource.onerror = (error) => {
-            logContainer.textContent += '\n⚠️ Connection lost (this is normal if the manager container is restarting).\n';
+            logContainer.textContent += '\n\n🔄 Connection closed. This is expected as Traefik is reloading the new configuration.\n✅ The stack should be up in a few seconds.';
             closeModalBtn.style.display = 'block';
             eventSource.close();
         };
