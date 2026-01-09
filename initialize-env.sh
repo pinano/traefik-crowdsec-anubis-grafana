@@ -220,7 +220,7 @@ fi
 
 # 1B. DOMAIN_MANAGER_SECRET_KEY
 DM_KEY=$(grep "^DOMAIN_MANAGER_SECRET_KEY=" "$ENV_FILE" | cut -d'=' -f2-)
-if [ -z "$DM_KEY" ] || [ "$DM_KEY" == "xxxx" ] || [ "$DM_KEY" == "REPLACE_ME" ]; then
+if [ -z "$DM_KEY" ] || [ "$DM_KEY" == "REPLACE_ME" ]; then
     echo "🔐 Generating secure random Secret Key for Domain Manager..."
     NEW_DM_KEY=$(openssl rand -hex 32)
     replace_val "DOMAIN_MANAGER_SECRET_KEY" "$NEW_DM_KEY"

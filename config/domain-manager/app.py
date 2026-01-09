@@ -12,7 +12,7 @@ ADMIN_USER = os.environ.get('DOMAIN_MANAGER_ADMIN_USER', 'admin')
 ADMIN_PASS = os.environ.get('DOMAIN_MANAGER_ADMIN_PASSWORD', 'admin')
 
 # Mirror the host path inside the container
-BASE_DIR = os.environ.get('APP_PATH_HOST', os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+BASE_DIR = os.environ.get('DOMAIN_MANAGER_APP_PATH_HOST', os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 CSV_PATH = os.path.join(BASE_DIR, 'domains.csv')
 START_SCRIPT = os.path.join(BASE_DIR, 'start.sh')
 
@@ -172,7 +172,7 @@ def api_services():
     
     try:
         # Get the current project name to exclude its containers
-        current_project = os.environ.get('COMPOSE_PROJECT_NAME', '')
+        current_project = os.environ.get('DOMAIN_MANAGER_PROJECT_NAME', '')
         # If not set, it defaults to the directory name of the project
         if not current_project:
             current_project = os.path.basename(BASE_DIR)

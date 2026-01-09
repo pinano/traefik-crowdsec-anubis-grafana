@@ -145,7 +145,7 @@ if [ "$CURRENT_DOZZLE_SYNC" != "$DOZZLE_ADMIN_CREDS_SYNC" ]; then
 fi
 
 # 3. Domain Manager Secret Key
-if [ -z "$DOMAIN_MANAGER_SECRET_KEY" ] || [ "$DOMAIN_MANAGER_SECRET_KEY" == "xxxx" ] || [ "$DOMAIN_MANAGER_SECRET_KEY" == "REPLACE_ME" ]; then
+if [ -z "$DOMAIN_MANAGER_SECRET_KEY" ] || [ "$DOMAIN_MANAGER_SECRET_KEY" == "REPLACE_ME" ]; then
     echo "   🔄 Domain Manager Secret Key is missing or default. Generating secure key..."
     NEW_DM_KEY=$(openssl rand -hex 32)
     update_env_var "DOMAIN_MANAGER_SECRET_KEY" "$NEW_DM_KEY"
@@ -179,9 +179,9 @@ else
 fi
 
 # Update .env to ensure Docker Compose picks it up correctly even from the file
-update_env_var "APP_PATH_HOST" "$DETECTED_PATH"
-export APP_PATH_HOST="$DETECTED_PATH"
-echo "   ✅ APP_PATH_HOST set to: $APP_PATH_HOST"
+update_env_var "DOMAIN_MANAGER_APP_PATH_HOST" "$DETECTED_PATH"
+export DOMAIN_MANAGER_APP_PATH_HOST="$DETECTED_PATH"
+echo "   ✅ DOMAIN_MANAGER_APP_PATH_HOST set to: $DOMAIN_MANAGER_APP_PATH_HOST"
 
 # Normalize CROWDSEC_DISABLE to lowercase
 CROWDSEC_DISABLE=$(echo "${CROWDSEC_DISABLE:-false}" | tr '[:upper:]' '[:lower:]')
@@ -189,8 +189,8 @@ CROWDSEC_DISABLE=$(echo "${CROWDSEC_DISABLE:-false}" | tr '[:upper:]' '[:lower:]
 # Build Compose command with or without CrowdSec profile
 # Enforce project name to avoid conflicts when running from within a container
 COMPOSE_BASE="docker compose"
-if [ -n "$COMPOSE_PROJECT_NAME" ]; then
-    COMPOSE_BASE="docker compose -p $COMPOSE_PROJECT_NAME"
+if [ -n "$DOMAIN_MANAGER_PROJECT_NAME" ]; then
+    COMPOSE_BASE="docker compose -p $DOMAIN_MANAGER_PROJECT_NAME"
 fi
 
 COMPOSE_CMD="$COMPOSE_BASE"

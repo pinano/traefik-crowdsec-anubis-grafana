@@ -10,23 +10,23 @@ services:
       - DOMAIN_MANAGER_ADMIN_PASSWORD=${DOMAIN_MANAGER_ADMIN_PASSWORD}
       - FLASK_SECRET_KEY=${DOMAIN_MANAGER_SECRET_KEY}
       - DOMAIN=${DOMAIN}
-      - COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}
-      - APP_PATH_HOST=${APP_PATH_HOST}
+      - DOMAIN_MANAGER_PROJECT_NAME=${DOMAIN_MANAGER_PROJECT_NAME}
+      - DOMAIN_MANAGER_APP_PATH_HOST=${DOMAIN_MANAGER_APP_PATH_HOST}
       - TZ=${TZ}
       - DOMAIN_MANAGER_INTERNAL=true
-    working_dir: ${APP_PATH_HOST}/config/domain-manager
+    working_dir: ${DOMAIN_MANAGER_APP_PATH_HOST}/config/domain-manager
     volumes:
-      - ./domains.csv:${APP_PATH_HOST}/domains.csv
-      - ./.env:${APP_PATH_HOST}/.env
-      - ./.env.dist:${APP_PATH_HOST}/.env.dist:ro
-      - ./start.sh:${APP_PATH_HOST}/start.sh:ro
-      - ./generate-config.py:${APP_PATH_HOST}/generate-config.py:ro
-      - ./docker-compose-traefik-crowdsec-redis.yaml:${APP_PATH_HOST}/docker-compose-traefik-crowdsec-redis.yaml:ro
-      - ./docker-compose-tools.yaml:${APP_PATH_HOST}/docker-compose-tools.yaml:ro
-      - ./docker-compose-anubis-generated.yaml:${APP_PATH_HOST}/docker-compose-anubis-generated.yaml
-      - ./docker-compose-grafana-loki-alloy.yaml:${APP_PATH_HOST}/docker-compose-grafana-loki-alloy.yaml:ro
-      - ./docker-compose-domain-manager.yaml:${APP_PATH_HOST}/docker-compose-domain-manager.yaml:ro
-      - ./config:${APP_PATH_HOST}/config
+      - ./domains.csv:${DOMAIN_MANAGER_APP_PATH_HOST}/domains.csv
+      - ./.env:${DOMAIN_MANAGER_APP_PATH_HOST}/.env
+      - ./.env.dist:${DOMAIN_MANAGER_APP_PATH_HOST}/.env.dist:ro
+      - ./start.sh:${DOMAIN_MANAGER_APP_PATH_HOST}/start.sh:ro
+      - ./generate-config.py:${DOMAIN_MANAGER_APP_PATH_HOST}/generate-config.py:ro
+      - ./docker-compose-traefik-crowdsec-redis.yaml:${DOMAIN_MANAGER_APP_PATH_HOST}/docker-compose-traefik-crowdsec-redis.yaml:ro
+      - ./docker-compose-tools.yaml:${DOMAIN_MANAGER_APP_PATH_HOST}/docker-compose-tools.yaml:ro
+      - ./docker-compose-anubis-generated.yaml:${DOMAIN_MANAGER_APP_PATH_HOST}/docker-compose-anubis-generated.yaml
+      - ./docker-compose-grafana-loki-alloy.yaml:${DOMAIN_MANAGER_APP_PATH_HOST}/docker-compose-grafana-loki-alloy.yaml:ro
+      - ./docker-compose-domain-manager.yaml:${DOMAIN_MANAGER_APP_PATH_HOST}/docker-compose-domain-manager.yaml:ro
+      - ./config:${DOMAIN_MANAGER_APP_PATH_HOST}/config
       - /var/run/docker.sock:/var/run/docker.sock
     labels:
       - "traefik.enable=true"
