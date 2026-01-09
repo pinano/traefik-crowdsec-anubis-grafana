@@ -435,7 +435,7 @@ fi
 echo "🚀 Deploying Traefik and remaining services..."
 
 # If running inside domain-manager, exclude it from the 'up' command to avoid killing this script
-if [ -n "$DOMAIN_MANAGER_ADMIN_USER" ]; then
+if [[ "$DOMAIN_MANAGER_INTERNAL" == "true" ]]; then
     echo "   ℹ️  Internal run detected. Excluding domain-manager from self-restart to ensure completion."
     # Get all services from all compose files, then filter out domain-manager
     SERVICES=$($COMPOSE_CMD $COMPOSE_FILES ps --services | grep -v "domain-manager" | xargs)
