@@ -107,10 +107,9 @@ set +a
 # This ensures path mirroring works correctly even if the folder is moved.
 
 DETECTED_PATH=$(pwd)
-if [ "$APP_PATH_HOST" != "$DETECTED_PATH" ]; then
-    echo "📍 Auto-detected project path: $DETECTED_PATH"
-    export APP_PATH_HOST="$DETECTED_PATH"
-fi
+# Always enforce absolute path to satisfy Docker's working_dir requirement
+export APP_PATH_HOST="$DETECTED_PATH"
+echo "📍 Project path set to: $APP_PATH_HOST"
 
 # =============================================================================
 # PHASE 0: Synchronize Dashboard Hashes
