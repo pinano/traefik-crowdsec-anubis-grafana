@@ -171,11 +171,18 @@ td {
 
 #domains-body tr {
     transition: all 0.2s ease;
+    position: relative;
+    z-index: 1;
 }
 
 #domains-body tr:hover {
     box-shadow: inset 0 0 0 1000px rgba(255, 255, 255, 0.4);
     filter: brightness(1.01);
+    z-index: 2;
+}
+
+#domains-body tr:focus-within {
+    z-index: 10;
 }
 
 th:nth-child(1),
