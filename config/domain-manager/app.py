@@ -165,6 +165,46 @@ def api_domains():
         write_csv(data)
         return jsonify({'status': 'success'})
 
+@app.route('/api/services', methods=['GET'])
+def api_services():
+    if not session.get('logged_in'):
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    try:
+        # Get the current project name to exclude its containers
+        current_project = os.environ.get('COMPOSE_PROJECT_NAME', '')
+        # If not set, it defaults to the directory name of the project
+        if not current_project:
+            current_project = os.path.basename(BASE_DIR)
+
+        # Get all running containers and their project label
+        # format: name|project
+        cmd = ["docker", "ps", "--format", "{{.Names}}|{{.Label \"com.docker.compose.project\"}}"]
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, env=ENV)
+        
+        all_containers = result.stdout.splitlines()
+        external_services = []
+        
+        for line in all_containers:
+            if '|' not in line:
+                continue
+            name, project = line.split('|', 1)
+            
+            # Exclude if it belongs to the current project
+            if project == current_project:
+                continue
+            
+            # Also exclude the domain-manager itself just in case
+            if name == "domain-manager":
+                continue
+                
+            external_services.append(name)
+            
+        return jsonify(sorted(list(set(external_services))))
+    except Exception as e:
+        print(f"Error getting external services: {e}")
+        return jsonify([])
+
 @app.route('/api/restart', methods=['POST'])
 def restart_stack():
     if not session.get('logged_in'):
