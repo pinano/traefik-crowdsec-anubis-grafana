@@ -144,6 +144,15 @@ if [ "$CURRENT_DOZZLE_SYNC" != "$DOZZLE_ADMIN_CREDS_SYNC" ]; then
     SYNC_NEEDED=$((SYNC_NEEDED + 1))
 fi
 
+# 3. Domain Manager Secret Key
+if [ -z "$DOMAIN_MANAGER_SECRET_KEY" ] || [ "$DOMAIN_MANAGER_SECRET_KEY" == "xxxx" ] || [ "$DOMAIN_MANAGER_SECRET_KEY" == "REPLACE_ME" ]; then
+    echo "   🔄 Domain Manager Secret Key is missing or default. Generating secure key..."
+    NEW_DM_KEY=$(openssl rand -hex 32)
+    update_env_var "DOMAIN_MANAGER_SECRET_KEY" "$NEW_DM_KEY"
+    export DOMAIN_MANAGER_SECRET_KEY="$NEW_DM_KEY"
+    SYNC_NEEDED=$((SYNC_NEEDED + 1))
+fi
+
 if [ $SYNC_NEEDED -gt 0 ]; then
     echo "   ✅ Authentication hashes synchronized in .env. Re-loading environment..."
     set -a

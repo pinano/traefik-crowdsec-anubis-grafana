@@ -219,11 +219,21 @@ if [[ "$gen_anubis" == "y" || "$gen_anubis" == "Y" || -z "$gen_anubis" ]]; then
 fi
 
 # 1B. DOMAIN_MANAGER_SECRET_KEY
-read -p "👉 Generate random Secret Key for Domain Manager? (Y/n): " gen_dm_key
-if [[ "$gen_dm_key" == "y" || "$gen_dm_key" == "Y" || -z "$gen_dm_key" ]]; then
+DM_KEY=$(grep "^DOMAIN_MANAGER_SECRET_KEY=" "$ENV_FILE" | cut -d'=' -f2-)
+if [ -z "$DM_KEY" ] || [ "$DM_KEY" == "xxxx" ] || [ "$DM_KEY" == "REPLACE_ME" ]; then
+    echo "🔐 Generating secure random Secret Key for Domain Manager..."
     NEW_DM_KEY=$(openssl rand -hex 32)
     replace_val "DOMAIN_MANAGER_SECRET_KEY" "$NEW_DM_KEY"
     echo "   ✅ Generated DOMAIN_MANAGER_SECRET_KEY"
+else
+    echo ""
+    echo "👉 Domain Manager Secret Key is already set."
+    read -p "   Regenerate it? (y/N): " regen_dm_key
+    if [[ "$regen_dm_key" == "y" || "$regen_dm_key" == "Y" ]]; then
+        NEW_DM_KEY=$(openssl rand -hex 32)
+        replace_val "DOMAIN_MANAGER_SECRET_KEY" "$NEW_DM_KEY"
+        echo "   ✅ Re-generated DOMAIN_MANAGER_SECRET_KEY"
+    fi
 fi
 
 # 2. TRAEFIK & DOZZLE DASHBOARD AUTH (Auto-generated)
