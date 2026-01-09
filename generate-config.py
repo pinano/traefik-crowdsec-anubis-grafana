@@ -460,7 +460,6 @@ def generate_configs():
                 'file': BASE_FILENAME,
                 'service': 'anubis-base'
             },
-            'container_name': anubis_service_name,
             'environment': [
                 f"PUBLIC_URL={public_url}",
                 f"REDIRECT_DOMAINS={redirect_domains_str}",
