@@ -316,12 +316,6 @@ input:focus {
     transition: background-color 0.2s;
 }
 
-.th-content {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
 .sortable:hover {
     background-color: #e2e8f0;
 }

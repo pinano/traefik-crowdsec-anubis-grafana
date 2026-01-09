@@ -101,6 +101,18 @@ source .env
 set +a
 
 # =============================================================================
+# AUTO-CONFIGURATION
+# =============================================================================
+# Calculate the absolute path of the project on the host.
+# This ensures path mirroring works correctly even if the folder is moved.
+
+DETECTED_PATH=$(pwd)
+if [ "$APP_PATH_HOST" != "$DETECTED_PATH" ]; then
+    echo "📍 Auto-detected project path: $DETECTED_PATH"
+    export APP_PATH_HOST="$DETECTED_PATH"
+fi
+
+# =============================================================================
 # PHASE 0: Synchronize Dashboard Hashes
 # =============================================================================
 # Checks if admin credentials have changed manually in .env and updates hashes.

@@ -89,6 +89,11 @@ replace_val() {
 echo ""
 echo "🔧 CONFIGURING VARIABLES..."
 
+# 0. Auto-set Host Path
+CURRENT_PATH=$(pwd)
+replace_val "APP_PATH_HOST" "$CURRENT_PATH"
+echo "   📍 Auto-configured APP_PATH_HOST to: $CURRENT_PATH"
+
 # --- INTERACTIVE PROMPTS ---
 
 prompt_val "DOMAIN" "Core domain (e.g. example.com)"
