@@ -1,14 +1,22 @@
 :root {
-    --primary-color: #2563eb;
-    --primary-hover: #1d4ed8;
-    --danger-color: #dc2626;
-    --danger-hover: #b91c1c;
-    --success-color: #059669;
-    --success-hover: #047857;
+    /* Pastel Palette */
+    --primary-color: #818cf8;
+    /* Soft Indigo */
+    --primary-hover: #6366f1;
+    --danger-color: #fca5a5;
+    /* Soft Rose */
+    --danger-hover: #f87171;
+    --success-color: #6ee7b7;
+    /* Soft Emerald */
+    --success-hover: #34d399;
+
     --bg-color: #f8fafc;
+    /* Slate 50 */
     --card-bg: #ffffff;
-    --text-color: #1e293b;
-    --text-muted: #64748b;
+    --text-color: #475569;
+    /* Slate 600 - Softer than black */
+    --text-muted: #94a3b8;
+    /* Slate 400 */
     --border-color: #e2e8f0;
     --input-bg: #ffffff;
     --header-bg: #f1f5f9;
@@ -21,7 +29,7 @@
 }
 
 body {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Roboto Condensed', sans-serif;
     background-color: var(--bg-color);
     color: var(--text-color);
     line-height: 1.5;
@@ -193,6 +201,7 @@ td:nth-child(8) {
 }
 
 input[type="text"],
+input[type="password"],
 input[type="number"] {
     width: 100%;
     padding: 0.35rem 0.5rem;
@@ -233,8 +242,16 @@ input:focus {
 
 .login-box h1 {
     text-align: center;
-    margin-bottom: 0.5rem;
+    margin-bottom: 2rem;
     color: var(--primary-color);
+    word-break: break-word;
+    line-height: 1.2;
+}
+
+.btn-block {
+    display: block;
+    width: 100%;
+    justify-content: center;
 }
 
 .login-box p {

@@ -153,7 +153,10 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch('/api/domains', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
                 body: JSON.stringify(payload)
             });
             if (response.ok) {
@@ -173,7 +176,7 @@ document.addEventListener('DOMContentLoaded', () => {
         logContainer.textContent = 'Connecting to restart stream...\n';
         closeModalBtn.style.display = 'none';
 
-        const eventSource = new EventSource('/api/restart-stream');
+        const eventSource = new EventSource(`/api/restart-stream?csrf_token=${csrfToken}`);
 
         eventSource.onmessage = (event) => {
             if (event.data.trim() === "[Process finished with code 0]") {

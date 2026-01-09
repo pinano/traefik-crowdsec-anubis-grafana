@@ -2,6 +2,7 @@ import os
 import csv
 import subprocess
 import secrets
+import re
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, Response
 
 app = Flask(__name__)
@@ -22,6 +23,56 @@ print(f"DEBUG: START_SCRIPT={START_SCRIPT}")
 DOMAIN = os.environ.get('DOMAIN', 'localhost')
 ENV = os.environ.copy()
 ENV['TERM'] = 'xterm'
+
+def generate_csrf_token():
+    if 'csrf_token' not in session:
+        session['csrf_token'] = secrets.token_hex(32)
+    return session['csrf_token']
+
+app.jinja_env.globals['csrf_token'] = generate_csrf_token
+
+@app.before_request
+def check_csrf():
+    if request.endpoint == 'login':
+        return
+    
+    # Standard POST check
+    if request.method == "POST":
+        token = request.headers.get('X-CSRFToken')
+        if not token or token != session.get('csrf_token'):
+            return jsonify({'error': 'CSRF token missing or invalid'}), 403
+
+    # Special check for restart-stream (GET side-effect)
+    if request.endpoint == 'restart_stream':
+        token = request.args.get('csrf_token')
+        if not token or token != session.get('csrf_token'):
+            return jsonify({'error': 'CSRF token missing or invalid'}), 403
+
+def validate_domain_data(entry):
+    # Basic validation to ensure no malicious content in CSV
+    # We allow alphanumeric, dot, dash, underscore, slash, colon (for ports/protocols)
+    # This is a loose check but prevents completely arbitrary text
+    allowed_pattern = re.compile(r'^[a-zA-Z0-9\.\-\_\:\/]+$')
+    
+    # Text fields that shouldn't contain weird characters
+    fields_to_check = ['domain', 'redirection', 'docker_service', 'anubis_subdomain']
+    
+    if not entry.get('domain'): 
+        return False # Domain is mandatory
+        
+    for field in fields_to_check:
+        val = entry.get(field, '')
+        if val and not allowed_pattern.match(str(val)):
+            return False
+            
+    # Numeric fields
+    for field in ['rate', 'burst', 'concurrency']:
+        val = entry.get(field, '')
+        if val and not str(val).isdigit():
+            return False
+            
+    return True
+
 
 def read_csv():
     data = []
@@ -58,6 +109,9 @@ def write_csv(data):
         f.write(header + '\n\n')
         writer = csv.writer(f)
         for entry in data:
+            if not validate_domain_data(entry):
+                print(f"Skipping invalid entry: {entry}")
+                continue
             writer.writerow([
                 entry['domain'],
                 entry['redirection'],
@@ -71,6 +125,16 @@ def write_csv(data):
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
+        # Login is exempt from global CSRF check if handled via form, 
+        # but let's check it if we were enforcing it globally. 
+        # However, check_csrf applies to ALL POSTs. We need to handle login specifically or exempt it.
+        # Since login comes from a form without JS usually, checking 'csrf_token' from form input is standard.
+        # For simplicity here, we assume the global check runs. 
+        # BUT wait, the global check looks for header X-CSRFToken. Forms usually send body.
+        # Let's exempt login from the JSON header check and do form check if needed.
+        pass # The global check will catch this if we don't handle it.
+        # IMPORTANT: We need to exempt login from the global header check or update login.html.
+        # Let's simply modify check_csrf to skip login endpoint.
         if request.form['username'] == ADMIN_USER and request.form['password'] == ADMIN_PASS:
             session['logged_in'] = True
             return redirect(url_for('index'))
