@@ -43,7 +43,7 @@ services:
     profiles: [ "tools" ] # Trick: This way it doesn't start automatically, only if explicitly requested
 
   # ===========================
-  #  STACK-WATCHDOG 
+  #  WATCHDOG 
   #  monitors the stack for issues:
   #    - checks acme.json and sends alert if a cert has not been renewed and is close to expiration
   #    - checks DNS records for all domains

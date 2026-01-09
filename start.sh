@@ -190,8 +190,8 @@ CROWDSEC_DISABLE=$(echo "${CROWDSEC_DISABLE:-false}" | tr '[:upper:]' '[:lower:]
 # Build Compose command with or without CrowdSec profile
 # Enforce project name to avoid conflicts when running from within a container
 COMPOSE_BASE="docker compose"
-if [ -n "$DOMAIN_MANAGER_PROJECT_NAME" ]; then
-    COMPOSE_BASE="docker compose -p $DOMAIN_MANAGER_PROJECT_NAME"
+if [ -n "$PROJECT_NAME" ]; then
+    COMPOSE_BASE="docker compose -p $PROJECT_NAME"
 fi
 
 COMPOSE_CMD="$COMPOSE_BASE"
@@ -409,7 +409,7 @@ if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
     echo -n "   ⏳ Waiting for CrowdSec API"
     timeout=60
     # Dynamic lookup to support project prefixes (e.g. stack-crowdsec-1)
-    CROWDSEC_ID=$(docker ps -aq --filter label=com.docker.compose.project=$DOMAIN_MANAGER_PROJECT_NAME --filter label=com.docker.compose.service=crowdsec | head -n 1)
+    CROWDSEC_ID=$(docker ps -aq --filter label=com.docker.compose.project=$PROJECT_NAME --filter label=com.docker.compose.service=crowdsec | head -n 1)
     
     while [ -z "$CROWDSEC_ID" ] || [ "$(docker inspect --format='{{.State.Health.Status}}' $CROWDSEC_ID 2>/dev/null)" != "healthy" ]; do
         sleep 2

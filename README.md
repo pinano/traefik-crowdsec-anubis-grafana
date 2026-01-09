@@ -32,8 +32,9 @@ It integrates industry-standard components to provide a multi-layered defense st
 3. **Anubis**: Custom "ForwardAuth" middleware implementing Proof-of-Work (PoW) challenges to mitigate sophisticated bot attacks.
 4. **Alloy & Loki**: Modern, resource-efficient log aggregation and processing pipeline.
 5. **Grafana**: Centralized observability and analytics.
+6. **Domain Manager**: A secure web interface to manage domains, redirections, and security policies in real-time.
 
-The system is fully automated. A Python orchestrator (`generate-config.py`) dynamically compiles complex Traefik configurations from a simple CSV inventory, ensuring consistent security policies across all services.
+The system is fully automated. A Python orchestrator (`generate-config.py`) dynamically compiles complex Traefik configurations from your domain inventory, which can be managed via the **Domain Manager** UI or directly in `domains.csv`.
 
 ---
 
@@ -233,13 +234,22 @@ A high-performance Valkey (Redis-compatible) instance acts as the session store 
 - **Configuration**: Tuned for cache usage (`allkeys-lru`).
 - **Persistence**: Uses AOF with per-second synchronization.
 
+### Domain Manager (Admin UI)
+
+The Domain Manager provides a user-friendly web interface (`https://domains.<domain>`) to manage the `domains.csv` inventory.
+
+- **Real-time Updates**: Changes are applied immediately to the infrastructure.
+- **Root Domain Grouping**: Automatically identifies and color-codes services by their root domain for better organization.
+- **Security Defaults**: Enforces safe defaults for rate-limiting and Anubis protection.
+- **Resource Discovery**: Lists currently running Docker containers to simplify service assignment.
+
 ### Observability Stack (Alloy, Loki, Grafana)
 
 - **Alloy**: OpenTelemetry-compatible agent that discovers Docker containers and forwards logs to Loki.
 - **Loki**: Log aggregation system optimized for efficiency.
 - **Grafana**: Visual dashboards for traffic analysis and attack monitoring.
 
-### Stack-Watchdog (Monitoring)
+### Watchdog (Monitoring)
 
 A lightweight utility service that monitors the stack and sends Telegram alerts.
 
@@ -277,6 +287,10 @@ A lightweight utility service that monitors the stack and sends Telegram alerts.
 │   │   ├── acquis.yaml
 │   │   ├── profiles.yaml
 │   │   └── parsers/                       # Custom parsers (IP whitelist)
+│   ├── domain-manager/                     # Admin UI backend (Python/Flask)
+│   │   ├── app.py
+│   │   ├── static/
+│   │   └── templates/
 │   ├── grafana/                           # Grafana datasources
 │   │   └── config.yaml
 │   ├── loki/                              # Loki log storage
@@ -294,8 +308,9 @@ A lightweight utility service that monitors the stack and sends Telegram alerts.
 │
 └── Docker Compose Files:
     ├── docker-compose-traefik-crowdsec-redis.yaml   # Core infrastructure
-    ├── docker-compose-tools.yaml                     # Tools & monitoring
+    ├── docker-compose-tools.yaml                     # Tools & monitoring (Dozzle, watchdog, etc)
     ├── docker-compose-grafana-loki-alloy.yaml        # Observability stack
+    ├── docker-compose-domain-manager.yaml            # Admin UI service
     ├── docker-compose-anubis-base.yaml               # Anubis template
     └── docker-compose-anubis-generated.yaml          # Auto-generated Anubis instances
 ```
@@ -407,6 +422,7 @@ To simplify manual management, we've implemented an **Auto-Sync Mechanism**:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `DOMAIN` | Primary domain for admin dashboards | - |
+| `PROJECT_NAME` | Prefix for all Docker containers (e.g., `stack`) | `stack` |
 | `TZ` | Server timezone | `Europe/Madrid` |
 
 #### Anubis
@@ -482,6 +498,9 @@ Legacy applications or slow backends may require adjusted timeouts. We provide t
 |----------|-------------|---------|
 | `TRAEFIK_ADMIN_USER` | Traefik dashboard username | `admin` |
 | `TRAEFIK_ADMIN_PASSWORD` | Traefik dashboard password | - |
+| `DOMAIN_MANAGER_ADMIN_USER` | Domain Manager username | `admin` |
+| `DOMAIN_MANAGER_ADMIN_PASSWORD` | Domain Manager password | - |
+| `DOMAIN_MANAGER_SECRET_KEY` | Flask secret key for sessions | Auto-generated |
 | `DOZZLE_ADMIN_USER` | Dozzle admin username | `admin` |
 | `DOZZLE_ADMIN_PASSWORD` | Dozzle admin password | - |
 | `GRAFANA_ADMIN_USER` | Grafana admin username | `admin` |
@@ -660,16 +679,17 @@ docker exec crowdsec cscli explain --file /var/log/traefik/access.log --type tra
 | Dashboard | URL | Auth |
 |-----------|-----|------|
 | Traefik | `https://traefik.<domain>` | Basic Auth |
+| Domain Manager | `https://domains.<domain>` | Login form |
 | Grafana | `https://grafana.<domain>` | Login form |
 | Dozzle | `https://dozzle.<domain>` | Basic Auth |
 
-### Stack-Watchdog Alerts
+### Watchdog Alerts
 
 The watchdog sends Telegram notifications for:
 
-- ⚠️ **SSL Alerts**: Certificate expiring within threshold
-- 🌐 **DNS Alerts**: Domain not resolving to expected IP
-- 🛡️ **CrowdSec Alerts**: LAPI down, no bouncers, or stale bouncer connections
+- ⚠️ **SSL Alerts**: Certificate expiring within threshold.
+- 🌐 **DNS Alerts**: Domain not resolving to the expected host IP.
+- 🛡️ **CrowdSec Alerts**: LAPI down, no bouncers, or bouncer connection issues.
 
 ---
 

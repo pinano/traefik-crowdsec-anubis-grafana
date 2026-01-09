@@ -189,7 +189,7 @@ def api_services():
     
     try:
         # Get the current project name to exclude its containers
-        current_project = os.environ.get('DOMAIN_MANAGER_PROJECT_NAME', '')
+        current_project = os.environ.get('PROJECT_NAME', '')
         # If not set, it defaults to the directory name of the project
         if not current_project:
             current_project = os.path.basename(BASE_DIR)

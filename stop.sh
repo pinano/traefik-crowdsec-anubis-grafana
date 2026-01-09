@@ -18,7 +18,7 @@ set +a
 
 # Default values for critical variables to avoid docker-compose warnings
 export TRAEFIK_CONFIG_HASH=${TRAEFIK_CONFIG_HASH:-""}
-export DOMAIN_MANAGER_PROJECT_NAME=${DOMAIN_MANAGER_PROJECT_NAME:-"stack"}
+export PROJECT_NAME=${PROJECT_NAME:-"stack"}
 
 set -e  # Exit on any error
 
@@ -61,7 +61,7 @@ fi
 echo "🛑 Stopping and cleaning the entire fleet..."
 
 # Enforce project name to avoid missing containers
-COMPOSE_CMD="docker compose -p $DOMAIN_MANAGER_PROJECT_NAME --profile crowdsec"
+COMPOSE_CMD="docker compose -p $PROJECT_NAME --profile crowdsec"
 
 # 1. Graceful stop (allow containers to finish tasks)
 # We use || true to ensure 'down' runs even if 'stop' encounters issues
