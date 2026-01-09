@@ -158,10 +158,10 @@ th {
 .root-domain-cell {
     font-weight: 500;
     color: var(--text-color);
-    opacity: 0.8;
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(0, 0, 0, 0.02);
     border-right: 1px solid var(--border-color);
     font-size: 0.85rem;
+    text-align: center;
 }
 
 td {
@@ -176,12 +176,12 @@ td:nth-child(1) {
 
 th:nth-child(2),
 td:nth-child(2) {
-    width: 18%;
+    width: 22%;
 }
 
 th:nth-child(3),
 td:nth-child(3) {
-    width: 15%;
+    width: 18%;
 }
 
 th:nth-child(4),
@@ -191,27 +191,33 @@ td:nth-child(4) {
 
 th:nth-child(5),
 td:nth-child(5) {
-    width: 13%;
+    width: 12%;
 }
 
 th:nth-child(6),
 td:nth-child(6) {
-    width: 7%;
+    width: 6%;
 }
 
 th:nth-child(7),
 td:nth-child(7) {
-    width: 7%;
+    width: 6%;
 }
 
 th:nth-child(8),
 td:nth-child(8) {
-    width: 7%;
+    width: 6%;
 }
 
 th:nth-child(9),
 td:nth-child(9) {
-    width: 12%;
+    width: 4%;
+    text-align: center;
+}
+
+#domains-table .remove-row-btn {
+    padding: 0.3rem;
+    line-height: 0;
 }
 
 input[type="text"],
@@ -224,6 +230,18 @@ input[type="number"] {
     border-radius: 0.25rem;
     color: var(--text-color);
     font-size: 0.8125rem;
+    transition: all 0.2s;
+}
+
+/* Allow row colors to show through inputs in the table */
+#domains-table .data-input {
+    background-color: rgba(255, 255, 255, 0.5);
+    border-color: rgba(0, 0, 0, 0.05);
+}
+
+#domains-table .data-input:focus {
+    background-color: var(--input-bg);
+    border-color: var(--primary-color);
 }
 
 ::placeholder {

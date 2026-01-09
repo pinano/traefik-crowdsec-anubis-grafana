@@ -33,6 +33,21 @@ document.addEventListener('DOMContentLoaded', () => {
         return parts.slice(-2).join('.');
     }
 
+    function getColorForRoot(rootDomain) {
+        if (!rootDomain || rootDomain === '-') return 'transparent';
+
+        let hash = 0;
+        for (let i = 0; i < rootDomain.length; i++) {
+            hash = (rootDomain.charCodeAt(i) * 31) + ((hash << 5) - hash);
+            hash = hash & hash; // Convert to 32bit integer
+        }
+
+        // Use HSL for consistent pastel look
+        // Hue: 0-360, Saturation: 75%, Lightness: 96% for very soft pastel
+        const h = Math.abs(hash) % 360;
+        return `hsl(${h}, 75%, 96%)`;
+    }
+
     function showToast(message, type = 'info') {
         toast.textContent = message;
         toast.className = 'toast show';
@@ -117,8 +132,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const tr = document.createElement('tr');
         tr.dataset.id = id;
+        const root = data._root_domain || getRootDomain(data.domain);
+        tr.style.backgroundColor = getColorForRoot(root);
+
         tr.innerHTML = `
-            <td class="root-domain-cell">${data._root_domain || getRootDomain(data.domain) || '-'}</td>
+            <td class="root-domain-cell">${root || '-'}</td>
             <td><input type="text" class="data-input" data-key="domain" value="${data.domain || ''}" placeholder="example.com"></td>
             <td><input type="text" class="data-input" data-key="redirection" value="${data.redirection || ''}" placeholder="www.example.com"></td>
             <td>
@@ -132,8 +150,8 @@ document.addEventListener('DOMContentLoaded', () => {
             <td><input type="text" class="data-input" data-key="burst" value="${data.burst || ''}" placeholder="100"></td>
             <td><input type="text" class="data-input" data-key="concurrency" value="${data.concurrency || ''}" placeholder="20"></td>
             <td>
-                <button class="btn btn-danger btn-sm remove-row-btn">
-                    <i data-lucide="trash-2"></i> Delete
+                <button class="btn btn-danger btn-sm remove-row-btn" title="Delete record">
+                    <i data-lucide="trash-2"></i>
                 </button>
             </td>
         `;
@@ -147,7 +165,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     domainObj._root_domain = getRootDomain(value.trim());
                     // Update visual cell immediately
                     const rootCell = tr.querySelector('.root-domain-cell');
-                    if (rootCell) rootCell.textContent = domainObj._root_domain || '-';
+                    const newRoot = domainObj._root_domain || '-';
+                    if (rootCell) rootCell.textContent = newRoot;
+
+                    // Update background color
+                    tr.style.backgroundColor = getColorForRoot(domainObj._root_domain);
                 }
             }
         };
