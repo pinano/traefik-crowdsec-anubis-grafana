@@ -465,6 +465,11 @@ input:focus {
     max-width: 450px;
 }
 
+.modal.modal-sm .modal-body {
+    text-align: center;
+    padding: 2.5rem 2rem;
+}
+
 .modal-header h2 {
     font-size: 1.25rem;
     font-weight: 700;
@@ -472,9 +477,23 @@ input:focus {
 }
 
 .modal-body {
-    padding: 1.5rem;
+    padding: 2rem 1.5rem;
     overflow-y: auto;
     background-color: var(--card-bg);
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    color: var(--text-color);
+}
+
+.modal-footer {
+    padding: 1rem 1.5rem;
+    background-color: #f8fafc;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    border-bottom-left-radius: 1rem;
+    border-bottom-right-radius: 1rem;
 }
 
 .modal-body-console {
