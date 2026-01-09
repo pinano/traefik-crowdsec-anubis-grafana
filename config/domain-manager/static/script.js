@@ -32,7 +32,9 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadDomains() {
         try {
             const response = await fetch('/api/domains');
-            allDomains = await response.json();
+            const data = await response.json();
+            // Assign unique IDs for reactive tracking
+            allDomains = data.map(d => ({ ...d, _id: crypto.randomUUID() }));
             applyFilterAndSort();
         } catch (error) {
             showToast('Error loading domains', 'danger');
@@ -72,7 +74,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function addRow(data = {}) {
+        const id = data._id || crypto.randomUUID();
+        if (!data._id) {
+            // New row added via UI
+            const newDomain = {
+                _id: id,
+                domain: data.domain || '',
+                redirection: data.redirection || '',
+                docker_service: data.docker_service || '',
+                anubis_subdomain: data.anubis_subdomain || '',
+                rate: data.rate || '',
+                burst: data.burst || '',
+                concurrency: data.concurrency || ''
+            };
+            allDomains.push(newDomain);
+        }
+
         const tr = document.createElement('tr');
+        tr.dataset.id = id;
         tr.innerHTML = `
             <td><input type="text" class="data-input" data-key="domain" value="${data.domain || ''}" placeholder="example.com"></td>
             <td><input type="text" class="data-input" data-key="redirection" value="${data.redirection || ''}" placeholder="www.example.com"></td>
@@ -88,6 +107,16 @@ document.addEventListener('DOMContentLoaded', () => {
             </td>
         `;
 
+        // Reactive update: when any input changes, update the source of truth
+        tr.querySelectorAll('.data-input').forEach(input => {
+            input.addEventListener('input', (e) => {
+                const domainObj = allDomains.find(d => d._id === id);
+                if (domainObj) {
+                    domainObj[e.target.dataset.key] = e.target.value.trim();
+                }
+            });
+        });
+
         tr.querySelector('.remove-row-btn').addEventListener('click', () => {
             rowToDelete = tr;
             const domainVal = tr.querySelector('[data-key="domain"]').value || 'this record';
@@ -101,8 +130,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     confirmDeleteBtn.addEventListener('click', () => {
         if (rowToDelete) {
-            const domainVal = rowToDelete.querySelector('[data-key="domain"]').value;
-            allDomains = allDomains.filter(d => d.domain !== domainVal || domainVal === '');
+            const id = rowToDelete.dataset.id;
+            allDomains = allDomains.filter(d => d._id !== id);
             rowToDelete.remove();
             rowToDelete = null;
         }
@@ -114,25 +143,18 @@ document.addEventListener('DOMContentLoaded', () => {
         confirmModal.classList.remove('show');
     });
 
-    function syncUItoState() {
-        const rows = Array.from(domainsBody.querySelectorAll('tr'));
-        allDomains = rows.map(row => {
-            const inputs = row.querySelectorAll('.data-input');
-            const obj = {};
-            inputs.forEach(input => {
-                obj[input.dataset.key] = input.value.trim();
-            });
-            return obj;
-        }).filter(item => item.domain !== '');
-    }
 
     saveBtn.addEventListener('click', async () => {
-        syncUItoState();
+        // Strip internal IDs before saving and filter empty domains
+        const payload = allDomains
+            .filter(d => d.domain && d.domain.trim() !== '')
+            .map(({ _id, ...rest }) => rest);
+
         try {
             const response = await fetch('/api/domains', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(allDomains)
+                body: JSON.stringify(payload)
             });
             if (response.ok) {
                 showToast('Changes saved successfully');
@@ -185,7 +207,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     searchInput.addEventListener('input', () => {
-        syncUItoState();
         applyFilterAndSort();
     });
 
@@ -202,7 +223,6 @@ document.addEventListener('DOMContentLoaded', () => {
             sortableHeaders.forEach(h => h.classList.remove('asc', 'desc'));
             header.classList.add(currentSort.direction);
 
-            syncUItoState();
             applyFilterAndSort();
         });
     });
