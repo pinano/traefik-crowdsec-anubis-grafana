@@ -205,6 +205,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const tr = document.createElement('tr');
+        if (!data._id) tr.classList.add('row-unsaved');
         tr.dataset.id = id;
         const root = data._root_domain || getRootDomain(data.domain);
         tr.style.backgroundColor = getColorForRoot(root);
@@ -254,6 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tr.querySelectorAll('.data-input').forEach(input => {
             input.addEventListener('input', (e) => {
                 updateTruth(e.target.dataset.key, e.target.value);
+                tr.classList.add('row-unsaved');
                 markUnsavedChanges();
             });
         });
@@ -508,9 +510,13 @@ document.addEventListener('DOMContentLoaded', () => {
         unsavedNotification.classList.remove('show');
         saveBtn.classList.remove('btn-save-needed');
         saveBtn.disabled = true;
-        // Body class removal handled by whoever calls this if they don't immediately show another banner
-        // But usually tracking clean state is complex.
-        // For our simple flow: save -> unsaved gone, restart needed appears.
+
+        // Clear unsaved styling from rows
+        document.querySelectorAll('.row-unsaved').forEach(row => {
+            row.classList.remove('row-unsaved');
+            // Re-apply original root color if needed, though CSS !important override handles the toggle.
+            // The existing style.backgroundColor is inline, so specific selector !important is good.
+        });
     }
 
     function renderGlobalDropdown(filter = '') {
