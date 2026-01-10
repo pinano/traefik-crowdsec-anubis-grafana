@@ -170,6 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 data.enabled = true;
                 updateRootColors();
                 applyFilterAndSort();
+                saveDomains(); // Auto-save on restore
             });
 
             deletedDomainsBody.appendChild(tr);
@@ -314,7 +315,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
 
-    saveBtn.addEventListener('click', async () => {
+    async function saveDomains(showSuccess = true) {
         // Strip internal IDs and temporary fields before saving and filter empty domains
         const payload = allDomains
             .filter(d => d.domain && d.domain.trim() !== '')
@@ -330,14 +331,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify(payload)
             });
             if (response.ok) {
-                showToast('Changes saved successfully');
+                if (showSuccess) showToast('Changes saved successfully');
             } else {
                 showToast('Error saving changes', 'danger');
             }
         } catch (error) {
             showToast('Network error', 'danger');
         }
-    });
+    }
+
+    saveBtn.addEventListener('click', () => saveDomains(true));
 
     exportBtn.addEventListener('click', () => {
         // Headers matching the CSV structure in the backend
@@ -404,6 +407,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     updateRootColors();
                     applyFilterAndSort(); // Re-renders active table
                     renderDeletedTable(); // Updates deleted table
+                    saveDomains(); // Auto-save on delete
                 }
                 rowToDelete = null;
             }
