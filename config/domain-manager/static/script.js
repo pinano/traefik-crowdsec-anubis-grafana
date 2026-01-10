@@ -509,4 +509,3 @@ document.addEventListener('DOMContentLoaded', () => {
     loadDomains();
     loadServices();
 });
-});
