@@ -44,10 +44,14 @@ document.addEventListener('DOMContentLoaded', () => {
             hash = hash & hash; // Convert to 32bit integer
         }
 
-        // Use HSL for consistent pastel look
-        // Hue: 0-360, Saturation: 75%, Lightness: 96% for very soft pastel
+        // Use HSL for consistent pastel look but with more distinction
+        // Hue: 0-360
+        // Saturation: 70-90% (More vibrant)
+        // Lightness: 88-94% (Slightly deeper to show color better)
         const h = Math.abs(hash) % 360;
-        return `hsl(${h}, 75%, 96%)`;
+        const s = 70 + (Math.abs(hash) % 21);
+        const l = 88 + (Math.abs(hash) % 7);
+        return `hsl(${h}, ${s}%, ${l}%)`;
     }
 
     function showToast(message, type = 'info') {
