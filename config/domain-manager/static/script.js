@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     const domainsBody = document.getElementById('domains-body');
     const saveBtn = document.getElementById('save-btn');
+    const exportBtn = document.getElementById('export-btn');
     const restartBtn = document.getElementById('restart-btn');
     const addRowBtn = document.getElementById('add-row-btn');
     const toast = document.getElementById('toast');
@@ -136,19 +137,19 @@ document.addEventListener('DOMContentLoaded', () => {
         tr.style.backgroundColor = getColorForRoot(root);
 
         tr.innerHTML = `
-            <td class="root-domain-cell">${root || '-'}</td>
-            <td><input type="text" class="data-input" data-key="domain" value="${data.domain || ''}" placeholder="example.com"></td>
-            <td><input type="text" class="data-input" data-key="redirection" value="${data.redirection || ''}" placeholder="www.example.com"></td>
-            <td>
+            <td class="root-domain-cell" data-label="Root Domain">${root || '-'}</td>
+            <td data-label="Domain"><input type="text" class="data-input" data-key="domain" value="${data.domain || ''}" placeholder="example.com"></td>
+            <td data-label="Redirection"><input type="text" class="data-input" data-key="redirection" value="${data.redirection || ''}" placeholder="www.example.com"></td>
+            <td data-label="Docker Service">
                 <div class="dropdown-container">
                     <input type="text" class="data-input service-input" data-key="docker_service" value="${data.docker_service || ''}" placeholder="my-service" autocomplete="off">
                     <div class="dropdown-menu"></div>
                 </div>
             </td>
-            <td><input type="text" class="data-input" data-key="anubis_subdomain" value="${data.anubis_subdomain || ''}" placeholder="anubis"></td>
-            <td><input type="text" class="data-input" data-key="rate" value="${data.rate || ''}" placeholder="50"></td>
-            <td><input type="text" class="data-input" data-key="burst" value="${data.burst || ''}" placeholder="100"></td>
-            <td><input type="text" class="data-input" data-key="concurrency" value="${data.concurrency || ''}" placeholder="20"></td>
+            <td data-label="Anubis Subdomain"><input type="text" class="data-input" data-key="anubis_subdomain" value="${data.anubis_subdomain || ''}" placeholder="anubis"></td>
+            <td data-label="Rate"><input type="text" class="data-input" data-key="rate" value="${data.rate || ''}" placeholder="50"></td>
+            <td data-label="Burst"><input type="text" class="data-input" data-key="burst" value="${data.burst || ''}" placeholder="100"></td>
+            <td data-label="Concurrency"><input type="text" class="data-input" data-key="concurrency" value="${data.concurrency || ''}" placeholder="20"></td>
             <td>
                 <button class="btn btn-danger btn-sm remove-row-btn" title="Delete record">
                     <i data-lucide="trash-2"></i>
@@ -221,6 +222,8 @@ document.addEventListener('DOMContentLoaded', () => {
             rowToDelete = tr;
             const domainVal = tr.querySelector('[data-key="domain"]').value || 'this record';
             confirmMsg.textContent = `Are you sure you want to delete ${domainVal}?`;
+            confirmDeleteBtn.textContent = 'Delete';
+            confirmAction = 'delete';
             confirmModal.classList.add('show');
         });
 
@@ -229,13 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     confirmDeleteBtn.addEventListener('click', () => {
-        if (rowToDelete) {
-            const id = rowToDelete.dataset.id;
-            allDomains = allDomains.filter(d => d._id !== id);
-            rowToDelete.remove();
-            rowToDelete = null;
-        }
-        confirmModal.classList.remove('show');
+        // This is now handled by the stateful listener below
     });
 
     cancelDeleteBtn.addEventListener('click', () => {
@@ -269,9 +266,78 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    restartBtn.addEventListener('click', () => {
-        if (!confirm('Are you sure you want to restart the stack? This will interrupt connections briefly.')) return;
+    exportBtn.addEventListener('click', () => {
+        // Headers matching the CSV structure in the backend
+        const headers = ['domain', 'redirection', 'docker_service', 'anubis_subdomain', 'rate', 'burst', 'concurrency'];
+        const rows = allDomains.filter(d => d.domain && d.domain.trim() !== '').map(d => {
+            return headers.map(header => {
+                // Escape quotes if necessary, though simple CSV here might not strictly need it for these fields
+                return d[header] || '';
+            }).join(',');
+        });
 
+        const csvContent = "data:text/csv;charset=utf-8,"
+            + "# " + headers.join(', ') + "\n\n"
+            + rows.join('\n');
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "domains.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    });
+
+    restartBtn.addEventListener('click', () => {
+        // Re-use the confirm modal for restart confirmation, or creation of a new one.
+        // For simplicity, we'll just use a direct confirmation prompt via a new modal or reusing the existing one with customized text.
+        // However, the cleanest UX is to use the confirm modal we already have but customize it.
+
+        rowToDelete = null; // Ensure no row deletion logic interferes
+        // We need a way to distinguish between delete and restart confirmation if we reuse the same modal.
+        // Let's create a specialized confirmation function or just separate handlers.
+
+        // Let's use the browser confirm for now as a fallback OR implement a proper "custom confirm" state.
+        // Given the requirement "se supone que tiene que mostrar una alerta ... pero en móvil nunca la muestra", 
+        // implies the native confirm() is flaky.
+
+        // We will repurpose the existing Confirm Modal for generic confirmations.
+        confirmMsg.textContent = 'Are you sure you want to restart the stack? This will interrupt connections briefly.';
+
+        // We need to change the behavior of the "Delete" button.
+        // Let's change the text of the button and its event listener temporarily.
+        const originalBtnText = confirmDeleteBtn.textContent;
+        const originalBtnClass = confirmDeleteBtn.className;
+
+        confirmDeleteBtn.textContent = 'Restart';
+        confirmDeleteBtn.className = 'btn btn-danger'; // Keep it red
+
+        // Remove old listener (not easily possible with anonymous functions) or use a state flag.
+        // Let's use a state flag: confirmAction
+
+        confirmAction = 'restart';
+        confirmModal.classList.add('show');
+    });
+
+    let confirmAction = 'delete'; // 'delete' or 'restart'
+
+    confirmDeleteBtn.addEventListener('click', () => {
+        if (confirmAction === 'delete') {
+            if (rowToDelete) {
+                const id = rowToDelete.dataset.id;
+                allDomains = allDomains.filter(d => d._id !== id);
+                rowToDelete.remove();
+                rowToDelete = null;
+            }
+            confirmModal.classList.remove('show');
+        } else if (confirmAction === 'restart') {
+            confirmModal.classList.remove('show');
+            initiateRestart();
+        }
+    });
+
+    function initiateRestart() {
         restartModal.classList.add('show');
         logContainer.textContent = 'Connecting to restart stream...\n';
         closeModalBtn.style.display = 'none';
@@ -298,10 +364,14 @@ document.addEventListener('DOMContentLoaded', () => {
             closeModalBtn.style.display = 'block';
             eventSource.close();
         };
-    });
+    }
 
-    closeModalBtn.addEventListener('click', () => {
-        restartModal.classList.remove('show');
+    cancelDeleteBtn.addEventListener('click', () => {
+        rowToDelete = null;
+        confirmModal.classList.remove('show');
+        // Reset state
+        confirmAction = 'delete';
+        confirmDeleteBtn.textContent = 'Delete';
     });
 
     addRowBtn.addEventListener('click', () => {
