@@ -368,6 +368,10 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    closeModalBtn.addEventListener('click', () => {
+        restartModal.classList.remove('show');
+    });
+
     cancelDeleteBtn.addEventListener('click', () => {
         rowToDelete = null;
         confirmModal.classList.remove('show');
