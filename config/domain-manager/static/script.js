@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
     const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
     const confirmMsg = document.getElementById('confirm-msg');
+    const confirmTitle = document.getElementById('confirm-modal-title');
 
     let allDomains = [];
     let allServices = [];
@@ -221,6 +222,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tr.querySelector('.remove-row-btn').addEventListener('click', () => {
             rowToDelete = tr;
             const domainVal = tr.querySelector('[data-key="domain"]').value || 'this record';
+            confirmTitle.textContent = 'Confirm Deletion';
             confirmMsg.textContent = `Are you sure you want to delete ${domainVal}?`;
             confirmDeleteBtn.textContent = 'Delete';
             confirmAction = 'delete';
@@ -276,11 +278,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }).join(',');
         });
 
-        const csvContent = "data:text/csv;charset=utf-8,"
-            + "# " + headers.join(', ') + "\n\n"
+        const csvContent = "# " + headers.join(', ') + "\n\n"
             + rows.join('\n');
 
-        const encodedUri = encodeURI(csvContent);
+        const encodedUri = "data:text/csv;charset=utf-8," + encodeURIComponent(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
         link.setAttribute("download", "domains.csv");
@@ -303,6 +304,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // implies the native confirm() is flaky.
 
         // We will repurpose the existing Confirm Modal for generic confirmations.
+        confirmTitle.textContent = 'Confirm Restart';
         confirmMsg.textContent = 'Are you sure you want to restart the stack? This will interrupt connections briefly.';
 
         // We need to change the behavior of the "Delete" button.
