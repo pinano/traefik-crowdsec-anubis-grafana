@@ -98,14 +98,40 @@ def read_csv():
     with open(CSV_PATH, mode='r', encoding='utf-8') as f:
         reader = csv.reader(f)
         for row in reader:
-            # Skip empty lines and comments for the UI
-            if not row or (row and row[0].strip().startswith('#')):
+            if not row:
                 continue
+
+            # Determine if enabled (not commented) or disabled (commented)
+            enabled = True
+            first_col = row[0].strip()
+            
+            # Skip pure comments that are not data (e.g. the header or actual comments)
+            # We assume a data row has at least domain info.
+            # Our header starts with "# domain", so we should ideally skip that specific line or generic comments.
+            # However, a commented row looks like "# example.com".
+            
+            if first_col.startswith('#'):
+                # Check if it looks like a data row (has CSV structure)
+                # This is tricky because csv.reader already split it.
+                # If it's a "soft deleted" row, the first cell has the #.
+                clean_domain = first_col.lstrip('#').strip()
+                if not clean_domain: 
+                    # specific check for the header line or empty comments
+                    continue
+                
+                # Check if this line is likely our header
+                if 'domain' in clean_domain and 'redirection' in row[1]:
+                    continue
+                    
+                enabled = False
+                row[0] = clean_domain
+            
             # Ensure row has enough columns (7 based on template)
             # domain, redirection, docker_service, anubis_subdomain, rate, burst, concurrency
             # pad if necessary
             while len(row) < 7:
                 row.append('')
+            
             data.append({
                 'domain': row[0].strip(),
                 'redirection': row[1].strip(),
@@ -113,7 +139,8 @@ def read_csv():
                 'anubis_subdomain': row[3].strip(),
                 'rate': row[4].strip(),
                 'burst': row[5].strip(),
-                'concurrency': row[6].strip()
+                'concurrency': row[6].strip(),
+                'enabled': enabled
             })
     return data
 
@@ -129,8 +156,13 @@ def write_csv(data):
             if not validate_domain_data(entry):
                 print(f"Skipping invalid entry: {entry}")
                 continue
+            
+            domain_val = entry['domain']
+            if not entry.get('enabled', True):
+                domain_val = f"# {domain_val}"
+            
             writer.writerow([
-                entry['domain'],
+                domain_val,
                 entry['redirection'],
                 entry['docker_service'],
                 entry['anubis_subdomain'],

@@ -161,7 +161,7 @@ table {
 
 th {
     background-color: var(--header-bg);
-    padding: 0.6rem 0.35rem;
+    padding: 0.4rem 0.35rem;
     font-size: 0.7rem;
     font-weight: 700;
     text-transform: uppercase;
@@ -179,8 +179,38 @@ th {
 }
 
 td {
-    padding: 0.4rem 0.35rem;
+    padding: 0.25rem 0.35rem;
     border-bottom: 1px solid var(--border-color);
+}
+
+.deleted-section {
+    margin-top: 3rem;
+    opacity: 0.6;
+    transition: opacity 0.3s;
+}
+
+.deleted-section:hover {
+    opacity: 1;
+}
+
+.deleted-section h2 {
+    font-size: 1.1rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+    font-weight: 600;
+}
+
+#deleted-domains-table .data-input {
+    color: var(--text-muted);
+    cursor: not-allowed;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+#deleted-domains-table tr {
+    background-color: #f9fafb;
+    /* Light gray for deleted */
 }
 
 #domains-body tr {

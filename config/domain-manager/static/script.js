@@ -126,7 +126,54 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderTable(data) {
         domainsBody.innerHTML = '';
-        data.forEach(domain => addRow(domain));
+        data.forEach(domain => {
+            if (domain.enabled !== false) {
+                addRow(domain);
+            }
+        });
+        renderArchivedTable();
+    }
+
+    function renderArchivedTable() {
+        if (!archivedDomainsBody) return;
+        archivedDomainsBody.innerHTML = '';
+        const archived = allDomains.filter(d => d.enabled === false);
+
+        if (archived.length === 0) {
+            // Optional: Hide section or show message
+        }
+
+        archived.forEach(data => {
+            const tr = document.createElement('tr');
+            const root = data._root_domain || '-';
+            // Use lighter/grayed out style or same colors? User asked specifically for the table.
+            // Style.css says background #f9fafb.
+
+            tr.innerHTML = `
+                <td class="root-domain-cell">${root}</td>
+                <td><input type="text" class="data-input" value="${data.domain || ''}" disabled></td>
+                <td><input type="text" class="data-input" value="${data.redirection || ''}" disabled></td>
+                <td><input type="text" class="data-input" value="${data.docker_service || ''}" disabled></td>
+                <td><input type="text" class="data-input" value="${data.anubis_subdomain || ''}" disabled></td>
+                <td><input type="text" class="data-input" value="${data.rate || ''}" disabled></td>
+                <td><input type="text" class="data-input" value="${data.burst || ''}" disabled></td>
+                <td><input type="text" class="data-input" value="${data.concurrency || ''}" disabled></td>
+                <td>
+                    <button class="btn btn-success btn-sm restore-row-btn" title="Restore record">
+                        <i data-lucide="rotate-ccw"></i>
+                    </button>
+                </td>
+            `;
+
+            tr.querySelector('.restore-row-btn').addEventListener('click', () => {
+                data.enabled = true;
+                updateRootColors();
+                applyFilterAndSort();
+            });
+
+            deletedDomainsBody.appendChild(tr);
+            if (window.lucide) lucide.createIcons({ root: tr });
+        });
     }
 
     function addRow(data = {}) {
@@ -142,7 +189,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 rate: data.rate || '',
                 burst: data.burst || '',
                 concurrency: data.concurrency || '',
-                _root_domain: getRootDomain(data.domain || '')
+                burst: data.burst || '',
+                concurrency: data.concurrency || '',
+                _root_domain: getRootDomain(data.domain || ''),
+                enabled: true
             };
             allDomains.push(newDomain);
         }
@@ -291,15 +341,14 @@ document.addEventListener('DOMContentLoaded', () => {
     exportBtn.addEventListener('click', () => {
         // Headers matching the CSV structure in the backend
         const headers = ['domain', 'redirection', 'docker_service', 'anubis_subdomain', 'rate', 'burst', 'concurrency'];
-        const rows = allDomains.filter(d => d.domain && d.domain.trim() !== '').map(d => {
-            return headers.map(header => {
-                // Escape quotes if necessary, though simple CSV here might not strictly need it for these fields
-                return d[header] || '';
-            }).join(',');
-        });
-
         const csvContent = "# " + headers.join(', ') + "\n\n"
-            + rows.join('\n');
+            + allDomains.map(d => {
+                let rowData = headers.map(header => d[header] || '').join(',');
+                if (d.enabled === false) {
+                    return '# ' + rowData;
+                }
+                return rowData;
+            }).join('\n');
 
         const encodedUri = "data:text/csv;charset=utf-8," + encodeURIComponent(csvContent);
         const link = document.createElement("a");
@@ -344,19 +393,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let confirmAction = 'delete'; // 'delete' or 'restart'
 
+    const deletedDomainsBody = document.getElementById('deleted-domains-body');
+
     confirmDeleteBtn.addEventListener('click', () => {
         if (confirmAction === 'delete') {
             if (rowToDelete) {
                 const id = rowToDelete.dataset.id;
-                allDomains = allDomains.filter(d => d._id !== id);
-                rowToDelete.remove();
+                const domainObj = allDomains.find(d => d._id === id);
+                if (domainObj) {
+                    domainObj.enabled = false; // Soft delete
+                    updateRootColors();
+                    applyFilterAndSort(); // Re-renders active table
+                    renderDeletedTable(); // Updates deleted table
+                }
                 rowToDelete = null;
-                updateRootColors();
-                // Refresh remaining rows
-                document.querySelectorAll('#domains-body tr').forEach(row => {
-                    const r = row.querySelector('.root-domain-cell').textContent;
-                    row.style.backgroundColor = getColorForRoot(r);
-                });
             }
             confirmModal.classList.remove('show');
         } else if (confirmAction === 'restart') {
