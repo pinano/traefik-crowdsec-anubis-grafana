@@ -72,7 +72,7 @@ def validate_domain_data(entry):
     allowed_pattern = re.compile(r'^[a-zA-Z0-9\.\-\_\/]+$')
     
     # Text fields that shouldn't contain weird characters
-    fields_to_check = ['domain', 'redirection', 'docker_service', 'anubis_subdomain']
+    fields_to_check = ['domain', 'redirection', 'service_name', 'anubis_subdomain']
     
     if not entry.get('domain'): 
         return False # Domain is mandatory
@@ -127,7 +127,7 @@ def read_csv():
                 row[0] = clean_domain
             
             # Ensure row has enough columns (7 based on template)
-            # domain, redirection, docker_service, anubis_subdomain, rate, burst, concurrency
+            # domain, redirection, service_name, anubis_subdomain, rate, burst, concurrency
             # pad if necessary
             while len(row) < 7:
                 row.append('')
@@ -135,7 +135,7 @@ def read_csv():
             data.append({
                 'domain': row[0].strip(),
                 'redirection': row[1].strip(),
-                'docker_service': row[2].strip(),
+                'service_name': row[2].strip(),
                 'anubis_subdomain': row[3].strip(),
                 'rate': row[4].strip(),
                 'burst': row[5].strip(),
@@ -147,7 +147,7 @@ def read_csv():
 def write_csv(data):
     # Preserving comments is hard with simple csv writer.
     # We will overwrite but try to keep the header.
-    header = "# domain, redirection, docker_service, anubis_subdomain, rate, burst, concurrency"
+    header = "# domain, redirection, service_name, anubis_subdomain, rate, burst, concurrency"
     
     with open(CSV_PATH, mode='w', encoding='utf-8', newline='') as f:
         f.write(header + '\n\n')
@@ -164,7 +164,7 @@ def write_csv(data):
             writer.writerow([
                 domain_val,
                 entry['redirection'],
-                entry['docker_service'],
+                entry['service_name'],
                 entry['anubis_subdomain'],
                 entry['rate'],
                 entry['burst'],

@@ -155,14 +155,14 @@ document.addEventListener('DOMContentLoaded', () => {
             // Style.css says background #f9fafb.
 
             tr.innerHTML = `
-                <td class="root-domain-cell">${root}</td>
-                <td><input type="text" class="data-input" value="${data.domain || ''}" disabled></td>
-                <td><input type="text" class="data-input" value="${data.redirection || ''}" disabled></td>
-                <td><input type="text" class="data-input" value="${data.docker_service || ''}" disabled></td>
-                <td><input type="text" class="data-input" value="${data.anubis_subdomain || ''}" disabled></td>
-                <td><input type="text" class="data-input" value="${data.rate || ''}" disabled></td>
-                <td><input type="text" class="data-input" value="${data.burst || ''}" disabled></td>
-                <td><input type="text" class="data-input" value="${data.concurrency || ''}" disabled></td>
+                <td class="root-domain-cell" data-label="Root Domain">${root}</td>
+                <td data-label="Domain"><input type="text" class="data-input" value="${data.domain || ''}" disabled></td>
+                <td data-label="Redirection"><input type="text" class="data-input" value="${data.redirection || ''}" disabled></td>
+                <td data-label="Service"><input type="text" class="data-input" value="${data.service_name || ''}" disabled></td>
+                <td data-label="Anubis Subdomain"><input type="text" class="data-input" value="${data.anubis_subdomain || ''}" disabled></td>
+                <td data-label="Rate"><input type="text" class="data-input" value="${data.rate || ''}" disabled></td>
+                <td data-label="Burst"><input type="text" class="data-input" value="${data.burst || ''}" disabled></td>
+                <td data-label="Concurrency"><input type="text" class="data-input" value="${data.concurrency || ''}" disabled></td>
                 <td>
                     <button class="btn btn-success btn-sm restore-row-btn" title="Restore record">
                         <i data-lucide="rotate-ccw"></i>
@@ -190,7 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 _id: id,
                 domain: data.domain || '',
                 redirection: data.redirection || '',
-                docker_service: data.docker_service || '',
+                service_name: data.service_name || '',
                 anubis_subdomain: data.anubis_subdomain || '',
                 rate: data.rate || '',
                 burst: data.burst || '',
@@ -215,8 +215,8 @@ document.addEventListener('DOMContentLoaded', () => {
             <td class="root-domain-cell" data-label="Root Domain">${root || '-'}</td>
             <td data-label="Domain"><input type="text" class="data-input" data-key="domain" value="${data.domain || ''}" placeholder="example.com"></td>
             <td data-label="Redirection"><input type="text" class="data-input" data-key="redirection" value="${data.redirection || ''}" placeholder="www.example.com"></td>
-            <td data-label="Docker Service">
-                <input type="text" class="data-input service-input" data-key="docker_service" value="${data.docker_service || ''}" placeholder="my-service" autocomplete="off">
+            <td data-label="Service">
+                <input type="text" class="data-input service-input" data-key="service_name" value="${data.service_name || ''}" placeholder="my-service" autocomplete="off">
             </td>
             <td data-label="Anubis Subdomain"><input type="text" class="data-input" data-key="anubis_subdomain" value="${data.anubis_subdomain || ''}" placeholder="anubis"></td>
             <td data-label="Rate"><input type="text" class="data-input" data-key="rate" value="${data.rate || ''}" placeholder="50"></td>
@@ -336,7 +336,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     exportBtn.addEventListener('click', () => {
         // Headers matching the CSV structure in the backend
-        const headers = ['domain', 'redirection', 'docker_service', 'anubis_subdomain', 'rate', 'burst', 'concurrency'];
+        const headers = ['domain', 'redirection', 'service_name', 'anubis_subdomain', 'rate', 'burst', 'concurrency'];
         const csvContent = "# " + headers.join(', ') + "\n\n"
             + allDomains.map(d => {
                 let rowData = headers.map(header => d[header] || '').join(',');

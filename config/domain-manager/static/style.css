@@ -412,19 +412,32 @@ input:focus {
     background-color: #e2e8f0;
 }
 
-.sortable i {
-    display: inline-block;
+.sortable .sort-icon {
+    display: none;
     vertical-align: middle;
     width: 14px;
     height: 14px;
     margin-left: 0.35rem;
-    opacity: 0.5;
     flex-shrink: 0;
 }
 
-.sortable.asc i,
-.sortable.desc i {
-    opacity: 1;
+.sortable .sort-icon.default {
+    display: inline-block;
+    opacity: 0.5;
+}
+
+.sortable.asc .sort-icon.default,
+.sortable.desc .sort-icon.default {
+    display: none;
+}
+
+.sortable.asc .sort-icon.asc {
+    display: inline-block;
+    color: var(--primary-color);
+}
+
+.sortable.desc .sort-icon.desc {
+    display: inline-block;
     color: var(--primary-color);
 }
 
