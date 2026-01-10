@@ -909,3 +909,31 @@ body.has-notification {
     border: 2px solid white;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
+
+/* Disabled Button Style */
+button:disabled {
+    background-color: #cbd5e1 !important;
+    /* Slate-300 */
+    border-color: #cbd5e1 !important;
+    color: #64748b !important;
+    /* Slate-500 */
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* Unsaved Row Highlight */
+.row-unsaved {
+    background-color: #fff7ed !important;
+    /* Orange-50 */
+    box-shadow: inset 3px 0 0 0 #f97316 !important;
+    /* Orange-500 border indicator */
+    transition: background-color 0.3s;
+}
+
+/* Ensure unsaved input fields stand out slightly */
+.row-unsaved .data-input {
+    background-color: #fff;
+    border-color: #fdba74;
+    /* Orange-300 */
+}

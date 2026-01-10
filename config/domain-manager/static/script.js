@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let allDomains = [];
     let allServices = [];
-    let currentSort = { column: null, direction: 'asc' };
+    let currentSort = { column: '_root_domain', direction: 'asc' };
     let rowToDelete = null;
 
     function getRootDomain(domain) {
@@ -198,14 +198,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 burst: data.burst || '',
                 concurrency: data.concurrency || '',
                 _root_domain: getRootDomain(data.domain || ''),
-                enabled: true
+                enabled: true,
+                _unsaved: true // Mark as unsaved
             };
             allDomains.push(newDomain);
             markUnsavedChanges();
         }
 
         const tr = document.createElement('tr');
-        if (!data._id) tr.classList.add('row-unsaved');
+        if (!data._id || data._unsaved) tr.classList.add('row-unsaved');
         tr.dataset.id = id;
         const root = data._root_domain || getRootDomain(data.domain);
         tr.style.backgroundColor = getColorForRoot(root);
@@ -233,6 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const domainObj = allDomains.find(d => d._id === id);
             if (domainObj) {
                 domainObj[key] = value.trim();
+                domainObj._unsaved = true; // Mark as unsaved
                 if (key === 'domain') {
                     domainObj._root_domain = getRootDomain(value.trim());
                     // Update visual cell immediately
@@ -511,12 +513,11 @@ document.addEventListener('DOMContentLoaded', () => {
         saveBtn.classList.remove('btn-save-needed');
         saveBtn.disabled = true;
 
-        // Clear unsaved styling from rows
+        // Clear unsaved styling from rows and state
         document.querySelectorAll('.row-unsaved').forEach(row => {
             row.classList.remove('row-unsaved');
-            // Re-apply original root color if needed, though CSS !important override handles the toggle.
-            // The existing style.backgroundColor is inline, so specific selector !important is good.
         });
+        allDomains.forEach(d => d._unsaved = false);
     }
 
     function renderGlobalDropdown(filter = '') {
