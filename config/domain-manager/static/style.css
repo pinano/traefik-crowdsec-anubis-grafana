@@ -59,9 +59,23 @@ header {
     color: var(--primary-color);
 }
 
-.logo p {
+.logo .subtitle-link {
     font-size: 0.875rem;
     color: var(--text-muted);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    transition: color 0.2s;
+}
+
+.logo .subtitle-link:hover {
+    color: var(--primary-color);
+}
+
+.logo .subtitle-link i {
+    width: 14px;
+    height: 14px;
 }
 
 .actions {
@@ -619,7 +633,12 @@ input:focus {
     }
 
     /* Card View for Table */
-    table, thead, tbody, th, td, tr {
+    table,
+    thead,
+    tbody,
+    th,
+    td,
+    tr {
         display: block;
     }
 
@@ -633,7 +652,7 @@ input:focus {
         margin-bottom: 1rem;
         border: 1px solid var(--border-color);
         border-radius: 0.5rem;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
         background: var(--card-bg);
         overflow: hidden;
     }
@@ -672,7 +691,7 @@ input:focus {
         text-transform: uppercase;
         content: attr(data-label);
     }
-    
+
     td:last-child:before {
         content: none;
     }
@@ -686,17 +705,18 @@ input:focus {
     }
 
     /* Input adjustments for mobile */
-    input[type="text"], 
-    input[type="password"], 
+    input[type="text"],
+    input[type="password"],
     input[type="number"] {
-        font-size: 16px; /* Prevent zoom on iOS */
+        font-size: 16px;
+        /* Prevent zoom on iOS */
     }
 
     /* Width overrides for card view */
     td:nth-child(n) {
         width: 100%;
     }
-    
+
     .remove-row-btn {
         width: 100%;
         justify-content: center;
@@ -704,7 +724,7 @@ input:focus {
         color: var(--danger-color);
         border: 1px solid #fecaca;
     }
-    
+
     .remove-row-btn:hover {
         background-color: var(--danger-color);
         color: white;
