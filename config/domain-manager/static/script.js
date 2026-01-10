@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const logContainer = document.getElementById('log-container');
     const closeModalBtn = document.getElementById('close-modal-btn');
     const restartNotification = document.getElementById('restart-notification');
+    const unsavedNotification = document.getElementById('unsaved-notification');
 
     // Modal elements for Confirmation
     const confirmModal = document.getElementById('confirm-modal');
@@ -198,6 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 enabled: true
             };
             allDomains.push(newDomain);
+            markUnsavedChanges();
         }
 
         const tr = document.createElement('tr');
@@ -253,6 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tr.querySelectorAll('.data-input').forEach(input => {
             input.addEventListener('input', (e) => {
                 updateTruth(e.target.dataset.key, e.target.value);
+                markUnsavedChanges();
             });
         });
 
@@ -333,6 +336,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (response.ok) {
                 if (showSuccess) showToast('Changes saved successfully');
+                clearUnsavedChanges();
                 markRestartNeeded();
             } else {
                 showToast('Error saving changes', 'danger');
@@ -501,9 +505,28 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function markRestartNeeded() {
-        restartNotification.classList.add('show');
-        document.body.classList.add('has-notification');
+        // Only show restart needed if not currently showing unsaved changes (priority to unsaved)
+        if (!unsavedNotification.classList.contains('show')) {
+            restartNotification.classList.add('show');
+            document.body.classList.add('has-notification');
+        }
+
         restartBtn.classList.add('btn-restart-needed');
+    }
+
+    function markUnsavedChanges() {
+        unsavedNotification.classList.add('show');
+        restartNotification.classList.remove('show'); // Unsaved takes priority for banners
+        document.body.classList.add('has-notification');
+        saveBtn.classList.add('btn-save-needed');
+    }
+
+    function clearUnsavedChanges() {
+        unsavedNotification.classList.remove('show');
+        saveBtn.classList.remove('btn-save-needed');
+        // Body class removal handled by whoever calls this if they don't immediately show another banner
+        // But usually tracking clean state is complex.
+        // For our simple flow: save -> unsaved gone, restart needed appears.
     }
 
     loadDomains();
