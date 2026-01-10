@@ -35,23 +35,33 @@ document.addEventListener('DOMContentLoaded', () => {
         return parts.slice(-2).join('.');
     }
 
+    // State for root domain colors
+    let rootColorMap = new Map();
+
+    function updateRootColors() {
+        // Extract unique roots, filter empty/invalid, and sort consistently
+        const roots = [...new Set(allDomains.map(d => d._root_domain || getRootDomain(d.domain)))]
+            .filter(r => r && r !== '-')
+            .sort((a, b) => a.localeCompare(b));
+
+        rootColorMap.clear();
+
+        if (roots.length === 0) return;
+
+        roots.forEach((root, index) => {
+            // Map index to Hue 0-360
+            // We leave a small gap at the end so 0 and 360 don't clash if the list wraps
+            const h = Math.floor((index / roots.length) * 360);
+
+            // Consistent pastel settings
+            // Saturation 85%, Lightness 92%
+            rootColorMap.set(root, `hsl(${h}, 85%, 92%)`);
+        });
+    }
+
     function getColorForRoot(rootDomain) {
         if (!rootDomain || rootDomain === '-') return 'transparent';
-
-        let hash = 0;
-        for (let i = 0; i < rootDomain.length; i++) {
-            hash = (rootDomain.charCodeAt(i) * 31) + ((hash << 5) - hash);
-            hash = hash & hash; // Convert to 32bit integer
-        }
-
-        // Use HSL for consistent pastel look but with more distinction
-        // Hue: 0-360
-        // Saturation: 70-90% (More vibrant)
-        // Lightness: 88-94% (Slightly deeper to show color better)
-        const h = Math.abs(hash) % 360;
-        const s = 70 + (Math.abs(hash) % 21);
-        const l = 88 + (Math.abs(hash) % 7);
-        return `hsl(${h}, ${s}%, ${l}%)`;
+        return rootColorMap.get(rootDomain) || 'transparent';
     }
 
     function showToast(message, type = 'info') {
@@ -71,6 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 _id: crypto.randomUUID(),
                 _root_domain: getRootDomain(d.domain)
             }));
+            updateRootColors();
             applyFilterAndSort();
         } catch (error) {
             showToast('Error loading domains', 'danger');
@@ -175,7 +186,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (rootCell) rootCell.textContent = newRoot;
 
                     // Update background color
-                    tr.style.backgroundColor = getColorForRoot(domainObj._root_domain);
+                    updateRootColors();
+                    // Need to refresh ALL rows because relative positioning might have changed
+                    document.querySelectorAll('#domains-body tr').forEach(row => {
+                        const r = row.querySelector('.root-domain-cell').textContent;
+                        row.style.backgroundColor = getColorForRoot(r);
+                    });
                 }
             }
         };
@@ -335,6 +351,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 allDomains = allDomains.filter(d => d._id !== id);
                 rowToDelete.remove();
                 rowToDelete = null;
+                updateRootColors();
+                // Refresh remaining rows
+                document.querySelectorAll('#domains-body tr').forEach(row => {
+                    const r = row.querySelector('.root-domain-cell').textContent;
+                    row.style.backgroundColor = getColorForRoot(r);
+                });
             }
             confirmModal.classList.remove('show');
         } else if (confirmAction === 'restart') {
