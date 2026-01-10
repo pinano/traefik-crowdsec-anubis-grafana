@@ -427,6 +427,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Hide notification
         restartNotification.classList.remove('show');
+        document.body.classList.remove('has-notification');
         restartBtn.classList.remove('btn-restart-needed');
 
         const eventSource = new EventSource(`/api/restart-stream?csrf_token=${csrfToken}`);
@@ -493,6 +494,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function markRestartNeeded() {
         restartNotification.classList.add('show');
+        document.body.classList.add('has-notification');
         restartBtn.classList.add('btn-restart-needed');
     }
 
