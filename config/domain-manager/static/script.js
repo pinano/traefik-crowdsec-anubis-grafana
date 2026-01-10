@@ -174,7 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 data.enabled = true;
                 updateRootColors();
                 applyFilterAndSort();
-                saveDomains(); // Auto-save on restore
+                markUnsavedChanges();
             });
 
             deletedDomainsBody.appendChild(tr);
@@ -395,7 +395,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     updateRootColors();
                     applyFilterAndSort(); // Re-renders active table
                     renderDeletedTable(); // Updates deleted table
-                    saveDomains(); // Auto-save on delete
+                    markUnsavedChanges();
                 }
                 rowToDelete = null;
             }
@@ -501,11 +501,13 @@ document.addEventListener('DOMContentLoaded', () => {
         restartNotification.classList.remove('show'); // Unsaved takes priority for banners
         document.body.classList.add('has-notification');
         saveBtn.classList.add('btn-save-needed');
+        saveBtn.disabled = false;
     }
 
     function clearUnsavedChanges() {
         unsavedNotification.classList.remove('show');
         saveBtn.classList.remove('btn-save-needed');
+        saveBtn.disabled = true;
         // Body class removal handled by whoever calls this if they don't immediately show another banner
         // But usually tracking clean state is complex.
         // For our simple flow: save -> unsaved gone, restart needed appears.
