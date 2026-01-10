@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const restartModal = document.getElementById('restart-modal');
     const logContainer = document.getElementById('log-container');
     const closeModalBtn = document.getElementById('close-modal-btn');
+    const restartNotification = document.getElementById('restart-notification');
 
     // Modal elements for Confirmation
     const confirmModal = document.getElementById('confirm-modal');
@@ -332,6 +333,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (response.ok) {
                 if (showSuccess) showToast('Changes saved successfully');
+                markRestartNeeded();
             } else {
                 showToast('Error saving changes', 'danger');
             }
@@ -423,6 +425,10 @@ document.addEventListener('DOMContentLoaded', () => {
         logContainer.textContent = 'Connecting to restart stream...\n';
         closeModalBtn.style.display = 'none';
 
+        // Hide notification
+        restartNotification.classList.remove('show');
+        restartBtn.classList.remove('btn-restart-needed');
+
         const eventSource = new EventSource(`/api/restart-stream?csrf_token=${csrfToken}`);
 
         eventSource.onmessage = (event) => {
@@ -484,6 +490,11 @@ document.addEventListener('DOMContentLoaded', () => {
             applyFilterAndSort();
         });
     });
+
+    function markRestartNeeded() {
+        restartNotification.classList.add('show');
+        restartBtn.classList.add('btn-restart-needed');
+    }
 
     loadDomains();
     loadServices();
