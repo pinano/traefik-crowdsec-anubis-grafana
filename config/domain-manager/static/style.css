@@ -684,6 +684,16 @@ input:focus {
         width: 100%;
     }
 
+    /* Remove table container styling on mobile to avoid double-boxing */
+    .table-container {
+        background-color: transparent;
+        border: none;
+        box-shadow: none;
+        padding: 0;
+        overflow: visible;
+        /* Allow card shadows to show */
+    }
+
     /* Card View for Table */
     table,
     thead,

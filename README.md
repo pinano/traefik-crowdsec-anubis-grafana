@@ -240,6 +240,7 @@ The Domain Manager provides a user-friendly web interface (`https://domains.<dom
 
 - **Real-time Updates**: Changes are applied immediately to the infrastructure.
 - **Root Domain Grouping**: Automatically identifies and color-codes services by their root domain for better organization.
+- **Strict Service Selection**: Dropdown automatically lists running Docker containers and detects `apache-host` availability (if Apache logs are present).
 - **Security Defaults**: Enforces safe defaults for rate-limiting and Anubis protection.
 - **Resource Discovery**: Lists currently running Docker containers to simplify service assignment.
 
@@ -774,7 +775,9 @@ To include Apache host logs in the Grafana/Loki observability pipeline, the stac
 #### How It Works
 
 1. **Automatic Detection**: `start.sh` checks for `/var/log/apache2` directory
-2. **Volume Mount**: If found, mounts the logs into the Alloy container
+2. **Volume Mount**: If found, mounts the logs into:
+    - **Alloy container**: For log processing and aggregation.
+    - **Domain Manager container**: To verify Apache presence and enable the `apache-host` option in the UI.
 3. **Log Parsing**: Alloy processes both access and error logs with proper label extraction
 
 #### Parsed Labels
