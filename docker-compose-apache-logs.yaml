@@ -8,3 +8,8 @@ services:
   alloy:
     volumes:
       - /var/log/apache2:/var/log/apache2:ro
+
+  # Mount Apache logs so Domain Manager detects them and enables 'apache-host' service option
+  domain-manager:
+    volumes:
+      - /var/log/apache2:/var/log/apache2:ro
