@@ -216,7 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <td data-label="Domain"><input type="text" class="data-input" data-key="domain" value="${data.domain || ''}" placeholder="example.com"></td>
             <td data-label="Redirection"><input type="text" class="data-input" data-key="redirection" value="${data.redirection || ''}" placeholder="www.example.com"></td>
             <td data-label="Service">
-                <input type="text" class="data-input service-input" data-key="service_name" value="${data.service_name || ''}" placeholder="my-service" autocomplete="off">
+                <input type="text" class="data-input service-input" data-key="service_name" value="${data.service_name || ''}" placeholder="Select service" readonly style="cursor: pointer;">
             </td>
             <td data-label="Anubis Subdomain"><input type="text" class="data-input" data-key="anubis_subdomain" value="${data.anubis_subdomain || ''}" placeholder="anubis"></td>
             <td data-label="Rate"><input type="text" class="data-input" data-key="rate" value="${data.rate || ''}" placeholder="50"></td>
@@ -265,17 +265,17 @@ document.addEventListener('DOMContentLoaded', () => {
         // Global Dropdown Integration
         const serviceInput = tr.querySelector('.service-input');
 
-        serviceInput.addEventListener('focus', () => {
+        const showDropdown = () => {
             activeServiceInput = serviceInput;
-            renderGlobalDropdown(serviceInput.value);
+            renderGlobalDropdown(''); // Show all
             updateGlobalDropdownPosition();
-        });
+        };
 
-        serviceInput.addEventListener('input', (e) => {
-            activeServiceInput = serviceInput;
-            renderGlobalDropdown(e.target.value);
-            updateGlobalDropdownPosition();
-        });
+        serviceInput.addEventListener('focus', showDropdown);
+        serviceInput.addEventListener('click', showDropdown);
+
+        // Remove the input listener that filtered the list since it's now readonly
+        // We still rely on the 'input' event dispatched manually from the dropdown item click to update truth
 
         // Update position on scroll could be complex, for now we close it on global scroll/resize or just let it float.
         // Usually creating a scroll listener on parent containers is needed to keep it attached. 

@@ -35,6 +35,15 @@ body {
     line-height: 1.5;
 }
 
+/* Enforce font on form elements */
+button,
+input,
+optgroup,
+select,
+textarea {
+    font-family: 'Roboto Condensed', sans-serif;
+}
+
 .container {
     max-width: 1800px;
     margin: 0 auto;
