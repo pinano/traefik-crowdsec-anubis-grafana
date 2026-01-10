@@ -466,48 +466,47 @@ document.addEventListener('DOMContentLoaded', () => {
         confirmDeleteBtn.textContent = 'Delete';
     });
 
-});
+    const addRowTopBtn = document.getElementById('add-row-top-btn');
+    if (addRowTopBtn) {
+        addRowTopBtn.addEventListener('click', () => {
+            addRow();
+            domainsBody.lastElementChild.querySelector('input').focus();
+        });
+    }
 
-const addRowTopBtn = document.getElementById('add-row-top-btn');
-if (addRowTopBtn) {
-    addRowTopBtn.addEventListener('click', () => {
+    addRowBtn.addEventListener('click', () => {
         addRow();
         domainsBody.lastElementChild.querySelector('input').focus();
     });
-}
 
-addRowBtn.addEventListener('click', () => {
-    addRow();
-    domainsBody.lastElementChild.querySelector('input').focus();
-});
-
-searchInput.addEventListener('input', () => {
-    applyFilterAndSort();
-});
-
-sortableHeaders.forEach(header => {
-    header.addEventListener('click', () => {
-        const column = header.dataset.sort;
-        if (currentSort.column === column) {
-            currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
-        } else {
-            currentSort.column = column;
-            currentSort.direction = 'asc';
-        }
-
-        sortableHeaders.forEach(h => h.classList.remove('asc', 'desc'));
-        header.classList.add(currentSort.direction);
-
+    searchInput.addEventListener('input', () => {
         applyFilterAndSort();
     });
+
+    sortableHeaders.forEach(header => {
+        header.addEventListener('click', () => {
+            const column = header.dataset.sort;
+            if (currentSort.column === column) {
+                currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSort.column = column;
+                currentSort.direction = 'asc';
+            }
+
+            sortableHeaders.forEach(h => h.classList.remove('asc', 'desc'));
+            header.classList.add(currentSort.direction);
+
+            applyFilterAndSort();
+        });
+    });
+
+    function markRestartNeeded() {
+        restartNotification.classList.add('show');
+        document.body.classList.add('has-notification');
+        restartBtn.classList.add('btn-restart-needed');
+    }
+
+    loadDomains();
+    loadServices();
 });
-
-function markRestartNeeded() {
-    restartNotification.classList.add('show');
-    document.body.classList.add('has-notification');
-    restartBtn.classList.add('btn-restart-needed');
-}
-
-loadDomains();
-loadServices();
 });
