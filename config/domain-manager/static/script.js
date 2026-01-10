@@ -15,6 +15,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeModalBtn = document.getElementById('close-modal-btn');
     const restartNotification = document.getElementById('restart-notification');
     const unsavedNotification = document.getElementById('unsaved-notification');
+    const globalDropdown = document.getElementById('global-service-dropdown');
+    let activeServiceInput = null;
 
     // Modal elements for Confirmation
     const confirmModal = document.getElementById('confirm-modal');
@@ -212,10 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <td data-label="Domain"><input type="text" class="data-input" data-key="domain" value="${data.domain || ''}" placeholder="example.com"></td>
             <td data-label="Redirection"><input type="text" class="data-input" data-key="redirection" value="${data.redirection || ''}" placeholder="www.example.com"></td>
             <td data-label="Docker Service">
-                <div class="dropdown-container">
-                    <input type="text" class="data-input service-input" data-key="docker_service" value="${data.docker_service || ''}" placeholder="my-service" autocomplete="off">
-                    <div class="dropdown-menu"></div>
-                </div>
+                <input type="text" class="data-input service-input" data-key="docker_service" value="${data.docker_service || ''}" placeholder="my-service" autocomplete="off">
             </td>
             <td data-label="Anubis Subdomain"><input type="text" class="data-input" data-key="anubis_subdomain" value="${data.anubis_subdomain || ''}" placeholder="anubis"></td>
             <td data-label="Rate"><input type="text" class="data-input" data-key="rate" value="${data.rate || ''}" placeholder="50"></td>
@@ -259,41 +258,24 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
-        // Custom Dropdown Logic
+        // Global Dropdown Integration
         const serviceInput = tr.querySelector('.service-input');
-        const dropdownMenu = tr.querySelector('.dropdown-menu');
 
-        const renderDropdown = (filter = '') => {
-            const filtered = allServices.filter(s => s.toLowerCase().includes(filter.toLowerCase()));
-            dropdownMenu.innerHTML = '';
-            if (filtered.length === 0) {
-                dropdownMenu.classList.remove('show');
-                return;
-            }
-
-            filtered.forEach(service => {
-                const item = document.createElement('div');
-                item.className = 'dropdown-item';
-                item.textContent = service;
-                item.addEventListener('click', () => {
-                    serviceInput.value = service;
-                    updateTruth('docker_service', service);
-                    dropdownMenu.classList.remove('show');
-                });
-                dropdownMenu.appendChild(item);
-            });
-            dropdownMenu.classList.add('show');
-        };
-
-        serviceInput.addEventListener('focus', () => renderDropdown(serviceInput.value));
-        serviceInput.addEventListener('input', (e) => renderDropdown(e.target.value));
-
-        // Click outside to close
-        document.addEventListener('click', (e) => {
-            if (!tr.contains(e.target)) {
-                dropdownMenu.classList.remove('show');
-            }
+        serviceInput.addEventListener('focus', () => {
+            activeServiceInput = serviceInput;
+            renderGlobalDropdown(serviceInput.value);
+            updateGlobalDropdownPosition();
         });
+
+        serviceInput.addEventListener('input', (e) => {
+            activeServiceInput = serviceInput;
+            renderGlobalDropdown(e.target.value);
+            updateGlobalDropdownPosition();
+        });
+
+        // Update position on scroll could be complex, for now we close it on global scroll/resize or just let it float.
+        // Usually creating a scroll listener on parent containers is needed to keep it attached. 
+        // For simplicity, we just rely on it being open.
 
         tr.querySelector('.remove-row-btn').addEventListener('click', () => {
             rowToDelete = tr;
@@ -528,6 +510,59 @@ document.addEventListener('DOMContentLoaded', () => {
         // But usually tracking clean state is complex.
         // For our simple flow: save -> unsaved gone, restart needed appears.
     }
+
+    function renderGlobalDropdown(filter = '') {
+        if (!activeServiceInput) return;
+
+        const filtered = allServices.filter(s => s.toLowerCase().includes(filter.toLowerCase()));
+        globalDropdown.innerHTML = '';
+
+        if (filtered.length === 0) {
+            globalDropdown.classList.remove('show');
+            return;
+        }
+
+        filtered.forEach(service => {
+            const item = document.createElement('div');
+            item.className = 'dropdown-item';
+            item.textContent = service;
+            item.addEventListener('click', () => {
+                activeServiceInput.value = service;
+                // Dispatch input event to trigger updateTruth and unsaved tracking
+                activeServiceInput.dispatchEvent(new Event('input', { bubbles: true }));
+                globalDropdown.classList.remove('show');
+                activeServiceInput = null;
+            });
+            globalDropdown.appendChild(item);
+        });
+
+        globalDropdown.classList.add('show');
+    }
+
+    function updateGlobalDropdownPosition() {
+        if (!activeServiceInput || !globalDropdown.classList.contains('show')) return;
+        const rect = activeServiceInput.getBoundingClientRect();
+        globalDropdown.style.top = `${rect.bottom + window.scrollY}px`;
+        globalDropdown.style.left = `${rect.left + window.scrollX}px`;
+        globalDropdown.style.width = `${rect.width}px`;
+    }
+
+    // Close global dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+        if (activeServiceInput && !activeServiceInput.contains(e.target) && !globalDropdown.contains(e.target)) {
+            globalDropdown.classList.remove('show');
+            activeServiceInput = null;
+        }
+    });
+
+    // Reposition on window resize (optional but good)
+    window.addEventListener('resize', () => {
+        if (globalDropdown.classList.contains('show')) {
+            updateGlobalDropdownPosition();
+        } else {
+            activeServiceInput = null;
+        }
+    });
 
     loadDomains();
     loadServices();
