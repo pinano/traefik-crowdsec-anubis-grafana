@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const toast = document.getElementById('toast');
     const searchInput = document.getElementById('search-input');
     const sortableHeaders = document.querySelectorAll('th.sortable');
+    const deletedDomainsBody = document.getElementById('deleted-domains-body');
 
     // Modal elements for Restart
     const restartModal = document.getElementById('restart-modal');
@@ -131,19 +132,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 addRow(domain);
             }
         });
-        renderArchivedTable();
+        renderDeletedTable();
     }
 
-    function renderArchivedTable() {
-        if (!archivedDomainsBody) return;
-        archivedDomainsBody.innerHTML = '';
-        const archived = allDomains.filter(d => d.enabled === false);
+    function renderDeletedTable() {
+        if (!deletedDomainsBody) return;
+        deletedDomainsBody.innerHTML = '';
+        const deleted = allDomains.filter(d => d.enabled === false);
 
-        if (archived.length === 0) {
+        if (deleted.length === 0) {
             // Optional: Hide section or show message
         }
 
-        archived.forEach(data => {
+        deleted.forEach(data => {
             const tr = document.createElement('tr');
             const root = data._root_domain || '-';
             // Use lighter/grayed out style or same colors? User asked specifically for the table.
@@ -392,8 +393,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     let confirmAction = 'delete'; // 'delete' or 'restart'
-
-    const deletedDomainsBody = document.getElementById('deleted-domains-body');
 
     confirmDeleteBtn.addEventListener('click', () => {
         if (confirmAction === 'delete') {
