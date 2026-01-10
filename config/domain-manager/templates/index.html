@@ -117,6 +117,7 @@
     <script src="{{ url_for('static', filename='script.js') }}"></script>
     <script>
         const csrfToken = "{{ csrf_token() }}";
+        const stackDomain = "{{ domain }}";
         // Initialize Lucide icons
         lucide.createIcons();
     </script>
