@@ -293,12 +293,14 @@ def check_domain():
     domain_to_check = data.get('domain', '').strip()
     redirection_to_check = data.get('redirection', '').strip()
     service_to_check = data.get('service_name', '').strip()
+    anubis_subdomain = data.get('anubis_subdomain', '').strip()
     
     status_response = {
         'status': 'match', # Pessimistic default, starts match, changes on error
         'domain': {'status': 'match'},
         'redirection': {'status': 'skipped'},
-        'service': {'status': 'found'}
+        'service': {'status': 'found'},
+        'anubis': {'status': 'skipped'}
     }
     
     # 0. Global Host IP
@@ -342,6 +344,31 @@ def check_domain():
              status_response['status'] = 'mismatch'
         else:
              status_response['redirection']['status'] = 'match'
+    
+    # 2.5. Anubis Check
+    if anubis_subdomain and domain_to_check:
+        # Get root domain from domain_to_check
+        parts = domain_to_check.split('.')
+        if len(parts) >= 2:
+            root_domain = ".".join(parts[-2:])
+            anubis_full_domain = f"{anubis_subdomain}.{root_domain}"
+            anubis_ip = resolve_domain(anubis_full_domain)
+            
+            if not anubis_ip:
+                status_response['anubis'] = {'status': 'error', 'message': f'Resolution failed for {anubis_full_domain}'}
+                status_response['status'] = 'mismatch'
+            elif anubis_ip != expected_ip:
+                status_response['anubis'] = {
+                    'status': 'mismatch',
+                    'expected': expected_ip,
+                    'actual': anubis_ip
+                }
+                status_response['status'] = 'mismatch'
+            else:
+                status_response['anubis']['status'] = 'match'
+        else:
+             status_response['anubis'] = {'status': 'error', 'message': 'Invalid domain for Anubis check'}
+             status_response['status'] = 'mismatch'
     
     # 3. Service Check
     if service_to_check:

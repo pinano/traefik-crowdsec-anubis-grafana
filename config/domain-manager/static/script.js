@@ -488,6 +488,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const domain = domainInput ? domainInput.value.trim() : '';
                 const redirection = redirectionInput ? redirectionInput.value.trim() : '';
                 const serviceName = serviceInput ? serviceInput.value.trim() : '';
+                const anubisSubdomain = row.querySelector('input[data-key="anubis_subdomain"]')?.value.trim() || '';
 
                 const rowLabel = domain || `Row ${index + 1}`;
                 const domainId = row.dataset.id;
@@ -540,7 +541,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             body: JSON.stringify({
                                 domain: domain,
                                 redirection: redirection,
-                                service_name: serviceName
+                                service_name: serviceName,
+                                anubis_subdomain: anubisSubdomain
                             })
                         });
 
@@ -571,6 +573,15 @@ document.addEventListener('DOMContentLoaded', () => {
                             tooltip.push(msg);
                             globalErrors.push(`${rowLabel} (Service): ${msg}`);
                             if (serviceInput) serviceInput.classList.add('input-error');
+                            isError = true;
+                        }
+
+                        if (data.anubis.status === 'mismatch' || data.anubis.status === 'error') {
+                            const msg = data.anubis.message || `Anubis DNS Mismatch`;
+                            tooltip.push(msg);
+                            globalErrors.push(`${rowLabel} (Anubis): ${msg}`);
+                            const anubisInput = row.querySelector('input[data-key="anubis_subdomain"]');
+                            if (anubisInput) anubisInput.classList.add('input-error');
                             isError = true;
                         }
 
