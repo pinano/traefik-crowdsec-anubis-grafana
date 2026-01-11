@@ -114,6 +114,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function getCleanPayload(domainObj) {
+        return {
+            domain: (domainObj.domain || '').trim().toLowerCase(),
+            redirection: (domainObj.redirection || '').trim().toLowerCase(),
+            service_name: (domainObj.service_name || '').trim().toLowerCase(),
+            anubis_subdomain: (domainObj.anubis_subdomain || '').trim().toLowerCase(),
+            rate: (domainObj.rate || '').trim(),
+            burst: (domainObj.burst || '').trim(),
+            concurrency: (domainObj.concurrency || '').trim(),
+            enabled: !!domainObj.enabled
+        };
+    }
+
     async function loadDomains() {
         try {
             const response = await fetch('/api/domains');
@@ -126,7 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }));
             updateRootColors();
             // Store a "pristine" copy of the data (values only, no internal IDs)
-            pristineData = JSON.stringify(allDomains.map(({ _id, _root_domain, ...rest }) => rest));
+            pristineData = JSON.stringify(allDomains.map(getCleanPayload));
             applyFilterAndSort();
         } catch (error) {
             showToast('Error loading domains', 'danger');
@@ -320,7 +333,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Reactive update: when any input changes, update the source of truth
         tr.querySelectorAll('.data-input').forEach(input => {
             input.addEventListener('input', (e) => {
-                const val = e.target.value;
+                const val = e.target.value.toLowerCase();
+                e.target.value = val; // Force visual synchronization
                 updateTruth(e.target.dataset.key, val);
 
                 // Reset status on change
@@ -646,7 +660,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Strip internal IDs and temporary fields before saving and filter empty domains
         const payload = allDomains
             .filter(d => d.domain && d.domain.trim() !== '' && d.service_name && d.service_name.trim() !== '')
-            .map(({ _id, _root_domain, ...rest }) => rest);
+            .map(getCleanPayload);
 
         try {
             const response = await fetch('/api/domains', {
@@ -837,6 +851,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     searchInput.addEventListener('input', () => {
+        searchInput.value = searchInput.value.toLowerCase();
         applyFilterAndSort();
     });
 
