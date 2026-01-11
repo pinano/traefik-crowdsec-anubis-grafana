@@ -218,7 +218,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <td data-label="Domain"><input type="text" class="data-input" data-key="domain" value="${data.domain || ''}" placeholder="example.com"></td>
             <td data-label="Redirection"><input type="text" class="data-input" data-key="redirection" value="${data.redirection || ''}" placeholder="www.example.com"></td>
             <td data-label="Service">
-                <input type="text" class="data-input service-input" data-key="service_name" value="${data.service_name || ''}" placeholder="Select service" readonly style="cursor: pointer;">
+                <input type="text" class="data-input service-input" data-key="service_name" value="${data.service_name || ''}" placeholder="Type or select service" autocomplete="off">
             </td>
             <td data-label="Anubis Subdomain"><input type="text" class="data-input" data-key="anubis_subdomain" value="${data.anubis_subdomain || ''}" placeholder="anubis"></td>
             <td data-label="Rate"><input type="text" class="data-input" data-key="rate" value="${data.rate || ''}" placeholder="50"></td>
@@ -269,15 +269,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const showDropdown = () => {
             activeServiceInput = serviceInput;
-            renderGlobalDropdown(''); // Show all
+            renderGlobalDropdown(''); // Show all on focus/click
             updateGlobalDropdownPosition();
         };
 
         serviceInput.addEventListener('focus', showDropdown);
         serviceInput.addEventListener('click', showDropdown);
 
-        // Remove the input listener that filtered the list since it's now readonly
-        // We still rely on the 'input' event dispatched manually from the dropdown item click to update truth
+        // Add input listener for filtering
+        serviceInput.addEventListener('input', (e) => {
+            if (activeServiceInput === serviceInput) {
+                renderGlobalDropdown(e.target.value);
+                updateGlobalDropdownPosition();
+            }
+        });
 
         // Update position on scroll could be complex, for now we close it on global scroll/resize or just let it float.
         // Usually creating a scroll listener on parent containers is needed to keep it attached. 
@@ -339,6 +344,32 @@ document.addEventListener('DOMContentLoaded', () => {
     checkBtn.addEventListener('click', async () => {
         const rows = Array.from(domainsBody.querySelectorAll('tr'));
 
+        // Concurrency Control
+        const MAX_CONCURRENCY = 3;
+        const queue = [];
+        let activeCount = 0;
+
+        const processQueue = () => {
+            if (queue.length === 0 && activeCount === 0) {
+                // All done
+                return;
+            }
+
+            while (activeCount < MAX_CONCURRENCY && queue.length > 0) {
+                const task = queue.shift();
+                activeCount++;
+                task().finally(() => {
+                    activeCount--;
+                    processQueue();
+                });
+            }
+        };
+
+        const enqueue = (task) => {
+            queue.push(task);
+            processQueue();
+        };
+
         for (const row of rows) {
             const domainInput = row.querySelector('input[data-key="domain"]');
             const redirectionInput = row.querySelector('input[data-key="redirection"]');
@@ -361,20 +392,31 @@ document.addEventListener('DOMContentLoaded', () => {
             row.classList.remove('row-error');
             row.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
 
-            fetch('/api/check-domain', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrfToken
-                },
-                body: JSON.stringify({
-                    domain: domain,
-                    redirection: redirection,
-                    service_name: serviceName
-                })
-            })
-                .then(res => res.json())
-                .then(data => {
+            // Define the task
+            const task = async () => {
+                try {
+                    const response = await fetch('/api/check-domain', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrfToken
+                        },
+                        body: JSON.stringify({
+                            domain: domain,
+                            redirection: redirection,
+                            service_name: serviceName
+                        })
+                    });
+
+                    if (response.status === 429) {
+                        throw new Error('Too Many Requests');
+                    }
+
+                    if (!response.ok) { // Check for other HTTP errors
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const data = await response.json();
                     let tooltip = [];
                     let isError = false;
 
@@ -419,11 +461,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
 
                     if (window.lucide) lucide.createIcons({ root: statusCell });
-                })
-                .catch(err => {
-                    statusCell.innerHTML = '<i data-lucide="help-circle" style="color: #6b7280; width: 1.2rem; height: 1.2rem;"></i>';
+
+                } catch (err) {
+                    console.error("Check failed for " + domain, err);
+                    statusCell.innerHTML = '<i data-lucide="help-circle" style="color: #6b7280; width: 1.2rem; height: 1.2rem;" title="Check failed (possible rate limit)"></i>';
                     if (window.lucide) lucide.createIcons({ root: statusCell });
-                });
+                }
+            };
+
+            enqueue(task);
         }
     });
 
