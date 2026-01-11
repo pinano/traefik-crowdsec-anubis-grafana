@@ -82,6 +82,30 @@ header {
     color: var(--primary-color);
 }
 
+.help-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px;
+    margin-left: 0.5rem;
+    vertical-align: middle;
+}
+
+.help-btn:hover {
+    color: var(--primary-color);
+    transform: scale(1.1);
+}
+
+.help-btn i {
+    width: 18px;
+    height: 18px;
+}
+
 .logo .subtitle-link i {
     width: 14px;
     height: 14px;

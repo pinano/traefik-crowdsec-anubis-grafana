@@ -33,6 +33,9 @@
                     class="subtitle-link">
                     <i data-lucide="book-open"></i> Project Documentation
                 </a>
+                <button id="help-btn" class="help-btn" title="Usage Instructions">
+                    <i data-lucide="help-circle"></i>
+                </button>
             </div>
             <div class="actions">
                 <button id="check-btn" class="btn btn-info" style="color: white; background-color: #0ea5e9;">
@@ -177,6 +180,88 @@
             <div class="modal-footer">
                 <button id="cancel-delete-btn" class="btn btn-secondary">Cancel</button>
                 <button id="confirm-delete-btn" class="btn btn-danger">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div id="help-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Usage Instructions</h2>
+                <button id="close-help-btn" class="toast-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="help-section">
+                    <h3
+                        style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color);">
+                        <i data-lucide="check-circle" style="color: var(--success-color);"></i> Status Indicators
+                    </h3>
+                    <p style="margin-bottom: 0.75rem;">The <strong>Check</strong> column shows the real-time status of
+                        each record:</p>
+                    <ul class="help-list" style="list-style: none; padding-left: 0;">
+                        <li style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.5rem;">
+                            <i data-lucide="help-circle" style="color: #94a3b8; flex-shrink: 0; margin-top: 2px;"></i>
+                            <span><strong>Pending:</strong> Record hasn't been validated yet or was recently
+                                modified.</span>
+                        </li>
+                        <li style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.5rem;">
+                            <i data-lucide="loader-2" class="animate-spin"
+                                style="color: #666; flex-shrink: 0; margin-top: 2px;"></i>
+                            <span><strong>Validating:</strong> Checking DNS records and Docker services.</span>
+                        </li>
+                        <li style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.5rem;">
+                            <i data-lucide="check-circle" style="color: #059669; flex-shrink: 0; margin-top: 2px;"></i>
+                            <span><strong>Valid:</strong> DNS resolves correctly to this host and the service
+                                exists.</span>
+                        </li>
+                        <li style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.5rem;">
+                            <i data-lucide="x-circle" style="color: #7f1d1d; flex-shrink: 0; margin-top: 2px;"></i>
+                            <span><strong>Invalid:</strong> There is an issue (DNS mismatch, service missing, etc.).
+                                Hover to see details.</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="help-section" style="margin-top: 1.5rem;">
+                    <h3
+                        style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; color: var(--primary-color);">
+                        <i data-lucide="edit-3"></i> Editing & Actions
+                    </h3>
+                    <ul class="help-list" style="list-style: none; padding-left: 0;">
+                        <li style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.5rem;">
+                            <i data-lucide="info" style="color: #f97316; flex-shrink: 0; margin-top: 2px;"></i>
+                            <span><strong>Unsaved Changes:</strong> Rows with pending changes are highlighted in <span
+                                    style="color: #f97316; font-weight: bold;">orange</span>.</span>
+                        </li>
+                        <li style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.5rem;">
+                            <i data-lucide="search"
+                                style="color: var(--primary-color); flex-shrink: 0; margin-top: 2px;"></i>
+                            <span><strong>Service Selection:</strong> Search from running containers or use
+                                <code>apache-host</code>.</span>
+                        </li>
+                        <li style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.5rem;">
+                            <i data-lucide="shield-check" style="color: #6366f1; flex-shrink: 0; margin-top: 2px;"></i>
+                            <span><strong>Anubis:</strong> Automatically verifies <code>subdomain.root_domain</code> DNS
+                                record.</span>
+                        </li>
+                        <li style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.5rem;">
+                            <i data-lucide="save"
+                                style="color: var(--primary-color); flex-shrink: 0; margin-top: 2px;"></i>
+                            <span><strong>Save Changes:</strong> Persists all records. All entries must be valid (Green)
+                                to save.</span>
+                        </li>
+                        <li style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.5rem;">
+                            <i data-lucide="refresh-cw"
+                                style="color: var(--danger-color); flex-shrink: 0; margin-top: 2px;"></i>
+                            <span><strong>Restart Stack:</strong> Applies changes. Only required if saved data actually
+                                changed.</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="close-help-footer-btn" class="btn btn-primary">Got it!</button>
             </div>
         </div>
     </div>

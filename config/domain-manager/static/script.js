@@ -27,6 +27,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const confirmMsg = document.getElementById('confirm-msg');
     const confirmTitle = document.getElementById('confirm-modal-title');
 
+    // Help Modal elements
+    const helpBtn = document.getElementById('help-btn');
+    const helpModal = document.getElementById('help-modal');
+    const closeHelpBtn = document.getElementById('close-help-btn');
+    const closeHelpFooterBtn = document.getElementById('close-help-footer-btn');
+
     let allDomains = [];
     let pristineData = ''; // JSON string of domains as they exist on server
     let allServices = [];
@@ -859,6 +865,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         restartBtn.classList.add('btn-restart-needed');
+    }
+
+    // Help Modal Event Listeners
+    if (helpBtn && helpModal) {
+        helpBtn.addEventListener('click', () => {
+            helpModal.classList.add('show');
+            if (window.lucide) lucide.createIcons({ root: helpModal });
+        });
+
+        const closeHelp = () => helpModal.classList.remove('show');
+        if (closeHelpBtn) closeHelpBtn.addEventListener('click', closeHelp);
+        if (closeHelpFooterBtn) closeHelpFooterBtn.addEventListener('click', closeHelp);
+
+        // Close on clicking overlay
+        helpModal.addEventListener('click', (e) => {
+            if (e.target === helpModal) closeHelp();
+        });
     }
 
     function markUnsavedChanges() {
