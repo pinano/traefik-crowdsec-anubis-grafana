@@ -127,20 +127,35 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
+    function refreshRowUnsavedState(tr, domainObj) {
+        if (!domainObj) return;
+        const currentState = JSON.stringify(getCleanPayload(domainObj));
+        if (domainObj._original && currentState === domainObj._original) {
+            tr.classList.remove('row-unsaved');
+        } else {
+            tr.classList.add('row-unsaved');
+        }
+    }
+
     async function loadDomains() {
         try {
             const response = await fetch('/api/domains');
             const data = await response.json();
             // Assign unique IDs for reactive tracking and calculate root domain
-            allDomains = data.map(d => ({
-                ...d,
-                _id: crypto.randomUUID(),
-                _root_domain: getRootDomain(d.domain)
-            }));
+            allDomains = data.map(d => {
+                const obj = {
+                    ...d,
+                    _id: crypto.randomUUID(),
+                    _root_domain: getRootDomain(d.domain)
+                };
+                obj._original = JSON.stringify(getCleanPayload(obj));
+                return obj;
+            });
             updateRootColors();
             // Store a "pristine" copy of the data (values only, no internal IDs)
             pristineData = JSON.stringify(allDomains.map(getCleanPayload));
             applyFilterAndSort();
+            refreshUnsavedUI();
         } catch (error) {
             showToast('Error loading domains', 'danger');
         }
@@ -237,7 +252,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 data.enabled = true;
                 updateRootColors();
                 applyFilterAndSort();
-                markUnsavedChanges();
+                refreshUnsavedUI();
             });
 
             deletedDomainsBody.appendChild(tr);
@@ -265,7 +280,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 _unsaved: true // Mark as unsaved
             };
             allDomains.push(newDomain);
-            markUnsavedChanges();
+            refreshUnsavedUI();
         }
 
         const tr = document.createElement('tr');
@@ -311,7 +326,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const domainObj = allDomains.find(d => d._id === id);
             if (domainObj) {
                 domainObj[key] = value.trim();
-                domainObj._unsaved = true; // Mark as unsaved
                 if (key === 'domain') {
                     domainObj._root_domain = getRootDomain(value.trim());
                     // Update visual cell immediately
@@ -342,13 +356,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (domainObj) {
                     domainObj._status = null;
                     domainObj._validation_errors = [];
+                    refreshRowUnsavedState(tr, domainObj);
                 }
                 tr.querySelector('.check-status-cell').innerHTML = '<i data-lucide="help-circle" style="color: #94a3b8; width: 1.2rem; height: 1.2rem;" title="Not validated"></i>';
                 if (window.lucide) lucide.createIcons({ root: tr.querySelector('.check-status-cell') });
                 tr.classList.remove('row-error');
 
-                tr.classList.add('row-unsaved');
-                markUnsavedChanges();
+                refreshUnsavedUI();
             });
         });
 
@@ -363,17 +377,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const validateServiceInput = () => {
             const val = serviceInput.value.trim();
-            if (!val) return; // Allow clearing
-
-            // Strict check
             if (allServices.length > 0 && !allServices.includes(val)) {
                 // Clear invalid text
                 serviceInput.value = '';
                 updateTruth('service_name', '');
-                tr.classList.add('row-unsaved');
-                markUnsavedChanges();
                 showToast('Please select a valid service from the list', 'danger');
             }
+            const domainObj = allDomains.find(d => d._id === id);
+            refreshRowUnsavedState(tr, domainObj);
+            refreshUnsavedUI();
         };
 
         serviceInput.addEventListener('focus', showDropdown);
@@ -673,7 +685,13 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (response.ok) {
                 if (showSuccess) showToast('Changes saved successfully');
-                clearUnsavedChanges();
+
+                // Update original state for all rows to match what was just saved
+                allDomains.forEach(d => {
+                    if (d.domain && d.domain.trim() !== '' && d.service_name && d.service_name.trim() !== '') {
+                        d._original = JSON.stringify(getCleanPayload(d));
+                    }
+                });
 
                 // Compare with previous state to see if restart is actually needed
                 const currentPayloadStr = JSON.stringify(payload);
@@ -681,6 +699,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     markRestartNeeded();
                     pristineData = currentPayloadStr;
                 }
+                refreshUnsavedUI();
             } else {
                 showToast('Error saving changes', 'danger');
                 saveBtn.disabled = false;
@@ -780,7 +799,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     updateRootColors();
                     applyFilterAndSort(); // Re-renders active table
                     renderDeletedTable(); // Updates deleted table
-                    markUnsavedChanges();
+                    refreshUnsavedUI();
                 }
                 rowToDelete = null;
             }
@@ -899,24 +918,38 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function markUnsavedChanges() {
-        unsavedNotification.classList.add('show');
-        restartNotification.classList.remove('show'); // Unsaved takes priority for banners
-        document.body.classList.add('has-notification');
-        saveBtn.classList.add('btn-save-needed');
-        saveBtn.disabled = false;
+    function refreshUnsavedUI() {
+        const payload = allDomains
+            .filter(d => d.domain && d.domain.trim() !== '' && d.service_name && d.service_name.trim() !== '')
+            .map(getCleanPayload);
+
+        const hasDataChanges = JSON.stringify(payload) !== pristineData;
+        const hasUnsavedRows = document.querySelectorAll('.row-unsaved').length > 0;
+        const hasChanges = hasDataChanges || hasUnsavedRows;
+
+        if (hasChanges) {
+            unsavedNotification.classList.add('show');
+            restartNotification.classList.remove('show');
+            document.body.classList.add('has-notification');
+            saveBtn.classList.add('btn-save-needed');
+            saveBtn.disabled = false;
+        } else {
+            unsavedNotification.classList.remove('show');
+            saveBtn.classList.remove('btn-save-needed');
+            saveBtn.disabled = true;
+            // Banner is gone, so if no other notification, remove the margin
+            if (!restartNotification.classList.contains('show')) {
+                document.body.classList.remove('has-notification');
+            }
+        }
     }
 
+    // Deprecated in favor of refreshUnsavedUI
+    function markUnsavedChanges() { refreshUnsavedUI(); }
     function clearUnsavedChanges() {
-        unsavedNotification.classList.remove('show');
-        saveBtn.classList.remove('btn-save-needed');
-        saveBtn.disabled = true;
-
-        // Clear unsaved styling from rows and state
-        document.querySelectorAll('.row-unsaved').forEach(row => {
-            row.classList.remove('row-unsaved');
-        });
-        allDomains.forEach(d => d._unsaved = false);
+        // Force reset
+        document.querySelectorAll('.row-unsaved').forEach(row => row.classList.remove('row-unsaved'));
+        refreshUnsavedUI();
     }
     function renderGlobalDropdown(filter = '') {
         if (!activeServiceInput) return;
@@ -943,14 +976,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 e.preventDefault(); // Prevent focus loss immediately
                 activeServiceInput.value = service;
                 // Update truth and mark unsaved directly since validation is passed
-                const id = activeServiceInput.closest('tr').dataset.id;
+                const tr = activeServiceInput.closest('tr');
+                const id = tr.dataset.id;
                 const domainObj = allDomains.find(d => d._id === id);
                 if (domainObj) {
                     domainObj['service_name'] = service;
-                    domainObj._unsaved = true;
+                    refreshRowUnsavedState(tr, domainObj);
                 }
-                activeServiceInput.closest('tr').classList.add('row-unsaved');
-                markUnsavedChanges();
+                refreshUnsavedUI();
 
                 globalDropdown.classList.remove('show');
                 activeServiceInput = null;

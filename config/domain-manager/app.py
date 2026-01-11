@@ -7,6 +7,7 @@ import socket
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, Response
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from functools import wraps
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', secrets.token_hex(32))
@@ -52,6 +53,16 @@ def generate_csrf_token():
     return session['csrf_token']
 
 app.jinja_env.globals['csrf_token'] = generate_csrf_token
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('logged_in'):
+            if request.path.startswith('/api/') or request.path == '/api/restart-stream':
+                return jsonify({'error': 'Unauthorized', 'message': 'Authentication required'}), 401
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 @app.before_request
 def check_csrf():
@@ -200,9 +211,8 @@ def logout():
     return redirect(url_for('login'))
 
 @app.route('/')
+@login_required
 def index():
-    if not session.get('logged_in'):
-        return redirect(url_for('login'))
     return render_template('index.html', 
                            domain=DOMAIN,
                            rate_avg=TRAEFIK_RATE_AVG,
@@ -210,10 +220,8 @@ def index():
                            concurrency=TRAEFIK_CONCURRENCY)
 
 @app.route('/api/domains', methods=['GET', 'POST'])
+@login_required
 def api_domains():
-    if not session.get('logged_in'):
-        return jsonify({'error': 'Unauthorized'}), 401
-    
     if request.method == 'GET':
         return jsonify(read_csv())
     
@@ -223,10 +231,8 @@ def api_domains():
         return jsonify({'status': 'success'})
 
 @app.route('/api/services', methods=['GET'])
+@login_required
 def api_services():
-    if not session.get('logged_in'):
-        return jsonify({'error': 'Unauthorized'}), 401
-    
     try:
         final_list = get_external_services()
         return jsonify(final_list)
@@ -285,10 +291,8 @@ def resolve_domain(domain):
 
 @app.route('/api/check-domain', methods=['POST'])
 @limiter.exempt
+@login_required 
 def check_domain():
-    if not session.get('logged_in'):
-        return jsonify({'error': 'Unauthorized'}), 401
-    
     data = request.json
     domain_to_check = data.get('domain', '').strip()
     redirection_to_check = data.get('redirection', '').strip()
@@ -390,10 +394,8 @@ def check_domain():
     return jsonify(status_response)
 
 @app.route('/api/restart', methods=['POST'])
+@login_required
 def restart_stack():
-    if not session.get('logged_in'):
-        return jsonify({'error': 'Unauthorized'}), 401
-    
     # We still keep the old restart for compatibility or simple trigger
     try:
         subprocess.Popen(['bash', START_SCRIPT], cwd=BASE_DIR, env=ENV)
@@ -402,10 +404,8 @@ def restart_stack():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/restart-stream')
+@login_required
 def restart_stream():
-    if not session.get('logged_in'):
-        return Response("Unauthorized", status=401)
-
     def generate():
         # Using bash explicitly and passing current environment
         process = subprocess.Popen(
