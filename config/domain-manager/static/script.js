@@ -144,10 +144,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (currentSort.column) {
             filtered.sort((a, b) => {
-                let valA = a[currentSort.column] || '';
-                let valB = b[currentSort.column] || '';
+                let valA = a[currentSort.column];
+                let valB = b[currentSort.column];
 
-                if (!isNaN(valA) && !isNaN(valB) && valA !== '' && valB !== '') {
+                if (currentSort.column === '_status') {
+                    const statusOrder = { 'invalid': 0, 'loading': 1, 'valid': 2, null: 3, undefined: 3 };
+                    valA = statusOrder[valA] !== undefined ? statusOrder[valA] : 3;
+                    valB = statusOrder[valB] !== undefined ? statusOrder[valB] : 3;
+                } else {
+                    valA = valA || '';
+                    valB = valB || '';
+                }
+
+                if (!isNaN(valA) && !isNaN(valB) && valA !== '' && valB !== '' && typeof valA !== 'string' && typeof valB !== 'string') {
                     return currentSort.direction === 'asc' ? valA - valB : valB - valA;
                 }
 
@@ -243,8 +252,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const root = data._root_domain || getRootDomain(data.domain);
         tr.style.backgroundColor = getColorForRoot(root);
 
+        let statusHtml = '';
+        if (data._status === 'loading') {
+            statusHtml = '<i data-lucide="loader-2" class="animate-spin" style="width: 1rem; height: 1rem; color: #666;"></i>';
+        } else if (data._status === 'valid') {
+            statusHtml = '<i data-lucide="check-circle" style="color: #059669; width: 1.2rem; height: 1.2rem;"></i>';
+        } else if (data._status === 'invalid') {
+            const errors = data._validation_errors || [];
+            statusHtml = `<i data-lucide="x-circle" style="color: #7f1d1d; width: 1.2rem; height: 1.2rem;" title="${errors.join('\n')}"></i>`;
+            tr.classList.add('row-error');
+        }
+
         tr.innerHTML = `
-            <td class="check-status-cell" style="text-align: center;"></td>
+            <td class="check-status-cell" style="text-align: center;">${statusHtml}</td>
             <td class="root-domain-cell" data-label="Root Domain">${root || '-'}</td>
             <td data-label="Domain"><input type="text" class="data-input" data-key="domain" value="${data.domain || ''}" placeholder="example.com"></td>
             <td data-label="Redirection"><input type="text" class="data-input" data-key="redirection" value="${data.redirection || ''}" placeholder="www.example.com"></td>
@@ -289,7 +309,18 @@ document.addEventListener('DOMContentLoaded', () => {
         // Reactive update: when any input changes, update the source of truth
         tr.querySelectorAll('.data-input').forEach(input => {
             input.addEventListener('input', (e) => {
-                updateTruth(e.target.dataset.key, e.target.value);
+                const val = e.target.value;
+                updateTruth(e.target.dataset.key, val);
+
+                // Reset status on change
+                const domainObj = allDomains.find(d => d._id === id);
+                if (domainObj) {
+                    domainObj._status = null;
+                    domainObj._validation_errors = [];
+                }
+                tr.querySelector('.check-status-cell').innerHTML = '';
+                tr.classList.remove('row-error');
+
                 tr.classList.add('row-unsaved');
                 markUnsavedChanges();
             });
@@ -459,10 +490,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const serviceName = serviceInput ? serviceInput.value.trim() : '';
 
                 const rowLabel = domain || `Row ${index + 1}`;
+                const domainId = row.dataset.id;
+                const domainObj = allDomains.find(d => d._id === domainId);
 
                 // Show loading spinner
                 statusCell.innerHTML = '<i data-lucide="loader-2" class="animate-spin" style="width: 1rem; height: 1rem; color: #666;"></i>';
                 if (window.lucide) lucide.createIcons({ root: statusCell });
+                if (domainObj) domainObj._status = 'loading';
 
                 // Clear previous errors
                 row.classList.remove('row-error');
@@ -473,13 +507,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!domain) {
                     const msg = `${rowLabel}: Domain is required`;
                     localErrors.push(msg);
-                    globalErrors.push(msg);
+                    globalErrors.push(`${rowLabel} (Domain): Required`);
                     if (domainInput) domainInput.classList.add('input-error');
                 }
                 if (!serviceName) {
                     const msg = `${rowLabel}: Service is required`;
                     localErrors.push(msg);
-                    globalErrors.push(msg);
+                    globalErrors.push(`${rowLabel} (Service): Required`);
                     if (serviceInput) serviceInput.classList.add('input-error');
                 }
 
@@ -487,6 +521,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     statusCell.innerHTML = `<i data-lucide="x-circle" style="color: #7f1d1d; width: 1.2rem; height: 1.2rem;" title="${localErrors.join('\n')}"></i>`;
                     row.classList.add('row-error');
                     if (window.lucide) lucide.createIcons({ root: statusCell });
+                    if (domainObj) {
+                        domainObj._status = 'invalid';
+                        domainObj._validation_errors = localErrors;
+                    }
                     allValid = false;
                     return; // Next row, don't enqueue task
                 }
@@ -515,7 +553,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (data.domain.status === 'mismatch' || data.domain.status === 'error') {
                             const msg = data.domain.message || `Domain IP Mismatch`;
                             tooltip.push(msg);
-                            globalErrors.push(`${rowLabel}: ${msg}`);
+                            globalErrors.push(`${rowLabel} (Domain): ${msg}`);
                             domainInput.classList.add('input-error');
                             isError = true;
                         }
@@ -523,7 +561,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (data.redirection.status === 'mismatch' || data.redirection.status === 'error') {
                             const msg = data.redirection.message || `Redirection IP Mismatch`;
                             tooltip.push(msg);
-                            globalErrors.push(`${rowLabel}: ${msg}`);
+                            globalErrors.push(`${rowLabel} (Redirection): ${msg}`);
                             if (redirectionInput) redirectionInput.classList.add('input-error');
                             isError = true;
                         }
@@ -531,7 +569,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (data.service.status === 'missing' || data.service.status === 'error') {
                             const msg = `Service validation failed`;
                             tooltip.push(msg);
-                            globalErrors.push(`${rowLabel}: ${msg}`);
+                            globalErrors.push(`${rowLabel} (Service): ${msg}`);
                             if (serviceInput) serviceInput.classList.add('input-error');
                             isError = true;
                         }
@@ -539,9 +577,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (isError || data.status === 'mismatch') {
                             statusCell.innerHTML = `<i data-lucide="x-circle" style="color: #7f1d1d; width: 1.2rem; height: 1.2rem;" title="${tooltip.join('\n')}"></i>`;
                             row.classList.add('row-error');
+                            if (domainObj) {
+                                domainObj._status = 'invalid';
+                                domainObj._validation_errors = tooltip;
+                            }
                             allValid = false;
                         } else {
                             statusCell.innerHTML = '<i data-lucide="check-circle" style="color: #22c55e; width: 1.2rem; height: 1.2rem;"></i>';
+                            if (domainObj) domainObj._status = 'valid';
                         }
                         if (window.lucide) lucide.createIcons({ root: statusCell });
                     } catch (err) {
