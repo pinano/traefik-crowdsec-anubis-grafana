@@ -304,10 +304,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Add input listener for filtering
         serviceInput.addEventListener('input', (e) => {
-            if (activeServiceInput === serviceInput) {
-                renderGlobalDropdown(e.target.value);
-                updateGlobalDropdownPosition();
-            }
+            activeServiceInput = serviceInput; // Ensure it's active
+            const filter = e.target.value;
+            renderGlobalDropdown(filter);
+            updateGlobalDropdownPosition();
+
+            // If filter matches exactly one service, but user is still typing, 
+            // keep showing the dropdown so they can see it's correct.
         });
 
         tr.querySelector('.remove-row-btn').addEventListener('click', () => {
