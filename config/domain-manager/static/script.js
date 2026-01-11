@@ -339,10 +339,10 @@ document.addEventListener('DOMContentLoaded', () => {
     checkBtn.addEventListener('click', async () => {
         const rows = Array.from(domainsBody.querySelectorAll('tr'));
 
-        let pending = 0;
-
         for (const row of rows) {
             const domainInput = row.querySelector('input[data-key="domain"]');
+            const redirectionInput = row.querySelector('input[data-key="redirection"]');
+            const serviceInput = row.querySelector('input[data-key="service_name"]');
             const statusCell = row.querySelector('.check-status-cell');
 
             if (!domainInput || !statusCell) continue;
@@ -350,16 +350,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const domain = domainInput.value.trim();
             if (!domain) continue;
 
+            const redirection = redirectionInput ? redirectionInput.value.trim() : '';
+            const serviceName = serviceInput ? serviceInput.value.trim() : '';
+
             // Show loading spinner
             statusCell.innerHTML = '<i data-lucide="loader-2" class="animate-spin" style="width: 1rem; height: 1rem; color: #666;"></i>';
             if (window.lucide) lucide.createIcons({ root: statusCell });
 
-            pending++;
-
-            // Call API
-            // We use a separate async IIFE or just separate calls to parallelize slightly or sequential
-            // Here we do it essentially sequential or slightly overlapped to not overload if many domains
-            // For better UX, let's do parallel but limit concurrency if needed. For now simple fetch is okay.
+            // Clear previous errors
+            row.classList.remove('row-error');
+            row.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
 
             fetch('/api/check-domain', {
                 method: 'POST',
@@ -367,25 +367,61 @@ document.addEventListener('DOMContentLoaded', () => {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': csrfToken
                 },
-                body: JSON.stringify({ domain: domain })
+                body: JSON.stringify({
+                    domain: domain,
+                    redirection: redirection,
+                    service_name: serviceName
+                })
             })
                 .then(res => res.json())
                 .then(data => {
-                    if (data.status === 'match') {
-                        statusCell.innerHTML = '<i data-lucide="check-circle" style="color: #22c55e; width: 1.2rem; height: 1.2rem;"></i>';
-                        row.classList.remove('row-error'); // Remove error style if fixed
-                    } else if (data.status === 'mismatch') {
-                        statusCell.innerHTML = `<i data-lucide="x-circle" style="color: #7f1d1d; width: 1.2rem; height: 1.2rem;" title="Expected: ${data.expected}, Actual: ${data.actual}"></i>`;
+                    let tooltip = [];
+                    let isError = false;
+
+                    // Domain Status
+                    if (data.domain.status === 'mismatch') {
+                        tooltip.push(`Domain IP Mismatch (Exp: ${data.domain.expected}, Act: ${data.domain.actual})`);
+                        domainInput.classList.add('input-error');
+                        isError = true;
+                    } else if (data.domain.status === 'error') {
+                        tooltip.push(`Domain Error: ${data.domain.message}`);
+                        domainInput.classList.add('input-error');
+                        isError = true;
+                    }
+
+                    // Redirection Status
+                    if (data.redirection.status === 'mismatch') {
+                        tooltip.push(`Redirection IP Mismatch (Exp: ${data.redirection.expected}, Act: ${data.redirection.actual})`);
+                        if (redirectionInput) redirectionInput.classList.add('input-error');
+                        isError = true;
+                    } else if (data.redirection.status === 'error') {
+                        tooltip.push(`Redirection Error: ${data.redirection.message}`);
+                        if (redirectionInput) redirectionInput.classList.add('input-error');
+                        isError = true;
+                    }
+
+                    // Service Status
+                    if (data.service.status === 'missing') {
+                        tooltip.push(`Service '${serviceName}' not found`);
+                        if (serviceInput) serviceInput.classList.add('input-error');
+                        isError = true;
+                    } else if (data.service.status === 'error') {
+                        tooltip.push(`Service Check Error`);
+                        if (serviceInput) serviceInput.classList.add('input-error');
+                        isError = true; // Strict?
+                    }
+
+                    if (isError || data.status === 'mismatch') {
+                        statusCell.innerHTML = `<i data-lucide="x-circle" style="color: #7f1d1d; width: 1.2rem; height: 1.2rem;" title="${tooltip.join('\n')}"></i>`;
                         row.classList.add('row-error');
                     } else {
-                        statusCell.innerHTML = `<i data-lucide="alert-circle" style="color: #7f1d1d; width: 1.2rem; height: 1.2rem;" title="${data.message}"></i>`;
-                        row.classList.add('row-error');
+                        statusCell.innerHTML = '<i data-lucide="check-circle" style="color: #22c55e; width: 1.2rem; height: 1.2rem;"></i>';
                     }
+
                     if (window.lucide) lucide.createIcons({ root: statusCell });
                 })
                 .catch(err => {
                     statusCell.innerHTML = '<i data-lucide="help-circle" style="color: #6b7280; width: 1.2rem; height: 1.2rem;"></i>';
-                    row.classList.remove('row-error');
                     if (window.lucide) lucide.createIcons({ root: statusCell });
                 });
         }

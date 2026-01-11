@@ -221,49 +221,55 @@ def api_services():
         return jsonify({'error': 'Unauthorized'}), 401
     
     try:
-        # Get the current project name to exclude its containers
-        current_project = os.environ.get('PROJECT_NAME', '')
-        # If not set, it defaults to the directory name of the project
-        if not current_project:
-            current_project = os.path.basename(BASE_DIR)
-
-        # Get all running containers and their project label
-        # format: name|project
-        cmd = ["docker", "ps", "--format", "{{.Names}}|{{.Label \"com.docker.compose.project\"}}"]
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True, env=ENV)
-        
-        all_containers = result.stdout.splitlines()
-        external_services = []
-        
-        for line in all_containers:
-            if '|' not in line:
-                continue
-            name, project = line.split('|', 1)
-            
-            # Exclude if it belongs to the current project
-            if project == current_project:
-                continue
-            
-            # Also exclude the domain-manager itself just in case
-            if name == "domain-manager":
-                continue
-                
-            external_services.append(name)
-            
-        final_list = sorted(list(set(external_services)))
-
-        # Append 'apache-host' if legacy installation is detected
-        if os.path.exists("/var/log/apache2"):
-            # Put it at the beginning of the list for easy access if it exists
-            final_list.insert(0, "apache-host")
-            
+        final_list = get_external_services()
         return jsonify(final_list)
     except Exception as e:
         print(f"Error getting external services: {e}")
         return jsonify([])
 
+def get_external_services():
+    # Get the current project name to exclude its containers
+    current_project = os.environ.get('PROJECT_NAME', '')
+    # If not set, it defaults to the directory name of the project
+    if not current_project:
+        current_project = os.path.basename(BASE_DIR)
+
+    # Get all running containers and their project label
+    # format: name|project
+    cmd = ["docker", "ps", "--format", "{{.Names}}|{{.Label \"com.docker.compose.project\"}}"]
+    result = subprocess.run(cmd, capture_output=True, text=True, check=True, env=ENV)
+    
+    all_containers = result.stdout.splitlines()
+    external_services = []
+    
+    for line in all_containers:
+        if '|' not in line:
+            continue
+        name, project = line.split('|', 1)
+        
+        # Exclude if it belongs to the current project
+        if project == current_project:
+            continue
+        
+        # Also exclude the domain-manager itself just in case
+        if name == "domain-manager":
+            continue
+            
+        external_services.append(name)
+        
+    final_list = sorted(list(set(external_services)))
+
+    # Append 'apache-host' if legacy installation is detected
+    if os.path.exists("/var/log/apache2"):
+        # Put it at the beginning of the list for easy access if it exists
+        final_list.insert(0, "apache-host")
+        
+    return final_list
+
 def resolve_domain(domain):
     try:
+        if not domain:
+            return None
         # Get the IP address of the domain
         ip = socket.gethostbyname(domain)
         return ip
@@ -276,33 +282,77 @@ def check_domain():
         return jsonify({'error': 'Unauthorized'}), 401
     
     data = request.json
-    domain_to_check = data.get('domain')
+    domain_to_check = data.get('domain', '').strip()
+    redirection_to_check = data.get('redirection', '').strip()
+    service_to_check = data.get('service_name', '').strip()
     
-    if not domain_to_check:
-        return jsonify({'status': 'error', 'message': 'No domain provided'})
+    status_response = {
+        'status': 'match', # Pessimistic default, starts match, changes on error
+        'domain': {'status': 'match'},
+        'redirection': {'status': 'skipped'},
+        'service': {'status': 'found'}
+    }
     
-    # 1. Resolve the domain to check
-    actual_ip = resolve_domain(domain_to_check)
-    
-    if not actual_ip:
-        return jsonify({'status': 'error', 'message': 'Could not resolve domain'})
-        
-    # 2. Resolve the host domain (DOMAIN env var) to get expected IP
-    # We assume 'DOMAIN' points to this server.
+    # 0. Global Host IP
     host_domain = os.environ.get('DOMAIN')
     expected_ip = resolve_domain(host_domain)
     
     if not expected_ip:
-         return jsonify({'status': 'error', 'message': 'Could not resolve host domain'})
+        return jsonify({'status': 'error', 'message': 'Could not resolve host domain'})
     
-    if actual_ip == expected_ip:
-        return jsonify({'status': 'match', 'ip': actual_ip})
+    # 1. Domain Check
+    if not domain_to_check:
+         status_response['domain'] = {'status': 'error', 'message': 'Empty domain'}
+         status_response['status'] = 'mismatch'
     else:
-        return jsonify({
-            'status': 'mismatch', 
-            'expected': expected_ip, 
-            'actual': actual_ip
-        })
+        actual_ip = resolve_domain(domain_to_check)
+        if not actual_ip:
+             status_response['domain'] = {'status': 'error', 'message': 'Resolution failed'}
+             status_response['status'] = 'mismatch'
+        elif actual_ip != expected_ip:
+             status_response['domain'] = {
+                 'status': 'mismatch', 
+                 'expected': expected_ip, 
+                 'actual': actual_ip
+             }
+             status_response['status'] = 'mismatch'
+        else:
+            status_response['domain']['status'] = 'match'
+
+    # 2. Redirection Check
+    if redirection_to_check:
+        redir_ip = resolve_domain(redirection_to_check)
+        if not redir_ip:
+             status_response['redirection'] = {'status': 'error', 'message': 'Resolution failed'}
+             status_response['status'] = 'mismatch'
+        elif redir_ip != expected_ip:
+             status_response['redirection'] = {
+                 'status': 'mismatch',
+                 'expected': expected_ip,
+                 'actual': redir_ip
+             }
+             status_response['status'] = 'mismatch'
+        else:
+             status_response['redirection']['status'] = 'match'
+    
+    # 3. Service Check
+    if service_to_check:
+        try:
+             services = get_external_services()
+             if service_to_check not in services:
+                 # Check if the service name might be slightly different or internal?
+                 # Assuming exact match required based on api_services
+                 status_response['service'] = {'status': 'missing'}
+                 status_response['status'] = 'mismatch'
+             else:
+                 status_response['service']['status'] = 'found'
+        except Exception:
+             status_response['service'] = {'status': 'error'}
+             # Don't fail the whole row just for internal error if possible? 
+             # But request asks to check existence.
+             status_response['status'] = 'mismatch'
+
+    return jsonify(status_response)
 
 @app.route('/api/restart', methods=['POST'])
 def restart_stack():

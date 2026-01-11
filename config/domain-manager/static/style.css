@@ -235,13 +235,18 @@ td {
 }
 
 .row-error {
-    background-color: #fca5a5 !important;
-    /* Striking Red */
+    background-color: #f87171 !important;
+    /* More saturated red */
 }
 
 .row-error input {
     color: #450a0a !important;
-    /* Dark Red text for contrast */
+}
+
+.input-error {
+    border: 2px solid #b91c1c !important;
+    background-color: #fee2e2 !important;
+    color: #b91c1c !important;
 }
 
 #domains-body tr:focus-within {
