@@ -373,15 +373,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 .then(data => {
                     if (data.status === 'match') {
                         statusCell.innerHTML = '<i data-lucide="check-circle" style="color: #22c55e; width: 1.2rem; height: 1.2rem;"></i>';
+                        row.classList.remove('row-error'); // Remove error style if fixed
                     } else if (data.status === 'mismatch') {
-                        statusCell.innerHTML = `<i data-lucide="x-circle" style="color: #ef4444; width: 1.2rem; height: 1.2rem;" title="Expected: ${data.expected}, Actual: ${data.actual}"></i>`;
+                        statusCell.innerHTML = `<i data-lucide="x-circle" style="color: #7f1d1d; width: 1.2rem; height: 1.2rem;" title="Expected: ${data.expected}, Actual: ${data.actual}"></i>`;
+                        row.classList.add('row-error');
                     } else {
-                        statusCell.innerHTML = `<i data-lucide="alert-circle" style="color: #f59e0b; width: 1.2rem; height: 1.2rem;" title="${data.message}"></i>`;
+                        statusCell.innerHTML = `<i data-lucide="alert-circle" style="color: #7f1d1d; width: 1.2rem; height: 1.2rem;" title="${data.message}"></i>`;
+                        row.classList.add('row-error');
                     }
                     if (window.lucide) lucide.createIcons({ root: statusCell });
                 })
                 .catch(err => {
                     statusCell.innerHTML = '<i data-lucide="help-circle" style="color: #6b7280; width: 1.2rem; height: 1.2rem;"></i>';
+                    row.classList.remove('row-error');
                     if (window.lucide) lucide.createIcons({ root: statusCell });
                 });
         }

@@ -234,38 +234,49 @@ td {
     z-index: 2;
 }
 
+.row-error {
+    background-color: #fca5a5 !important;
+    /* Striking Red */
+}
+
+.row-error input {
+    color: #450a0a !important;
+    /* Dark Red text for contrast */
+}
+
 #domains-body tr:focus-within {
     z-index: 10;
 }
 
 th:nth-child(1),
 td:nth-child(1) {
-    width: 12%;
+    width: 4%;
+    text-align: center;
 }
 
 th:nth-child(2),
 td:nth-child(2) {
-    width: 22%;
+    width: 12%;
 }
 
 th:nth-child(3),
 td:nth-child(3) {
-    width: 18%;
+    width: 20%;
 }
 
 th:nth-child(4),
 td:nth-child(4) {
-    width: 14%;
+    width: 16%;
 }
 
 th:nth-child(5),
 td:nth-child(5) {
-    width: 12%;
+    width: 14%;
 }
 
 th:nth-child(6),
 td:nth-child(6) {
-    width: 6%;
+    width: 12%;
 }
 
 th:nth-child(7),
@@ -280,6 +291,11 @@ td:nth-child(8) {
 
 th:nth-child(9),
 td:nth-child(9) {
+    width: 6%;
+}
+
+th:nth-child(10),
+td:nth-child(10) {
     width: 4%;
     text-align: center;
 }
