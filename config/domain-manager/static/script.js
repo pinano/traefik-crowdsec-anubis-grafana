@@ -274,8 +274,33 @@ document.addEventListener('DOMContentLoaded', () => {
             updateGlobalDropdownPosition();
         };
 
+        const validateServiceInput = () => {
+            const val = serviceInput.value.trim();
+            if (!val) return; // Allow clearing
+
+            // Strict check
+            if (allServices.length > 0 && !allServices.includes(val)) {
+                // Clear invalid text
+                serviceInput.value = '';
+                updateTruth('service_name', '');
+                tr.classList.add('row-unsaved');
+                markUnsavedChanges();
+                showToast('Please select a valid service from the list', 'danger');
+            }
+        };
+
         serviceInput.addEventListener('focus', showDropdown);
         serviceInput.addEventListener('click', showDropdown);
+        serviceInput.addEventListener('blur', () => {
+            // Small delay to allow mousedown selection to happen first
+            setTimeout(() => {
+                validateServiceInput();
+                if (activeServiceInput === serviceInput) {
+                    globalDropdown.classList.remove('show');
+                    activeServiceInput = null;
+                }
+            }, 200);
+        });
 
         // Add input listener for filtering
         serviceInput.addEventListener('input', (e) => {
@@ -284,10 +309,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateGlobalDropdownPosition();
             }
         });
-
-        // Update position on scroll could be complex, for now we close it on global scroll/resize or just let it float.
-        // Usually creating a scroll listener on parent containers is needed to keep it attached. 
-        // For simplicity, we just rely on it being open.
 
         tr.querySelector('.remove-row-btn').addEventListener('click', () => {
             rowToDelete = tr;
@@ -302,16 +323,6 @@ document.addEventListener('DOMContentLoaded', () => {
         domainsBody.appendChild(tr);
         if (window.lucide) lucide.createIcons({ root: tr });
     }
-
-    confirmDeleteBtn.addEventListener('click', () => {
-        // This is now handled by the stateful listener below
-    });
-
-    cancelDeleteBtn.addEventListener('click', () => {
-        rowToDelete = null;
-        confirmModal.classList.remove('show');
-    });
-
 
     async function saveDomains(showSuccess = true) {
         // Strip internal IDs and temporary fields before saving and filter empty domains
@@ -659,7 +670,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         allDomains.forEach(d => d._unsaved = false);
     }
-
     function renderGlobalDropdown(filter = '') {
         if (!activeServiceInput) return;
 
@@ -675,10 +685,20 @@ document.addEventListener('DOMContentLoaded', () => {
             const item = document.createElement('div');
             item.className = 'dropdown-item';
             item.textContent = service;
-            item.addEventListener('click', () => {
+            // Use mousedown to ensure it fires before blur
+            item.addEventListener('mousedown', (e) => {
+                e.preventDefault(); // Prevent focus loss immediately
                 activeServiceInput.value = service;
-                // Dispatch input event to trigger updateTruth and unsaved tracking
-                activeServiceInput.dispatchEvent(new Event('input', { bubbles: true }));
+                // Update truth and mark unsaved directly since validation is passed
+                const id = activeServiceInput.closest('tr').dataset.id;
+                const domainObj = allDomains.find(d => d._id === id);
+                if (domainObj) {
+                    domainObj['service_name'] = service;
+                    domainObj._unsaved = true;
+                }
+                activeServiceInput.closest('tr').classList.add('row-unsaved');
+                markUnsavedChanges();
+
                 globalDropdown.classList.remove('show');
                 activeServiceInput = null;
             });
