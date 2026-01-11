@@ -369,10 +369,176 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.lucide) lucide.createIcons({ root: tr });
     }
 
+    async function validateAllRows() {
+        const rows = Array.from(domainsBody.querySelectorAll('tr'));
+        let allValid = true;
+
+        // Concurrency Control for validation requests
+        const MAX_CONCURRENCY = 10;
+        const queue = [];
+        let activeCount = 0;
+
+        const results = [];
+
+        return new Promise((resolve) => {
+            const processQueue = () => {
+                if (queue.length === 0 && activeCount === 0) {
+                    resolve(allValid);
+                    return;
+                }
+
+                while (activeCount < MAX_CONCURRENCY && queue.length > 0) {
+                    const task = queue.shift();
+                    activeCount++;
+                    task().finally(() => {
+                        activeCount--;
+                        processQueue();
+                    });
+                }
+            };
+
+            const enqueue = (task) => {
+                queue.push(task);
+                processQueue();
+            };
+
+            const rowsToValidate = rows.filter(row => {
+                const domainInput = row.querySelector('input[data-key="domain"]');
+                const serviceInput = row.querySelector('input[data-key="service_name"]');
+                const redirectionInput = row.querySelector('input[data-key="redirection"]');
+                const anubisInput = row.querySelector('input[data-key="anubis_subdomain"]');
+
+                // A row is "active" if it has any human-intent data
+                return (domainInput && domainInput.value.trim() !== '') ||
+                    (serviceInput && serviceInput.value.trim() !== '') ||
+                    (redirectionInput && redirectionInput.value.trim() !== '') ||
+                    (anubisInput && anubisInput.value.trim() !== '');
+            });
+
+            if (rowsToValidate.length === 0) {
+                resolve(true);
+                return;
+            }
+
+            for (const row of rowsToValidate) {
+                const domainInput = row.querySelector('input[data-key="domain"]');
+                const redirectionInput = row.querySelector('input[data-key="redirection"]');
+                const serviceInput = row.querySelector('input[data-key="service_name"]');
+                const statusCell = row.querySelector('.check-status-cell');
+
+                const domain = domainInput ? domainInput.value.trim() : '';
+                const redirection = redirectionInput ? redirectionInput.value.trim() : '';
+                const serviceName = serviceInput ? serviceInput.value.trim() : '';
+
+                // Show loading spinner
+                statusCell.innerHTML = '<i data-lucide="loader-2" class="animate-spin" style="width: 1rem; height: 1rem; color: #666;"></i>';
+                if (window.lucide) lucide.createIcons({ root: statusCell });
+
+                // Clear previous errors
+                row.classList.remove('row-error');
+                row.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
+
+                // Basic mandatory check before network request
+                let localErrors = [];
+                if (!domain) {
+                    localErrors.push("Domain is required");
+                    if (domainInput) domainInput.classList.add('input-error');
+                }
+                if (!serviceName) {
+                    localErrors.push("Service is required");
+                    if (serviceInput) serviceInput.classList.add('input-error');
+                }
+
+                if (localErrors.length > 0) {
+                    statusCell.innerHTML = `<i data-lucide="x-circle" style="color: #7f1d1d; width: 1.2rem; height: 1.2rem;" title="${localErrors.join('\n')}"></i>`;
+                    row.classList.add('row-error');
+                    if (window.lucide) lucide.createIcons({ root: statusCell });
+                    allValid = false;
+                    continue; // Skip network check for this row
+                }
+
+                const task = async () => {
+                    try {
+                        const response = await fetch('/api/check-domain', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': csrfToken
+                            },
+                            body: JSON.stringify({
+                                domain: domain,
+                                redirection: redirection,
+                                service_name: serviceName
+                            })
+                        });
+
+                        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+                        const data = await response.json();
+                        let tooltip = [];
+                        let isError = false;
+
+                        if (data.domain.status === 'mismatch' || data.domain.status === 'error') {
+                            tooltip.push(data.domain.message || `Domain IP Mismatch`);
+                            domainInput.classList.add('input-error');
+                            isError = true;
+                        }
+
+                        if (data.redirection.status === 'mismatch' || data.redirection.status === 'error') {
+                            tooltip.push(data.redirection.message || `Redirection IP Mismatch`);
+                            if (redirectionInput) redirectionInput.classList.add('input-error');
+                            isError = true;
+                        }
+
+                        if (data.service.status === 'missing' || data.service.status === 'error') {
+                            tooltip.push(`Service validation failed`);
+                            if (serviceInput) serviceInput.classList.add('input-error');
+                            isError = true;
+                        }
+
+                        if (isError || data.status === 'mismatch') {
+                            statusCell.innerHTML = `<i data-lucide="x-circle" style="color: #7f1d1d; width: 1.2rem; height: 1.2rem;" title="${tooltip.join('\n')}"></i>`;
+                            row.classList.add('row-error');
+                            allValid = false;
+                        } else {
+                            statusCell.innerHTML = '<i data-lucide="check-circle" style="color: #22c55e; width: 1.2rem; height: 1.2rem;"></i>';
+                        }
+                        if (window.lucide) lucide.createIcons({ root: statusCell });
+                    } catch (err) {
+                        console.error("Check failed for " + domain, err);
+                        statusCell.innerHTML = '<i data-lucide="help-circle" style="color: #6b7280; width: 1.2rem; height: 1.2rem;" title="Check failed"></i>';
+                        if (window.lucide) lucide.createIcons({ root: statusCell });
+                        allValid = false;
+                    }
+                };
+                enqueue(task);
+            }
+        });
+    }
+
     async function saveDomains(showSuccess = true) {
+        // Disable save button and show state
+        saveBtn.disabled = true;
+        const originalText = saveBtn.innerHTML;
+        saveBtn.innerHTML = '<i data-lucide="loader-2" class="animate-spin"></i> Validating...';
+        if (window.lucide) lucide.createIcons({ root: saveBtn });
+
+        const isValid = await validateAllRows();
+
+        if (!isValid) {
+            showToast('Cannot save: some records are invalid. Please check the highlighted fields.', 'danger');
+            saveBtn.innerHTML = originalText;
+            if (window.lucide) lucide.createIcons({ root: saveBtn });
+            saveBtn.disabled = false;
+            return;
+        }
+
+        saveBtn.innerHTML = '<i data-lucide="loader-2" class="animate-spin"></i> Saving...';
+        if (window.lucide) lucide.createIcons({ root: saveBtn });
+
         // Strip internal IDs and temporary fields before saving and filter empty domains
         const payload = allDomains
-            .filter(d => d.domain && d.domain.trim() !== '')
+            .filter(d => d.domain && d.domain.trim() !== '' && d.service_name && d.service_name.trim() !== '')
             .map(({ _id, _root_domain, ...rest }) => rest);
 
         try {
@@ -390,144 +556,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 markRestartNeeded();
             } else {
                 showToast('Error saving changes', 'danger');
+                saveBtn.disabled = false;
             }
         } catch (error) {
             showToast('Network error', 'danger');
+            saveBtn.disabled = false;
+        } finally {
+            saveBtn.innerHTML = originalText;
+            if (window.lucide) lucide.createIcons({ root: saveBtn });
         }
     }
 
     saveBtn.addEventListener('click', () => saveDomains(true));
 
     checkBtn.addEventListener('click', async () => {
-        const rows = Array.from(domainsBody.querySelectorAll('tr'));
+        const originalText = checkBtn.innerHTML;
+        checkBtn.disabled = true;
+        checkBtn.innerHTML = '<i data-lucide="loader-2" class="animate-spin"></i> Validating...';
+        if (window.lucide) lucide.createIcons({ root: checkBtn });
 
-        // Concurrency Control
-        const MAX_CONCURRENCY = 50;
-        const queue = [];
-        let activeCount = 0;
+        await validateAllRows();
 
-        const processQueue = () => {
-            if (queue.length === 0 && activeCount === 0) {
-                // All done
-                return;
-            }
-
-            while (activeCount < MAX_CONCURRENCY && queue.length > 0) {
-                const task = queue.shift();
-                activeCount++;
-                task().finally(() => {
-                    activeCount--;
-                    processQueue();
-                });
-            }
-        };
-
-        const enqueue = (task) => {
-            queue.push(task);
-            processQueue();
-        };
-
-        for (const row of rows) {
-            const domainInput = row.querySelector('input[data-key="domain"]');
-            const redirectionInput = row.querySelector('input[data-key="redirection"]');
-            const serviceInput = row.querySelector('input[data-key="service_name"]');
-            const statusCell = row.querySelector('.check-status-cell');
-
-            if (!domainInput || !statusCell) continue;
-
-            const domain = domainInput.value.trim();
-            if (!domain) continue;
-
-            const redirection = redirectionInput ? redirectionInput.value.trim() : '';
-            const serviceName = serviceInput ? serviceInput.value.trim() : '';
-
-            // Show loading spinner
-            statusCell.innerHTML = '<i data-lucide="loader-2" class="animate-spin" style="width: 1rem; height: 1rem; color: #666;"></i>';
-            if (window.lucide) lucide.createIcons({ root: statusCell });
-
-            // Clear previous errors
-            row.classList.remove('row-error');
-            row.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
-
-            // Define the task
-            const task = async () => {
-                try {
-                    const response = await fetch('/api/check-domain', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': csrfToken
-                        },
-                        body: JSON.stringify({
-                            domain: domain,
-                            redirection: redirection,
-                            service_name: serviceName
-                        })
-                    });
-
-                    if (response.status === 429) {
-                        throw new Error('Too Many Requests');
-                    }
-
-                    if (!response.ok) { // Check for other HTTP errors
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-
-                    const data = await response.json();
-                    let tooltip = [];
-                    let isError = false;
-
-                    // Domain Status
-                    if (data.domain.status === 'mismatch') {
-                        tooltip.push(`Domain IP Mismatch (Exp: ${data.domain.expected}, Act: ${data.domain.actual})`);
-                        domainInput.classList.add('input-error');
-                        isError = true;
-                    } else if (data.domain.status === 'error') {
-                        tooltip.push(`Domain Error: ${data.domain.message}`);
-                        domainInput.classList.add('input-error');
-                        isError = true;
-                    }
-
-                    // Redirection Status
-                    if (data.redirection.status === 'mismatch') {
-                        tooltip.push(`Redirection IP Mismatch (Exp: ${data.redirection.expected}, Act: ${data.redirection.actual})`);
-                        if (redirectionInput) redirectionInput.classList.add('input-error');
-                        isError = true;
-                    } else if (data.redirection.status === 'error') {
-                        tooltip.push(`Redirection Error: ${data.redirection.message}`);
-                        if (redirectionInput) redirectionInput.classList.add('input-error');
-                        isError = true;
-                    }
-
-                    // Service Status
-                    if (data.service.status === 'missing') {
-                        tooltip.push(`Service '${serviceName}' not found`);
-                        if (serviceInput) serviceInput.classList.add('input-error');
-                        isError = true;
-                    } else if (data.service.status === 'error') {
-                        tooltip.push(`Service Check Error`);
-                        if (serviceInput) serviceInput.classList.add('input-error');
-                        isError = true; // Strict?
-                    }
-
-                    if (isError || data.status === 'mismatch') {
-                        statusCell.innerHTML = `<i data-lucide="x-circle" style="color: #7f1d1d; width: 1.2rem; height: 1.2rem;" title="${tooltip.join('\n')}"></i>`;
-                        row.classList.add('row-error');
-                    } else {
-                        statusCell.innerHTML = '<i data-lucide="check-circle" style="color: #22c55e; width: 1.2rem; height: 1.2rem;"></i>';
-                    }
-
-                    if (window.lucide) lucide.createIcons({ root: statusCell });
-
-                } catch (err) {
-                    console.error("Check failed for " + domain, err);
-                    statusCell.innerHTML = '<i data-lucide="help-circle" style="color: #6b7280; width: 1.2rem; height: 1.2rem;" title="Check failed (possible rate limit)"></i>';
-                    if (window.lucide) lucide.createIcons({ root: statusCell });
-                }
-            };
-
-            enqueue(task);
-        }
+        checkBtn.innerHTML = originalText;
+        if (window.lucide) lucide.createIcons({ root: checkBtn });
+        checkBtn.disabled = false;
     });
 
     exportBtn.addEventListener('click', () => {

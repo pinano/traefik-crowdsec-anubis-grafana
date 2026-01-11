@@ -78,8 +78,8 @@ def validate_domain_data(entry):
     # Text fields that shouldn't contain weird characters
     fields_to_check = ['domain', 'redirection', 'service_name', 'anubis_subdomain']
     
-    if not entry.get('domain'): 
-        return False # Domain is mandatory
+    if not entry.get('domain') or not entry.get('service_name'): 
+        return False # Domain and Service are mandatory
         
     for field in fields_to_check:
         val = entry.get(field, '')
