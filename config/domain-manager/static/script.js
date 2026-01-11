@@ -71,11 +71,40 @@ document.addEventListener('DOMContentLoaded', () => {
         return rootColorMap.get(rootDomain) || 'transparent';
     }
 
-    function showToast(message, type = 'info') {
-        toast.textContent = message;
-        toast.className = 'toast show';
-        if (type === 'danger') toast.classList.add('alert-danger');
-        setTimeout(() => toast.classList.remove('show'), 3000);
+    function showToast(message, type = 'info', persistent = false, details = []) {
+        let content = '';
+
+        if (persistent) {
+            content += `
+                <div class="toast-header">
+                    <span>Notification</span>
+                    <button class="toast-close" title="Dismiss">&times;</button>
+                </div>`;
+        }
+
+        content += `<div class="toast-body">${message}`;
+
+        if (details.length > 0) {
+            content += `<ul class="error-list">`;
+            details.forEach(detail => {
+                content += `<li>${detail}</li>`;
+            });
+            content += `</ul>`;
+        }
+
+        content += `</div>`;
+
+        toast.innerHTML = content;
+        toast.className = `toast show alert-${type}`;
+
+        const closeBtn = toast.querySelector('.toast-close');
+        if (closeBtn) {
+            closeBtn.onclick = () => toast.classList.remove('show');
+        }
+
+        if (!persistent) {
+            setTimeout(() => toast.classList.remove('show'), 4000);
+        }
     }
 
     async function loadDomains() {
@@ -372,18 +401,17 @@ document.addEventListener('DOMContentLoaded', () => {
     async function validateAllRows() {
         const rows = Array.from(domainsBody.querySelectorAll('tr'));
         let allValid = true;
+        let globalErrors = [];
 
         // Concurrency Control for validation requests
         const MAX_CONCURRENCY = 10;
         const queue = [];
         let activeCount = 0;
 
-        const results = [];
-
         return new Promise((resolve) => {
             const processQueue = () => {
                 if (queue.length === 0 && activeCount === 0) {
-                    resolve(allValid);
+                    resolve({ isValid: allValid, errors: globalErrors });
                     return;
                 }
 
@@ -416,11 +444,11 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (rowsToValidate.length === 0) {
-                resolve(true);
+                resolve({ isValid: true, errors: [] });
                 return;
             }
 
-            for (const row of rowsToValidate) {
+            rowsToValidate.forEach((row, index) => {
                 const domainInput = row.querySelector('input[data-key="domain"]');
                 const redirectionInput = row.querySelector('input[data-key="redirection"]');
                 const serviceInput = row.querySelector('input[data-key="service_name"]');
@@ -429,6 +457,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const domain = domainInput ? domainInput.value.trim() : '';
                 const redirection = redirectionInput ? redirectionInput.value.trim() : '';
                 const serviceName = serviceInput ? serviceInput.value.trim() : '';
+
+                const rowLabel = domain || `Row ${index + 1}`;
 
                 // Show loading spinner
                 statusCell.innerHTML = '<i data-lucide="loader-2" class="animate-spin" style="width: 1rem; height: 1rem; color: #666;"></i>';
@@ -441,11 +471,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Basic mandatory check before network request
                 let localErrors = [];
                 if (!domain) {
-                    localErrors.push("Domain is required");
+                    const msg = `${rowLabel}: Domain is required`;
+                    localErrors.push(msg);
+                    globalErrors.push(msg);
                     if (domainInput) domainInput.classList.add('input-error');
                 }
                 if (!serviceName) {
-                    localErrors.push("Service is required");
+                    const msg = `${rowLabel}: Service is required`;
+                    localErrors.push(msg);
+                    globalErrors.push(msg);
                     if (serviceInput) serviceInput.classList.add('input-error');
                 }
 
@@ -454,7 +488,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     row.classList.add('row-error');
                     if (window.lucide) lucide.createIcons({ root: statusCell });
                     allValid = false;
-                    continue; // Skip network check for this row
+                    return; // Next row, don't enqueue task
                 }
 
                 const task = async () => {
@@ -479,19 +513,25 @@ document.addEventListener('DOMContentLoaded', () => {
                         let isError = false;
 
                         if (data.domain.status === 'mismatch' || data.domain.status === 'error') {
-                            tooltip.push(data.domain.message || `Domain IP Mismatch`);
+                            const msg = data.domain.message || `Domain IP Mismatch`;
+                            tooltip.push(msg);
+                            globalErrors.push(`${rowLabel}: ${msg}`);
                             domainInput.classList.add('input-error');
                             isError = true;
                         }
 
                         if (data.redirection.status === 'mismatch' || data.redirection.status === 'error') {
-                            tooltip.push(data.redirection.message || `Redirection IP Mismatch`);
+                            const msg = data.redirection.message || `Redirection IP Mismatch`;
+                            tooltip.push(msg);
+                            globalErrors.push(`${rowLabel}: ${msg}`);
                             if (redirectionInput) redirectionInput.classList.add('input-error');
                             isError = true;
                         }
 
                         if (data.service.status === 'missing' || data.service.status === 'error') {
-                            tooltip.push(`Service validation failed`);
+                            const msg = `Service validation failed`;
+                            tooltip.push(msg);
+                            globalErrors.push(`${rowLabel}: ${msg}`);
                             if (serviceInput) serviceInput.classList.add('input-error');
                             isError = true;
                         }
@@ -508,11 +548,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         console.error("Check failed for " + domain, err);
                         statusCell.innerHTML = '<i data-lucide="help-circle" style="color: #6b7280; width: 1.2rem; height: 1.2rem;" title="Check failed"></i>';
                         if (window.lucide) lucide.createIcons({ root: statusCell });
+                        globalErrors.push(`${rowLabel}: Resolution check failed`);
                         allValid = false;
                     }
                 };
                 enqueue(task);
-            }
+            });
         });
     }
 
@@ -523,10 +564,10 @@ document.addEventListener('DOMContentLoaded', () => {
         saveBtn.innerHTML = '<i data-lucide="loader-2" class="animate-spin"></i> Validating...';
         if (window.lucide) lucide.createIcons({ root: saveBtn });
 
-        const isValid = await validateAllRows();
+        const { isValid, errors } = await validateAllRows();
 
         if (!isValid) {
-            showToast('Cannot save: some records are invalid. Please check the highlighted fields.', 'danger');
+            showToast('Cannot save: some records are invalid. Please check the highlighted fields.', 'danger', true, errors);
             saveBtn.innerHTML = originalText;
             if (window.lucide) lucide.createIcons({ root: saveBtn });
             saveBtn.disabled = false;
