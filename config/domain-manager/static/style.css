@@ -68,42 +68,35 @@ header {
     color: var(--primary-color);
 }
 
+.logo-subtitles {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+}
+
 .logo .subtitle-link {
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
     color: var(--text-muted);
     text-decoration: none;
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    transition: color 0.2s;
+    transition: all 0.2s;
+    background: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font-family: inherit;
 }
 
 .logo .subtitle-link:hover {
     color: var(--primary-color);
 }
 
-.help-btn {
-    background: transparent;
-    border: none;
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: all 0.2s;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2px;
-    margin-left: 0.5rem;
-    vertical-align: middle;
-}
-
-.help-btn:hover {
-    color: var(--primary-color);
-    transform: scale(1.1);
-}
-
-.help-btn i {
-    width: 18px;
-    height: 18px;
+.subtitle-separator {
+    color: var(--border-color);
+    font-size: 0.75rem;
 }
 
 .logo .subtitle-link i {

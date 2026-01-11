@@ -29,13 +29,16 @@
         <header>
             <div class="logo">
                 <h1>domains.{{ domain }}</h1>
-                <a href="https://github.com/pinano/traefik-crowdsec-anubis-grafana" target="_blank"
-                    class="subtitle-link">
-                    <i data-lucide="book-open"></i> Project Documentation
-                </a>
-                <button id="help-btn" class="help-btn" title="Usage Instructions">
-                    <i data-lucide="help-circle"></i>
-                </button>
+                <div class="logo-subtitles">
+                    <a href="https://github.com/pinano/traefik-crowdsec-anubis-grafana" target="_blank"
+                        class="subtitle-link">
+                        <i data-lucide="book-open"></i> Project Documentation
+                    </a>
+                    <span class="subtitle-separator">|</span>
+                    <button id="help-btn" class="subtitle-link help-link-btn" title="Usage Instructions">
+                        <i data-lucide="help-circle"></i> Interface Help
+                    </button>
+                </div>
             </div>
             <div class="actions">
                 <button id="check-btn" class="btn btn-info" style="color: white; background-color: #0ea5e9;">
@@ -69,7 +72,7 @@
             <div class="table-container">
                 <table id="domains-table">
                     <thead>
-                        <th class="sortable" data-sort="_status">Check
+                        <th class="sortable" data-sort="_status">Valid
                             <i data-lucide="chevrons-up-down" class="sort-icon default"></i>
                             <i data-lucide="chevron-up" class="sort-icon asc"></i>
                             <i data-lucide="chevron-down" class="sort-icon desc"></i>
@@ -133,7 +136,7 @@
                     <table id="deleted-domains-table">
                         <thead>
                             <tr>
-                                <th>Check</th>
+                                <th>Valid</th>
                                 <th>Root Domain</th>
                                 <th>Domain</th>
                                 <th>Redirection</th>
