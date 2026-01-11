@@ -40,6 +40,9 @@ print(f"DEBUG: CSV_PATH={CSV_PATH}")
 print(f"DEBUG: START_SCRIPT={START_SCRIPT}")
 
 DOMAIN = os.environ.get('DOMAIN', 'localhost')
+TRAEFIK_RATE_AVG = os.environ.get('TRAEFIK_GLOBAL_RATE_AVG', '60')
+TRAEFIK_RATE_BURST = os.environ.get('TRAEFIK_GLOBAL_RATE_BURST', '120')
+TRAEFIK_CONCURRENCY = os.environ.get('TRAEFIK_GLOBAL_CONCURRENCY', '25')
 ENV = os.environ.copy()
 ENV['TERM'] = 'xterm'
 
@@ -200,7 +203,11 @@ def logout():
 def index():
     if not session.get('logged_in'):
         return redirect(url_for('login'))
-    return render_template('index.html', domain=DOMAIN)
+    return render_template('index.html', 
+                           domain=DOMAIN,
+                           rate_avg=TRAEFIK_RATE_AVG,
+                           rate_burst=TRAEFIK_RATE_BURST,
+                           concurrency=TRAEFIK_CONCURRENCY)
 
 @app.route('/api/domains', methods=['GET', 'POST'])
 def api_domains():
