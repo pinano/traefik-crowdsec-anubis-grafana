@@ -3,6 +3,7 @@ import csv
 import subprocess
 import secrets
 import re
+import socket
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, Response
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -260,6 +261,48 @@ def api_services():
     except Exception as e:
         print(f"Error getting external services: {e}")
         return jsonify([])
+
+def resolve_domain(domain):
+    try:
+        # Get the IP address of the domain
+        ip = socket.gethostbyname(domain)
+        return ip
+    except Exception as e:
+        return None
+
+@app.route('/api/check-domain', methods=['POST'])
+def check_domain():
+    if not session.get('logged_in'):
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    data = request.json
+    domain_to_check = data.get('domain')
+    
+    if not domain_to_check:
+        return jsonify({'status': 'error', 'message': 'No domain provided'})
+    
+    # 1. Resolve the domain to check
+    actual_ip = resolve_domain(domain_to_check)
+    
+    if not actual_ip:
+        return jsonify({'status': 'error', 'message': 'Could not resolve domain'})
+        
+    # 2. Resolve the host domain (DOMAIN env var) to get expected IP
+    # We assume 'DOMAIN' points to this server.
+    host_domain = os.environ.get('DOMAIN')
+    expected_ip = resolve_domain(host_domain)
+    
+    if not expected_ip:
+         return jsonify({'status': 'error', 'message': 'Could not resolve host domain'})
+    
+    if actual_ip == expected_ip:
+        return jsonify({'status': 'match', 'ip': actual_ip})
+    else:
+        return jsonify({
+            'status': 'mismatch', 
+            'expected': expected_ip, 
+            'actual': actual_ip
+        })
 
 @app.route('/api/restart', methods=['POST'])
 def restart_stack():

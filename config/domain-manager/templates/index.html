@@ -38,6 +38,9 @@
                 <button id="save-btn" class="btn btn-primary" disabled>
                     <i data-lucide="save"></i> Save Changes
                 </button>
+                <button id="check-btn" class="btn btn-info" style="color: white; background-color: #0ea5e9;">
+                    <i data-lucide="network"></i> Check Domain IPs
+                </button>
                 <button id="export-btn" class="btn btn-success">
                     <i data-lucide="download"></i> Export CSV
                 </button>
@@ -63,6 +66,7 @@
             <div class="table-container">
                 <table id="domains-table">
                     <thead>
+                        <th>Check</th>
                         <th class="sortable" data-sort="_root_domain">Root Domain
                             <i data-lucide="chevrons-up-down" class="sort-icon default"></i>
                             <i data-lucide="chevron-up" class="sort-icon asc"></i>

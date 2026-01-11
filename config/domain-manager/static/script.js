@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     const domainsBody = document.getElementById('domains-body');
     const saveBtn = document.getElementById('save-btn');
+    const checkBtn = document.getElementById('check-btn');
     const exportBtn = document.getElementById('export-btn');
     const restartBtn = document.getElementById('restart-btn');
     const addRowBtn = document.getElementById('add-row-btn');
@@ -212,6 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tr.style.backgroundColor = getColorForRoot(root);
 
         tr.innerHTML = `
+            <td class="check-status-cell" style="text-align: center;"></td>
             <td class="root-domain-cell" data-label="Root Domain">${root || '-'}</td>
             <td data-label="Domain"><input type="text" class="data-input" data-key="domain" value="${data.domain || ''}" placeholder="example.com"></td>
             <td data-label="Redirection"><input type="text" class="data-input" data-key="redirection" value="${data.redirection || ''}" placeholder="www.example.com"></td>
@@ -333,6 +335,57 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     saveBtn.addEventListener('click', () => saveDomains(true));
+
+    checkBtn.addEventListener('click', async () => {
+        const rows = Array.from(domainsBody.querySelectorAll('tr'));
+
+        let pending = 0;
+
+        for (const row of rows) {
+            const domainInput = row.querySelector('input[data-key="domain"]');
+            const statusCell = row.querySelector('.check-status-cell');
+
+            if (!domainInput || !statusCell) continue;
+
+            const domain = domainInput.value.trim();
+            if (!domain) continue;
+
+            // Show loading spinner
+            statusCell.innerHTML = '<i data-lucide="loader-2" class="animate-spin" style="width: 1rem; height: 1rem; color: #666;"></i>';
+            if (window.lucide) lucide.createIcons({ root: statusCell });
+
+            pending++;
+
+            // Call API
+            // We use a separate async IIFE or just separate calls to parallelize slightly or sequential
+            // Here we do it essentially sequential or slightly overlapped to not overload if many domains
+            // For better UX, let's do parallel but limit concurrency if needed. For now simple fetch is okay.
+
+            fetch('/api/check-domain', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ domain: domain })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'match') {
+                        statusCell.innerHTML = '<i data-lucide="check-circle" style="color: #22c55e; width: 1.2rem; height: 1.2rem;"></i>';
+                    } else if (data.status === 'mismatch') {
+                        statusCell.innerHTML = `<i data-lucide="x-circle" style="color: #ef4444; width: 1.2rem; height: 1.2rem;" title="Expected: ${data.expected}, Actual: ${data.actual}"></i>`;
+                    } else {
+                        statusCell.innerHTML = `<i data-lucide="alert-circle" style="color: #f59e0b; width: 1.2rem; height: 1.2rem;" title="${data.message}"></i>`;
+                    }
+                    if (window.lucide) lucide.createIcons({ root: statusCell });
+                })
+                .catch(err => {
+                    statusCell.innerHTML = '<i data-lucide="help-circle" style="color: #6b7280; width: 1.2rem; height: 1.2rem;"></i>';
+                    if (window.lucide) lucide.createIcons({ root: statusCell });
+                });
+        }
+    });
 
     exportBtn.addEventListener('click', () => {
         // Headers matching the CSV structure in the backend
