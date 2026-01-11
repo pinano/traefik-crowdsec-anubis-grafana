@@ -659,7 +659,13 @@ document.addEventListener('DOMContentLoaded', () => {
         checkBtn.innerHTML = '<i data-lucide="loader-2" class="animate-spin"></i> Validating...';
         if (window.lucide) lucide.createIcons({ root: checkBtn });
 
-        await validateAllRows();
+        const { isValid, errors } = await validateAllRows();
+
+        if (!isValid) {
+            showToast('Validation failed: some records have issues. Please check the highlighted fields.', 'danger', true, errors);
+        } else {
+            showToast('All records validated successfully', 'success');
+        }
 
         checkBtn.innerHTML = originalText;
         if (window.lucide) lucide.createIcons({ root: checkBtn });

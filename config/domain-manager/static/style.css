@@ -234,26 +234,6 @@ td {
     z-index: 2;
 }
 
-.row-error {
-    background-color: #f87171 !important;
-    /* More saturated red */
-}
-
-.row-error input {
-    color: #450a0a !important;
-}
-
-.input-error {
-    border: 3px solid #7f1d1d !important;
-    /* Dark Red Border */
-    background-color: #ffffff !important;
-    /* White Body for max contrast against red row */
-    color: #991b1b !important;
-    /* Dark Red Text */
-    font-weight: bold;
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5);
-    /* Halo effect */
-}
 
 #domains-body tr:focus-within {
     z-index: 10;
@@ -1065,4 +1045,26 @@ button:disabled {
     background-color: #fff;
     border-color: #fdba74;
     /* Orange-300 */
+}
+
+/* Error styles moved here to ensure precedence over unsaved highlight */
+.row-error {
+    background-color: #f87171 !important;
+    /* More saturated red */
+}
+
+.row-error input {
+    color: #450a0a !important;
+}
+
+.input-error {
+    border: 3px solid #7f1d1d !important;
+    /* Dark Red Border */
+    background-color: #ffffff !important;
+    /* White Body for max contrast against red row */
+    color: #991b1b !important;
+    /* Dark Red Text */
+    font-weight: bold;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5);
+    /* Halo effect */
 }
