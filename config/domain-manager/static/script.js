@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const confirmTitle = document.getElementById('confirm-modal-title');
 
     let allDomains = [];
+    let pristineData = ''; // JSON string of domains as they exist on server
     let allServices = [];
     let currentSort = { column: '_root_domain', direction: 'asc' };
     let rowToDelete = null;
@@ -118,6 +119,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 _root_domain: getRootDomain(d.domain)
             }));
             updateRootColors();
+            // Store a "pristine" copy of the data (values only, no internal IDs)
+            pristineData = JSON.stringify(allDomains.map(({ _id, _root_domain, ...rest }) => rest));
             applyFilterAndSort();
         } catch (error) {
             showToast('Error loading domains', 'danger');
@@ -261,6 +264,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const errors = data._validation_errors || [];
             statusHtml = `<i data-lucide="x-circle" style="color: #7f1d1d; width: 1.2rem; height: 1.2rem;" title="${errors.join('\n')}"></i>`;
             tr.classList.add('row-error');
+        } else {
+            statusHtml = '<i data-lucide="help-circle" style="color: #94a3b8; width: 1.2rem; height: 1.2rem;" title="Not validated"></i>';
         }
 
         tr.innerHTML = `
@@ -318,7 +323,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     domainObj._status = null;
                     domainObj._validation_errors = [];
                 }
-                tr.querySelector('.check-status-cell').innerHTML = '';
+                tr.querySelector('.check-status-cell').innerHTML = '<i data-lucide="help-circle" style="color: #94a3b8; width: 1.2rem; height: 1.2rem;" title="Not validated"></i>';
+                if (window.lucide) lucide.createIcons({ root: tr.querySelector('.check-status-cell') });
                 tr.classList.remove('row-error');
 
                 tr.classList.add('row-unsaved');
@@ -648,7 +654,13 @@ document.addEventListener('DOMContentLoaded', () => {
             if (response.ok) {
                 if (showSuccess) showToast('Changes saved successfully');
                 clearUnsavedChanges();
-                markRestartNeeded();
+
+                // Compare with previous state to see if restart is actually needed
+                const currentPayloadStr = JSON.stringify(payload);
+                if (currentPayloadStr !== pristineData) {
+                    markRestartNeeded();
+                    pristineData = currentPayloadStr;
+                }
             } else {
                 showToast('Error saving changes', 'danger');
                 saveBtn.disabled = false;
