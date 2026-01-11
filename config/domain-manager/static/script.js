@@ -156,6 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Style.css says background #f9fafb.
 
             tr.innerHTML = `
+                <td></td>
                 <td class="root-domain-cell" data-label="Root Domain">${root}</td>
                 <td data-label="Domain"><input type="text" class="data-input" value="${data.domain || ''}" disabled></td>
                 <td data-label="Redirection"><input type="text" class="data-input" value="${data.redirection || ''}" disabled></td>
@@ -345,7 +346,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const rows = Array.from(domainsBody.querySelectorAll('tr'));
 
         // Concurrency Control
-        const MAX_CONCURRENCY = 3;
+        const MAX_CONCURRENCY = 50;
         const queue = [];
         let activeCount = 0;
 
