@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const unsavedNotification = document.getElementById('unsaved-notification');
     const globalDropdown = document.getElementById('global-service-dropdown');
     let activeServiceInput = null;
+    let highlightedServiceIndex = -1;
 
     // Modal elements for Confirmation
     const confirmModal = document.getElementById('confirm-modal');
@@ -306,12 +307,53 @@ document.addEventListener('DOMContentLoaded', () => {
         serviceInput.addEventListener('input', (e) => {
             activeServiceInput = serviceInput; // Ensure it's active
             const filter = e.target.value;
+            highlightedServiceIndex = filter ? 0 : -1; // Highlight first on search
             renderGlobalDropdown(filter);
             updateGlobalDropdownPosition();
 
             // If filter matches exactly one service, but user is still typing, 
             // keep showing the dropdown so they can see it's correct.
         });
+
+        serviceInput.addEventListener('keydown', (e) => {
+            if (!globalDropdown.classList.contains('show')) return;
+
+            const items = globalDropdown.querySelectorAll('.dropdown-item');
+            if (items.length === 0) return;
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                highlightedServiceIndex = (highlightedServiceIndex + 1) % items.length;
+                updateDropdownHighlight(items);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                highlightedServiceIndex = (highlightedServiceIndex - 1 + items.length) % items.length;
+                updateDropdownHighlight(items);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (highlightedServiceIndex >= 0 && highlightedServiceIndex < items.length) {
+                    items[highlightedServiceIndex].dispatchEvent(new MouseEvent('mousedown'));
+                } else if (items.length > 0) {
+                    // Default to first if none highlighted? 
+                    // Actually, if they press enter and nothing is highlighted, maybe they want the first match.
+                    items[0].dispatchEvent(new MouseEvent('mousedown'));
+                }
+            } else if (e.key === 'Escape') {
+                globalDropdown.classList.remove('show');
+                activeServiceInput = null;
+            }
+        });
+
+        function updateDropdownHighlight(items) {
+            items.forEach((item, index) => {
+                if (index === highlightedServiceIndex) {
+                    item.classList.add('selected');
+                    item.scrollIntoView({ block: 'nearest' });
+                } else {
+                    item.classList.remove('selected');
+                }
+            });
+        }
 
         tr.querySelector('.remove-row-btn').addEventListener('click', () => {
             rowToDelete = tr;
@@ -684,9 +726,14 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        filtered.forEach(service => {
+        // Clamp index if filtered list changed
+        if (highlightedServiceIndex >= filtered.length) highlightedServiceIndex = filtered.length - 1;
+        if (highlightedServiceIndex < 0 && filtered.length > 0 && filter) highlightedServiceIndex = 0;
+
+        filtered.forEach((service, index) => {
             const item = document.createElement('div');
             item.className = 'dropdown-item';
+            if (index === highlightedServiceIndex) item.classList.add('selected');
             item.textContent = service;
             // Use mousedown to ensure it fires before blur
             item.addEventListener('mousedown', (e) => {
