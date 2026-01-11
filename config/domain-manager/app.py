@@ -277,6 +277,7 @@ def resolve_domain(domain):
         return None
 
 @app.route('/api/check-domain', methods=['POST'])
+@limiter.exempt
 def check_domain():
     if not session.get('logged_in'):
         return jsonify({'error': 'Unauthorized'}), 401

@@ -259,6 +259,10 @@ td {
     z-index: 10;
 }
 
+td.check-status-cell {
+    vertical-align: bottom;
+}
+
 th:nth-child(1),
 td:nth-child(1) {
     width: 4%;
