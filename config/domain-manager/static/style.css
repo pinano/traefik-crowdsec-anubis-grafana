@@ -244,9 +244,15 @@ td {
 }
 
 .input-error {
-    border: 2px solid #b91c1c !important;
-    background-color: #fee2e2 !important;
-    color: #b91c1c !important;
+    border: 3px solid #7f1d1d !important;
+    /* Dark Red Border */
+    background-color: #ffffff !important;
+    /* White Body for max contrast against red row */
+    color: #991b1b !important;
+    /* Dark Red Text */
+    font-weight: bold;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5);
+    /* Halo effect */
 }
 
 #domains-body tr:focus-within {
