@@ -4,19 +4,38 @@ document.addEventListener('DOMContentLoaded', () => {
     const checkBtn = document.getElementById('check-btn');
     const exportBtn = document.getElementById('export-btn');
     const restartBtn = document.getElementById('restart-btn');
-    const addRowBtn = document.getElementById('add-row-btn');
-    const toast = document.getElementById('toast');
     const searchInput = document.getElementById('search-input');
-    const sortableHeaders = document.querySelectorAll('th.sortable');
-    const deletedDomainsBody = document.getElementById('deleted-domains-body');
-
-    // Modal elements for Restart
+    const addRowBtn = document.getElementById('add-row-btn');
+    const globalDropdown = document.getElementById('global-service-dropdown');
+    const sortableHeaders = document.querySelectorAll('.sortable');
+    const unsavedNotification = document.getElementById('unsaved-notification');
+    const restartNotification = document.getElementById('restart-notification');
     const restartModal = document.getElementById('restart-modal');
     const logContainer = document.getElementById('log-container');
     const closeModalBtn = document.getElementById('close-modal-btn');
-    const restartNotification = document.getElementById('restart-notification');
-    const unsavedNotification = document.getElementById('unsaved-notification');
-    const globalDropdown = document.getElementById('global-service-dropdown');
+    // Header Sticky Logic
+    const header = document.querySelector('header');
+    let headerSpacer = document.createElement('div');
+    headerSpacer.className = 'header-spacer';
+    header.after(headerSpacer);
+
+    window.addEventListener('scroll', () => {
+        if (window.innerWidth > 768) { // Only on desktop
+            const stickyThreshold = 50;
+            if (window.scrollY > stickyThreshold) {
+                header.classList.add('header-scrolled');
+                headerSpacer.style.display = 'block';
+                headerSpacer.style.height = header.offsetHeight + 'px';
+            } else {
+                header.classList.remove('header-scrolled');
+                headerSpacer.style.display = 'none';
+            }
+        } else {
+            header.classList.remove('header-scrolled');
+            headerSpacer.style.display = 'none';
+        }
+    });
+
     let activeServiceInput = null;
     let highlightedServiceIndex = -1;
 

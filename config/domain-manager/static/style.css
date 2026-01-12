@@ -66,6 +66,36 @@ header {
     border-radius: 0.5rem;
     border: 1px solid var(--border-color);
     box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1000;
+}
+
+.header-scrolled {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 0.5rem 2rem;
+    border-radius: 0;
+    margin-bottom: 0;
+    border-left: none;
+    border-right: none;
+    border-top: none;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    backdrop-filter: blur(8px);
+    background-color: rgba(255, 255, 255, 0.85);
+}
+
+/* Offset if banner is present */
+body.has-notification .header-scrolled {
+    top: 60px;
+    /* Banner height + overlap padding if needed */
+}
+
+.header-spacer {
+    display: none;
+    height: 0;
+    margin-bottom: 1.5rem;
 }
 
 .logo h1 {
