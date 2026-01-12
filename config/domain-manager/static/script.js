@@ -63,13 +63,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (roots.length === 0) return;
 
         roots.forEach((root, index) => {
-            // Map index to Hue 0-360
-            // We leave a small gap at the end so 0 and 360 don't clash if the list wraps
-            const h = Math.floor((index / roots.length) * 360);
+            // Golden angle distribution for distinct hues (approx 137.5 degrees)
+            const h = (index * 137.5) % 360;
 
-            // Consistent pastel settings
-            // Saturation 85%, Lightness 92%
-            rootColorMap.set(root, `hsl(${h}, 85%, 92%)`);
+            // Toggle lightness and saturation for alternating "tones" between adjacent groups
+            const l = (index % 2 === 0) ? 94 : 88;
+            const s = (index % 2 === 0) ? 80 : 90;
+
+            rootColorMap.set(root, `hsl(${h}, ${s}%, ${l}%)`);
         });
     }
 
