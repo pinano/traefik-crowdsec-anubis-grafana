@@ -692,7 +692,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         console.error("Check failed for " + domain, err);
                         statusCell.innerHTML = '<i data-lucide="help-circle" style="color: #6b7280; width: 1.2rem; height: 1.2rem;" title="Check failed"></i>';
                         if (window.lucide) lucide.createIcons({ root: statusCell });
-                        globalErrors.push(`${rowLabel}: Resolution check failed`);
+                        globalErrors.push(`${rowLabel}: Resolution check failed (${err.message})`);
                         allValid = false;
                     }
                 };
