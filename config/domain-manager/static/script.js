@@ -136,6 +136,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function debounce(func, wait) {
+        let timeout;
+        return function (...args) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(this, args), wait);
+        };
+    }
+
+    // Debounced search handler
+    const debouncedSearch = debounce(() => {
+        applyFilterAndSort();
+    }, 250);
+
+    searchInput.addEventListener('input', debouncedSearch);
+
     function getCleanPayload(domainObj) {
         return {
             domain: (domainObj.domain || '').trim().toLowerCase(),
@@ -148,6 +163,156 @@ document.addEventListener('DOMContentLoaded', () => {
             enabled: !!domainObj.enabled
         };
     }
+
+    function updateDomainField(id, key, value, tr) {
+        const domainObj = allDomains.find(d => d._id === id);
+        if (domainObj) {
+            domainObj[key] = value.trim();
+            if (key === 'domain') {
+                domainObj._root_domain = getRootDomain(value.trim());
+                // Update visual cell immediately
+                const rootCell = tr.querySelector('.root-domain-cell');
+                const newRoot = domainObj._root_domain || '-';
+                if (rootCell) rootCell.textContent = newRoot;
+
+                // Update background color
+                updateRootColors();
+                // Need to refresh ALL rows because relative positioning might have changed
+                document.querySelectorAll('#domains-body tr').forEach(row => {
+                    const r = row.querySelector('.root-domain-cell').textContent;
+                    row.style.backgroundColor = getColorForRoot(r);
+                });
+            }
+        }
+    }
+
+    // Event Delegation for Domains Table
+    domainsBody.addEventListener('input', (e) => {
+        if (e.target.classList.contains('data-input')) {
+            const input = e.target;
+            const tr = input.closest('tr');
+            if (!tr) return;
+            const id = tr.dataset.id;
+            const key = input.dataset.key;
+
+            // Sync value and update truth
+            const val = input.value.toLowerCase();
+            input.value = val;
+            updateDomainField(id, key, val, tr);
+
+            // Reset status on change
+            const domainObj = allDomains.find(d => d._id === id);
+            if (domainObj) {
+                domainObj._status = null;
+                domainObj._validation_errors = [];
+                refreshRowUnsavedState(tr, domainObj);
+            }
+
+            const statusCell = tr.querySelector('.check-status-cell');
+            if (statusCell) {
+                statusCell.innerHTML = '<i data-lucide="help-circle" style="color: #94a3b8; width: 1.2rem; height: 1.2rem;" title="Not validated"></i>';
+                if (window.lucide) lucide.createIcons({ root: statusCell });
+            }
+            tr.classList.remove('row-error');
+
+            refreshUnsavedUI();
+
+            // Special handling for filtering in service input
+            if (input.classList.contains('service-input')) {
+                activeServiceInput = input;
+                const filter = input.value;
+                highlightedServiceIndex = filter ? 0 : -1;
+                renderGlobalDropdown(filter);
+                updateGlobalDropdownPosition();
+            }
+        }
+    });
+
+    domainsBody.addEventListener('focusin', (e) => {
+        if (e.target.classList.contains('service-input')) {
+            activeServiceInput = e.target;
+            renderGlobalDropdown('');
+            updateGlobalDropdownPosition();
+        }
+    });
+
+    domainsBody.addEventListener('click', (e) => {
+        if (e.target.classList.contains('service-input')) {
+            activeServiceInput = e.target;
+            renderGlobalDropdown('');
+            updateGlobalDropdownPosition();
+        }
+
+        const removeBtn = e.target.closest('.remove-row-btn');
+        if (removeBtn) {
+            const tr = removeBtn.closest('tr');
+            rowToDelete = tr;
+            const domainVal = tr.querySelector('[data-key="domain"]').value || 'this record';
+            confirmTitle.textContent = 'Confirm Deletion';
+            confirmMsg.textContent = `Are you sure you want to delete ${domainVal}?`;
+            confirmDeleteBtn.textContent = 'Delete';
+            confirmAction = 'delete';
+            confirmModal.classList.add('show');
+        }
+    });
+
+    domainsBody.addEventListener('focusout', (e) => {
+        if (e.target.classList.contains('service-input')) {
+            const input = e.target;
+            setTimeout(() => {
+                validateServiceInput(input);
+                if (activeServiceInput === input) {
+                    globalDropdown.classList.remove('show');
+                    activeServiceInput = null;
+                }
+            }, 200);
+        }
+    });
+
+    domainsBody.addEventListener('keydown', (e) => {
+        if (e.target.classList.contains('service-input')) {
+            if (!globalDropdown.classList.contains('show')) return;
+
+            const items = globalDropdown.querySelectorAll('.dropdown-item');
+            if (items.length === 0) return;
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                highlightedServiceIndex = (highlightedServiceIndex + 1) % items.length;
+                updateDropdownHighlight(items);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                highlightedServiceIndex = (highlightedServiceIndex - 1 + items.length) % items.length;
+                updateDropdownHighlight(items);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (highlightedServiceIndex >= 0 && highlightedServiceIndex < items.length) {
+                    items[highlightedServiceIndex].dispatchEvent(new MouseEvent('mousedown'));
+                } else if (items.length > 0) {
+                    items[0].dispatchEvent(new MouseEvent('mousedown'));
+                }
+            } else if (e.key === 'Escape') {
+                globalDropdown.classList.remove('show');
+                activeServiceInput = null;
+            }
+        }
+    });
+
+    function validateServiceInput(input) {
+        const tr = input.closest('tr');
+        const id = tr.dataset.id;
+        const val = input.value.trim();
+
+        if (allServices.length > 0 && !allServices.includes(val)) {
+            input.value = '';
+            updateDomainField(id, 'service_name', '', tr);
+            showToast('Please select a valid service from the list', 'danger');
+        }
+        const domainObj = allDomains.find(d => d._id === id);
+        refreshRowUnsavedState(tr, domainObj);
+        refreshUnsavedUI();
+    }
+
 
     function refreshRowUnsavedState(tr, domainObj) {
         if (!domainObj) return;
@@ -230,11 +395,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderTable(data) {
         domainsBody.innerHTML = '';
+        const fragment = document.createDocumentFragment();
         data.forEach(domain => {
             if (domain.enabled !== false) {
-                addRow(domain);
+                const tr = addRow(domain, false); // false = don't append, just return
+                fragment.appendChild(tr);
             }
         });
+        domainsBody.appendChild(fragment);
         renderDeletedTable();
     }
 
@@ -282,7 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function addRow(data = {}) {
+    function addRow(data = {}, append = true) {
         const id = data._id || crypto.randomUUID();
         if (!data._id) {
             // New row added via UI
@@ -343,150 +511,12 @@ document.addEventListener('DOMContentLoaded', () => {
             </td>
         `;
 
-        // Helper to update truth
-        const updateTruth = (key, value) => {
-            const domainObj = allDomains.find(d => d._id === id);
-            if (domainObj) {
-                domainObj[key] = value.trim();
-                if (key === 'domain') {
-                    domainObj._root_domain = getRootDomain(value.trim());
-                    // Update visual cell immediately
-                    const rootCell = tr.querySelector('.root-domain-cell');
-                    const newRoot = domainObj._root_domain || '-';
-                    if (rootCell) rootCell.textContent = newRoot;
-
-                    // Update background color
-                    updateRootColors();
-                    // Need to refresh ALL rows because relative positioning might have changed
-                    document.querySelectorAll('#domains-body tr').forEach(row => {
-                        const r = row.querySelector('.root-domain-cell').textContent;
-                        row.style.backgroundColor = getColorForRoot(r);
-                    });
-                }
-            }
-        };
-
-        // Reactive update: when any input changes, update the source of truth
-        tr.querySelectorAll('.data-input').forEach(input => {
-            input.addEventListener('input', (e) => {
-                const val = e.target.value.toLowerCase();
-                e.target.value = val; // Force visual synchronization
-                updateTruth(e.target.dataset.key, val);
-
-                // Reset status on change
-                const domainObj = allDomains.find(d => d._id === id);
-                if (domainObj) {
-                    domainObj._status = null;
-                    domainObj._validation_errors = [];
-                    refreshRowUnsavedState(tr, domainObj);
-                }
-                tr.querySelector('.check-status-cell').innerHTML = '<i data-lucide="help-circle" style="color: #94a3b8; width: 1.2rem; height: 1.2rem;" title="Not validated"></i>';
-                if (window.lucide) lucide.createIcons({ root: tr.querySelector('.check-status-cell') });
-                tr.classList.remove('row-error');
-
-                refreshUnsavedUI();
-            });
-        });
-
-        // Global Dropdown Integration
-        const serviceInput = tr.querySelector('.service-input');
-
-        const showDropdown = () => {
-            activeServiceInput = serviceInput;
-            renderGlobalDropdown(''); // Show all on focus/click
-            updateGlobalDropdownPosition();
-        };
-
-        const validateServiceInput = () => {
-            const val = serviceInput.value.trim();
-            if (allServices.length > 0 && !allServices.includes(val)) {
-                // Clear invalid text
-                serviceInput.value = '';
-                updateTruth('service_name', '');
-                showToast('Please select a valid service from the list', 'danger');
-            }
-            const domainObj = allDomains.find(d => d._id === id);
-            refreshRowUnsavedState(tr, domainObj);
-            refreshUnsavedUI();
-        };
-
-        serviceInput.addEventListener('focus', showDropdown);
-        serviceInput.addEventListener('click', showDropdown);
-        serviceInput.addEventListener('blur', () => {
-            // Small delay to allow mousedown selection to happen first
-            setTimeout(() => {
-                validateServiceInput();
-                if (activeServiceInput === serviceInput) {
-                    globalDropdown.classList.remove('show');
-                    activeServiceInput = null;
-                }
-            }, 200);
-        });
-
-        // Add input listener for filtering
-        serviceInput.addEventListener('input', (e) => {
-            activeServiceInput = serviceInput; // Ensure it's active
-            const filter = e.target.value;
-            highlightedServiceIndex = filter ? 0 : -1; // Highlight first on search
-            renderGlobalDropdown(filter);
-            updateGlobalDropdownPosition();
-
-            // If filter matches exactly one service, but user is still typing, 
-            // keep showing the dropdown so they can see it's correct.
-        });
-
-        serviceInput.addEventListener('keydown', (e) => {
-            if (!globalDropdown.classList.contains('show')) return;
-
-            const items = globalDropdown.querySelectorAll('.dropdown-item');
-            if (items.length === 0) return;
-
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                highlightedServiceIndex = (highlightedServiceIndex + 1) % items.length;
-                updateDropdownHighlight(items);
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                highlightedServiceIndex = (highlightedServiceIndex - 1 + items.length) % items.length;
-                updateDropdownHighlight(items);
-            } else if (e.key === 'Enter') {
-                e.preventDefault();
-                if (highlightedServiceIndex >= 0 && highlightedServiceIndex < items.length) {
-                    items[highlightedServiceIndex].dispatchEvent(new MouseEvent('mousedown'));
-                } else if (items.length > 0) {
-                    // Default to first if none highlighted? 
-                    // Actually, if they press enter and nothing is highlighted, maybe they want the first match.
-                    items[0].dispatchEvent(new MouseEvent('mousedown'));
-                }
-            } else if (e.key === 'Escape') {
-                globalDropdown.classList.remove('show');
-                activeServiceInput = null;
-            }
-        });
-
-        function updateDropdownHighlight(items) {
-            items.forEach((item, index) => {
-                if (index === highlightedServiceIndex) {
-                    item.classList.add('selected');
-                    item.scrollIntoView({ block: 'nearest' });
-                } else {
-                    item.classList.remove('selected');
-                }
-            });
-        }
-
-        tr.querySelector('.remove-row-btn').addEventListener('click', () => {
-            rowToDelete = tr;
-            const domainVal = tr.querySelector('[data-key="domain"]').value || 'this record';
-            confirmTitle.textContent = 'Confirm Deletion';
-            confirmMsg.textContent = `Are you sure you want to delete ${domainVal}?`;
-            confirmDeleteBtn.textContent = 'Delete';
-            confirmAction = 'delete';
-            confirmModal.classList.add('show');
-        });
-
-        domainsBody.appendChild(tr);
         if (window.lucide) lucide.createIcons({ root: tr });
+
+        if (append) {
+            domainsBody.appendChild(tr);
+        }
+        return tr;
     }
 
     async function validateAllRows() {
@@ -886,20 +916,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const addRowTopBtn = document.getElementById('add-row-top-btn');
     if (addRowTopBtn) {
         addRowTopBtn.addEventListener('click', () => {
-            addRow();
-            domainsBody.lastElementChild.querySelector('input').focus();
+            const tr = addRow();
+            const firstInput = tr.querySelector('input');
+            if (firstInput) firstInput.focus();
         });
     }
 
     addRowBtn.addEventListener('click', () => {
-        addRow();
-        domainsBody.lastElementChild.querySelector('input').focus();
+        const tr = addRow(); // addRow appends by default
+        const firstInput = tr.querySelector('input');
+        if (firstInput) firstInput.focus();
     });
 
-    searchInput.addEventListener('input', () => {
-        searchInput.value = searchInput.value.toLowerCase();
-        applyFilterAndSort();
-    });
+    // Old search listener removed in favor of debounced one above
+
 
     sortableHeaders.forEach(header => {
         header.addEventListener('click', () => {
