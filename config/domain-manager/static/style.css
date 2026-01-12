@@ -199,6 +199,7 @@ th {
     text-transform: uppercase;
     color: var(--text-muted);
     border-bottom: 2px solid var(--border-color);
+    text-align: center;
 }
 
 .root-domain-cell {
