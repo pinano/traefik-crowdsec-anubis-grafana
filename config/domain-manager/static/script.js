@@ -13,6 +13,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const restartModal = document.getElementById('restart-modal');
     const logContainer = document.getElementById('log-container');
     const closeModalBtn = document.getElementById('close-modal-btn');
+    const toast = document.getElementById('toast');
+    const deletedDomainsBody = document.getElementById('deleted-domains-body');
     // Header Sticky Logic
     const header = document.querySelector('header');
     let headerSpacer = document.createElement('div');
