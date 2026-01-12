@@ -686,20 +686,25 @@ document.addEventListener('DOMContentLoaded', () => {
             if (response.ok) {
                 if (showSuccess) showToast('Changes saved successfully');
 
-                // Update original state for all rows to match what was just saved
+                // Update original state and clear unsaved flag for all rows
                 allDomains.forEach(d => {
-                    if (d.domain && d.domain.trim() !== '' && d.service_name && d.service_name.trim() !== '') {
+                    if (d.domain && d.domain.trim() !== '') {
                         d._original = JSON.stringify(getCleanPayload(d));
+                        d._unsaved = false;
                     }
                 });
 
                 // Compare with previous state to see if restart is actually needed
                 const currentPayloadStr = JSON.stringify(payload);
-                if (currentPayloadStr !== pristineData) {
-                    markRestartNeeded();
+                const restartNeeded = currentPayloadStr !== pristineData;
+
+                if (restartNeeded) {
                     pristineData = currentPayloadStr;
+                    markRestartNeeded();
                 }
-                refreshUnsavedUI();
+
+                // Force UI to clear all unsaved highlights and hide banner
+                clearUnsavedChanges();
             } else {
                 showToast('Error saving changes', 'danger');
                 saveBtn.disabled = false;
