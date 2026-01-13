@@ -210,6 +210,7 @@ body.has-notification .header-scrolled {
     padding: 0.1rem 0.3rem;
     font-size: 0.7rem;
     gap: 0;
+    width: 1.45rem;
 }
 
 .btn-xs i {
