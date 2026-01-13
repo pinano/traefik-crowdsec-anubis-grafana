@@ -206,6 +206,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 domainObj._status = null;
                 domainObj._validation_errors = [];
                 refreshRowUnsavedState(tr, domainObj);
+
+                // If domain changed, reset status on potential duplicates too
+                if (key === 'domain') {
+                    const changedDomain = val.trim().toLowerCase();
+                    document.querySelectorAll('#domains-body tr').forEach(row => {
+                        const rowId = row.dataset.id;
+                        const otherObj = allDomains.find(d => d._id === rowId);
+                        if (otherObj && otherObj._id !== id && (otherObj.domain || '').trim().toLowerCase() === changedDomain) {
+                            otherObj._status = null;
+                            otherObj._validation_errors = [];
+                            const sCell = row.querySelector('.check-status-cell');
+                            if (sCell) {
+                                sCell.innerHTML = '<i data-lucide="help-circle" style="color: #94a3b8; width: 1.2rem; height: 1.2rem;" title="Not validated"></i>';
+                                if (window.lucide) lucide.createIcons({ root: sCell });
+                            }
+                            row.classList.remove('row-error');
+                        }
+                    });
+                }
             }
 
             const statusCell = tr.querySelector('.check-status-cell');
@@ -450,7 +469,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function addRow(data = {}, append = true) {
+    function addRow(data = {}, position = 'bottom') {
         const id = data._id || crypto.randomUUID();
         if (!data._id) {
             // New row added via UI
@@ -463,13 +482,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 rate: data.rate || '',
                 burst: data.burst || '',
                 concurrency: data.concurrency || '',
-                burst: data.burst || '',
-                concurrency: data.concurrency || '',
                 _root_domain: getRootDomain(data.domain || ''),
                 enabled: true,
                 _unsaved: true // Mark as unsaved
             };
-            allDomains.push(newDomain);
+            if (position === 'top') {
+                allDomains.unshift(newDomain);
+            } else {
+                allDomains.push(newDomain);
+            }
             refreshUnsavedUI();
         }
 
@@ -513,9 +534,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (window.lucide) lucide.createIcons({ root: tr });
 
-        if (append) {
+        if (position === 'top') {
+            domainsBody.prepend(tr);
+        } else if (position === 'bottom') {
             domainsBody.appendChild(tr);
         }
+        // If position is anything else (like false), we don't append, just return
         return tr;
     }
 
@@ -523,6 +547,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const rows = Array.from(domainsBody.querySelectorAll('tr'));
         let allValid = true;
         let globalErrors = [];
+
+        // 1. Pre-calculate duplicates across ALL domains (enabled and disabled)
+        const domainCounts = {};
+        allDomains.forEach(d => {
+            const dom = (d.domain || '').trim().toLowerCase();
+            if (dom) domainCounts[dom] = (domainCounts[dom] || 0) + 1;
+        });
 
         // Concurrency Control for validation requests
         const MAX_CONCURRENCY = 10;
@@ -575,7 +606,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const serviceInput = row.querySelector('input[data-key="service_name"]');
                 const statusCell = row.querySelector('.check-status-cell');
 
-                const domain = domainInput ? domainInput.value.trim() : '';
+                const domain = domainInput ? domainInput.value.trim().toLowerCase() : '';
                 const redirection = redirectionInput ? redirectionInput.value.trim() : '';
                 const serviceName = serviceInput ? serviceInput.value.trim() : '';
                 const anubisSubdomain = row.querySelector('input[data-key="anubis_subdomain"]')?.value.trim() || '';
@@ -585,22 +616,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 const domainObj = allDomains.find(d => d._id === domainId);
 
                 // Show loading spinner
-                statusCell.innerHTML = '<i data-lucide="loader-2" class="animate-spin" style="width: 1rem; height: 1rem; color: #666;"></i>';
-                if (window.lucide) lucide.createIcons({ root: statusCell });
+                if (statusCell) {
+                    statusCell.innerHTML = '<i data-lucide="loader-2" class="animate-spin" style="width: 1rem; height: 1rem; color: #666;"></i>';
+                    if (window.lucide) lucide.createIcons({ root: statusCell });
+                }
                 if (domainObj) domainObj._status = 'loading';
 
                 // Clear previous errors
                 row.classList.remove('row-error');
                 row.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
 
-                // Basic mandatory check before network request
+                // Basic mandatory check and Duplicate check
                 let localErrors = [];
                 if (!domain) {
                     const msg = `${rowLabel}: Domain is required`;
                     localErrors.push(msg);
                     globalErrors.push(`${rowLabel} (Domain): Required`);
                     if (domainInput) domainInput.classList.add('input-error');
+                } else if (domainCounts[domain] > 1) {
+                    const msg = `${rowLabel}: Duplicate domain detected`;
+                    localErrors.push(msg);
+                    globalErrors.push(`${rowLabel} (Domain): Duplicate detected`);
+                    if (domainInput) domainInput.classList.add('input-error');
                 }
+
                 if (!serviceName) {
                     const msg = `${rowLabel}: Service is required`;
                     localErrors.push(msg);
@@ -609,9 +648,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 if (localErrors.length > 0) {
-                    statusCell.innerHTML = `<i data-lucide="x-circle" style="color: #7f1d1d; width: 1.2rem; height: 1.2rem;" title="${localErrors.join('\n')}"></i>`;
+                    if (statusCell) {
+                        statusCell.innerHTML = `<i data-lucide="x-circle" style="color: #7f1d1d; width: 1.2rem; height: 1.2rem;" title="${localErrors.join('\n')}"></i>`;
+                        if (window.lucide) lucide.createIcons({ root: statusCell });
+                    }
                     row.classList.add('row-error');
-                    if (window.lucide) lucide.createIcons({ root: statusCell });
                     if (domainObj) {
                         domainObj._status = 'invalid';
                         domainObj._validation_errors = localErrors;
@@ -916,16 +957,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const addRowTopBtn = document.getElementById('add-row-top-btn');
     if (addRowTopBtn) {
         addRowTopBtn.addEventListener('click', () => {
-            const tr = addRow();
+            const tr = addRow({}, 'top');
             const firstInput = tr.querySelector('input');
             if (firstInput) firstInput.focus();
         });
     }
 
     addRowBtn.addEventListener('click', () => {
-        const tr = addRow(); // addRow appends by default
+        const tr = addRow({}, 'bottom'); // addRow appends by default
         const firstInput = tr.querySelector('input');
-        if (firstInput) firstInput.focus();
+        if (firstInput) {
+            firstInput.focus();
+            tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
     });
 
     // Old search listener removed in favor of debounced one above

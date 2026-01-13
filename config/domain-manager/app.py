@@ -227,6 +227,26 @@ def api_domains():
     
     if request.method == 'POST':
         data = request.json
+        
+        # Check for duplicates
+        seen_domains = {}
+        duplicates = []
+        for entry in data:
+            domain = entry.get('domain', '').strip().lower()
+            if not domain:
+                continue
+            if domain in seen_domains:
+                if domain not in duplicates:
+                    duplicates.append(domain)
+            seen_domains[domain] = True
+        
+        if duplicates:
+            return jsonify({
+                'status': 'error', 
+                'message': f'Duplicate domains found: {", ".join(duplicates)}',
+                'duplicates': duplicates
+            }), 400
+            
         write_csv(data)
         return jsonify({'status': 'success'})
 
