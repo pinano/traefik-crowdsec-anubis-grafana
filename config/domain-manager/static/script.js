@@ -480,7 +480,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Scroll to the newly restored row in the main table
                 setTimeout(() => {
                     const restoredRow = domainsBody.querySelector(`tr[data-id="${data._id}"]`);
-                    if (restoredRow) restoredRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    if (restoredRow) {
+                        restoredRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        // Add pulse effect
+                        restoredRow.classList.add('row-restore-pulse');
+                        // Remove class after animation to clean up
+                        setTimeout(() => restoredRow.classList.remove('row-restore-pulse'), 1000);
+                    }
                 }, 100);
             });
 
