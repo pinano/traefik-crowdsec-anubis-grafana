@@ -451,11 +451,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td data-label="Burst"><input type="text" class="data-input" value="${data.burst || ''}" disabled></td>
                 <td data-label="Concurrency"><input type="text" class="data-input" value="${data.concurrency || ''}" disabled></td>
                 <td>
-                    <div style="display: flex; gap: 0.5rem; justify-content: center;">
-                        <button class="btn btn-success btn-sm restore-row-btn" title="Restore record">
+                    <div style="display: flex; gap: 0.25rem; justify-content: center;">
+                        <button class="btn btn-success btn-xs btn-compact restore-row-btn" title="Restore record">
                             <i data-lucide="rotate-ccw"></i>
                         </button>
-                        <button class="btn btn-danger btn-sm permanent-delete-btn" title="Delete permanently">
+                        <button class="btn btn-danger btn-xs btn-compact permanent-delete-btn" title="Delete permanently">
                             <i data-lucide="trash-2"></i>
                         </button>
                     </div>

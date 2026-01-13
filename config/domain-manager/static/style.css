@@ -206,6 +206,22 @@ body.has-notification .header-scrolled {
     font-size: 0.75rem;
 }
 
+.btn-xs {
+    padding: 0.1rem 0.3rem;
+    font-size: 0.7rem;
+    gap: 0;
+}
+
+.btn-xs i {
+    width: 14px;
+    height: 14px;
+}
+
+.btn-compact {
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+}
+
 .table-container {
     background-color: var(--card-bg);
     border-radius: 0.5rem;
