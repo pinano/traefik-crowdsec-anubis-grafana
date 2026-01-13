@@ -465,10 +465,23 @@ document.addEventListener('DOMContentLoaded', () => {
             tr.dataset.id = data._id; // Ensure ID is preserved for identification
 
             tr.querySelector('.restore-row-btn').addEventListener('click', () => {
-                data.enabled = true;
+                // Find index in allDomains
+                const idx = allDomains.findIndex(d => d._id === data._id);
+                if (idx !== -1) {
+                    // Remove from current position and move to end
+                    const [restored] = allDomains.splice(idx, 1);
+                    restored.enabled = true;
+                    allDomains.push(restored);
+                }
                 updateRootColors();
                 applyFilterAndSort();
                 refreshUnsavedUI();
+
+                // Scroll to the newly restored row in the main table
+                setTimeout(() => {
+                    const restoredRow = domainsBody.querySelector(`tr[data-id="${data._id}"]`);
+                    if (restoredRow) restoredRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 100);
             });
 
             tr.querySelector('.permanent-delete-btn').addEventListener('click', () => {
