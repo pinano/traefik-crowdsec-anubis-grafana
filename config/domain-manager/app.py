@@ -228,10 +228,12 @@ def api_domains():
     if request.method == 'POST':
         data = request.json
         
-        # Check for duplicates
+        # Check for duplicates (only for enabled records)
         seen_domains = {}
         duplicates = []
         for entry in data:
+            if not entry.get('enabled', True):
+                continue
             domain = entry.get('domain', '').strip().lower()
             if not domain:
                 continue

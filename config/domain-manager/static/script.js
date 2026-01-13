@@ -451,17 +451,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td data-label="Burst"><input type="text" class="data-input" value="${data.burst || ''}" disabled></td>
                 <td data-label="Concurrency"><input type="text" class="data-input" value="${data.concurrency || ''}" disabled></td>
                 <td>
-                    <button class="btn btn-success btn-sm restore-row-btn" title="Restore record">
-                        <i data-lucide="rotate-ccw"></i>
-                    </button>
+                    <div style="display: flex; gap: 0.5rem; justify-content: center;">
+                        <button class="btn btn-success btn-sm restore-row-btn" title="Restore record">
+                            <i data-lucide="rotate-ccw"></i>
+                        </button>
+                        <button class="btn btn-danger btn-sm permanent-delete-btn" title="Delete permanently">
+                            <i data-lucide="trash-2"></i>
+                        </button>
+                    </div>
                 </td>
             `;
+
+            tr.dataset.id = data._id; // Ensure ID is preserved for identification
 
             tr.querySelector('.restore-row-btn').addEventListener('click', () => {
                 data.enabled = true;
                 updateRootColors();
                 applyFilterAndSort();
                 refreshUnsavedUI();
+            });
+
+            tr.querySelector('.permanent-delete-btn').addEventListener('click', () => {
+                rowToDelete = tr;
+                confirmAction = 'permanent-delete';
+                confirmTitle.textContent = 'Permanent Deletion';
+                confirmMsg.textContent = `Are you sure you want to PERMANENTLY delete ${(data.domain || 'this record')}? This cannot be undone.`;
+                confirmDeleteBtn.textContent = 'Delete Forever';
+                confirmDeleteBtn.className = 'btn btn-danger';
+                confirmModal.classList.add('show');
             });
 
             deletedDomainsBody.appendChild(tr);
@@ -548,11 +565,13 @@ document.addEventListener('DOMContentLoaded', () => {
         let allValid = true;
         let globalErrors = [];
 
-        // 1. Pre-calculate duplicates across ALL domains (enabled and disabled)
+        // 1. Pre-calculate duplicates across only ENABLED domains
         const domainCounts = {};
         allDomains.forEach(d => {
-            const dom = (d.domain || '').trim().toLowerCase();
-            if (dom) domainCounts[dom] = (domainCounts[dom] || 0) + 1;
+            if (d.enabled !== false) {
+                const dom = (d.domain || '').trim().toLowerCase();
+                if (dom) domainCounts[dom] = (domainCounts[dom] || 0) + 1;
+            }
         });
 
         // Concurrency Control for validation requests
@@ -902,6 +921,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 rowToDelete = null;
             }
             confirmModal.classList.remove('show');
+        } else if (confirmAction === 'permanent-delete') {
+            if (rowToDelete) {
+                const id = rowToDelete.dataset.id;
+                allDomains = allDomains.filter(d => d._id !== id);
+                updateRootColors();
+                applyFilterAndSort(); // Re-renders active table
+                renderDeletedTable(); // Updates deleted table
+                refreshUnsavedUI();
+                rowToDelete = null;
+            }
+            confirmModal.classList.remove('show');
+            // Reset state
+            confirmDeleteBtn.textContent = 'Delete';
+            confirmAction = 'delete';
         } else if (confirmAction === 'restart') {
             confirmModal.classList.remove('show');
             initiateRestart();
@@ -952,6 +985,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Reset state
         confirmAction = 'delete';
         confirmDeleteBtn.textContent = 'Delete';
+        confirmDeleteBtn.className = 'btn btn-danger';
     });
 
     const addRowTopBtn = document.getElementById('add-row-top-btn');
