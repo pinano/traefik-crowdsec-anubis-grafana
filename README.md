@@ -474,7 +474,7 @@ To simplify manual management, we've implemented an **Auto-Sync Mechanism**:
 | `TRAEFIK_GLOBAL_CONCURRENCY` | Default concurrent connections | `25` |
 | `TRAEFIK_HSTS_MAX_AGE` | HSTS header duration (seconds) | `31536000` |
 | `TRAEFIK_ACME_EMAIL` | Let's Encrypt contact email | - |
-| `TRAEFIK_ACME_ENV_TYPE` | `staging` or `production` (ignored if `TRAEFIK_ACME_CA_SERVER` is set) | `staging` |
+| `TRAEFIK_ACME_ENV_TYPE` | `staging`, `production`, or `local` (ignored if `TRAEFIK_ACME_CA_SERVER` is set) | `staging` |
 | `TRAEFIK_ACME_CA_SERVER` | Optional direct URL override for the ACME server | - |
 | `TRAEFIK_DASHBOARD_AUTH` | Basic auth for dashboard (htpasswd format) | - |
 | `TRAEFIK_BLOCKED_PATHS` | Comma-separated list of path prefixes to block globally (regex supported) | - |
