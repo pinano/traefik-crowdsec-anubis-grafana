@@ -339,21 +339,44 @@ name: custom/ip-whitelist
 description: "User-defined trusted IPs from environment variable"
 whitelist:
   reason: "Trusted IP configured via CROWDSEC_WHITELIST_IPS"
-  ip:
 EOF
     
-    # Parse comma-separated IPs and add each as a YAML list item
-    IP_COUNT=0
-    IFS=',' read -ra IPS <<< "$CROWDSEC_WHITELIST_IPS"
-    for ip in "${IPS[@]}"; do
+    # Parse comma-separated IPs and separate them into IPs and CIDRs
+    declare -a IPS_LIST
+    declare -a CIDRS_LIST
+    
+    IFS=',' read -ra ENTRIES <<< "$CROWDSEC_WHITELIST_IPS"
+    for entry in "${ENTRIES[@]}"; do
         # Trim whitespace
-        ip=$(echo "$ip" | xargs)
-        if [ -n "$ip" ]; then
-            echo "    - \"$ip\"" >> "$WHITELIST_FILE"
-            echo "   ✅ Whitelisted: $ip"
-            IP_COUNT=$((IP_COUNT + 1))
+        entry=$(echo "$entry" | xargs)
+        if [ -n "$entry" ]; then
+            if [[ "$entry" == *"/"* ]]; then
+                CIDRS_LIST+=("$entry")
+            else
+                IPS_LIST+=("$entry")
+            fi
         fi
     done
+
+    # Append IPs if present
+    if [ ${#IPS_LIST[@]} -gt 0 ]; then
+        echo "  ip:" >> "$WHITELIST_FILE"
+        for ip in "${IPS_LIST[@]}"; do
+            echo "    - \"$ip\"" >> "$WHITELIST_FILE"
+            echo "   ✅ Whitelisted IP: $ip"
+            IP_COUNT=$((IP_COUNT + 1))
+        done
+    fi
+
+    # Append CIDRs if present
+    if [ ${#CIDRS_LIST[@]} -gt 0 ]; then
+        echo "  cidr:" >> "$WHITELIST_FILE"
+        for cidr in "${CIDRS_LIST[@]}"; do
+            echo "    - \"$cidr\"" >> "$WHITELIST_FILE"
+            echo "   ✅ Whitelisted CIDR: $cidr"
+            IP_COUNT=$((IP_COUNT + 1))
+        done
+    fi
     
     echo "   ✅ Whitelist generated with $IP_COUNT entries."
 else
