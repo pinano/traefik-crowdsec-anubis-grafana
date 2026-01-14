@@ -23,3 +23,6 @@ config/anubis/assets/custom.css
 config/anubis/assets/static/img/happy.webp
 config/anubis/assets/static/img/pensive.webp
 config/anubis/assets/static/img/reject.webp
+
+# Python cache files
+__pycache__
