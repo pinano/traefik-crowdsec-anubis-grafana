@@ -268,6 +268,10 @@ if [ -n "$TRAEFIK_ACME_ENV_TYPE" ]; then
             export TRAEFIK_ACME_CA_SERVER="https://acme-v02.api.letsencrypt.org/directory"
             echo "   ✅ Let's Encrypt PRODUCTION environment."
             ;;
+        local)
+            export TRAEFIK_ACME_CA_SERVER=""
+            echo "   🏠 Local Development environment (Self-Signed Certs)."
+            ;;
         *)
             echo "   ⚠️ Unknown TRAEFIK_ACME_ENV_TYPE: '$TRAEFIK_ACME_ENV_TYPE'. Ignoring."
             ;;

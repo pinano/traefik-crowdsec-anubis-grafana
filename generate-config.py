@@ -21,6 +21,8 @@ OUTPUT_TRAEFIK = 'config/traefik/dynamic-config/routers-generated.yaml'
 CROWDSEC_API_KEY = os.getenv('CROWDSEC_API_KEY')
 REDIS_PASSWORD = os.getenv('REDIS_PASSWORD')
 CROWDSEC_DISABLE = os.getenv('CROWDSEC_DISABLE', 'false').lower() == 'true'
+TRAEFIK_ENV_TYPE = os.getenv('TRAEFIK_ACME_ENV_TYPE', 'staging')
+IS_LOCAL_DEV = (TRAEFIK_ENV_TYPE == 'local')
 
 # Blocked Paths (Comma-separated list of regex patterns)
 BLOCKED_PATHS_STR = os.getenv('TRAEFIK_BLOCKED_PATHS', '').strip()
@@ -172,9 +174,14 @@ def process_router(entry, http_section, domain_to_cert_def):
         'rule': f"Host(`{domain}`)",
         'entryPoints': ["websecure"],
         'service': target_service,
-        'tls': {'certResolver': 'le'},
+        'tls': {}, # Default to empty TLS (self-signed)
         'middlewares': mw_list
     }
+    
+    # Only use Let's Encrypt if NOT in local dev mode
+    if not IS_LOCAL_DEV:
+        router_conf['tls']['certResolver'] = 'le'
+
     
     # Inject TLS domains if specific batch exists
     if domain in domain_to_cert_def:
@@ -390,43 +397,46 @@ def generate_configs():
         }
 
     # -------------------------------------------------------------------------
-    # TLS Grouping Logic (SAN / Chunking)
+    # TLS Grouping Logic (SAN / Chunking) - SKIPPED IN LOCAL DEV
     # -------------------------------------------------------------------------
-    # 1. Group all domains by their root
-    domains_by_root = defaultdict(list)
-    for entry in raw_entries:
-        domains_by_root[entry['root']].append(entry['domain'])
-
-        if entry['anubis_sub']:
-            full_anubis_url = f"{entry['anubis_sub']}.{entry['root']}"
-            domains_by_root[entry['root']].append(full_anubis_url)
-
-    # 2. Generate the chunked 'tls.domains' configuration
-    tls_configs = []
-    
-    for root_domain, subdomains in domains_by_root.items():
-        # Deduplicate and sort
-        subs_unicos = sorted(list(set(subdomains)))
-        
-        # Chunking loop in batches of TLS_BATCH_SIZE
-        for i in range(0, len(subs_unicos), TLS_BATCH_SIZE):
-            batch = subs_unicos[i:i + TLS_BATCH_SIZE]
-            
-            # The first one is Main, the rest are SANs
-            cert_def = {"main": batch[0]}
-            if len(batch) > 1:
-                cert_def["sans"] = batch[1:]
-            
-            tls_configs.append(cert_def)
-
-    # Map domain -> certificate definition (batch)
     domain_to_cert_def = {}
-    for batch in tls_configs:
-         domains_in_batch = [batch['main']] + batch.get('sans', [])
-         for d in domains_in_batch:
-             domain_to_cert_def[d] = batch
-             
-    print(f"    🔐 TLS Config: Generated {len(tls_configs)} certificates grouped (Batch size: {TLS_BATCH_SIZE}).")
+    tls_configs = []
+
+    if not IS_LOCAL_DEV:
+        # 1. Group all domains by their root
+        domains_by_root = defaultdict(list)
+        for entry in raw_entries:
+            domains_by_root[entry['root']].append(entry['domain'])
+
+            if entry['anubis_sub']:
+                full_anubis_url = f"{entry['anubis_sub']}.{entry['root']}"
+                domains_by_root[entry['root']].append(full_anubis_url)
+
+        # 2. Generate the chunked 'tls.domains' configuration
+        for root_domain, subdomains in domains_by_root.items():
+            # Deduplicate and sort
+            subs_unicos = sorted(list(set(subdomains)))
+            
+            # Chunking loop in batches of TLS_BATCH_SIZE
+            for i in range(0, len(subs_unicos), TLS_BATCH_SIZE):
+                batch = subs_unicos[i:i + TLS_BATCH_SIZE]
+                
+                # The first one is Main, the rest are SANs
+                cert_def = {"main": batch[0]}
+                if len(batch) > 1:
+                    cert_def["sans"] = batch[1:]
+                
+                tls_configs.append(cert_def)
+
+        # Map domain -> certificate definition (batch)
+        for batch in tls_configs:
+            domains_in_batch = [batch['main']] + batch.get('sans', [])
+            for d in domains_in_batch:
+                domain_to_cert_def[d] = batch
+                
+        print(f"    🔐 TLS Config: Generated {len(tls_configs)} certificates grouped (Batch size: {TLS_BATCH_SIZE}).")
+    else:
+        print("    🏠 Local Dev Mode: Skipping Let's Encrypt TLS grouping (Self-Signed).")
 
     protected_groups = {}
     anubis_service_names = set() 
