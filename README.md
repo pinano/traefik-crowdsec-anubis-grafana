@@ -693,8 +693,41 @@ The watchdog sends Telegram notifications for:
 - 🛡️ **CrowdSec Alerts**: LAPI down, no bouncers, or bouncer connection issues.
 
 ---
-
-## Apache Legacy Configuration
+ 
+ ## Trusted Local SSL (mkcert)
+ 
+ This stack supports locally trusted certificates to prevent browser security warnings ("Your connection is not private") during development.
+ 
+ ### Prerequisites
+ 
+ 1. Install [mkcert](https://github.com/FiloSottile/mkcert) on your host machine.
+ 2. Run `mkcert -install` to add the local CA to your system's trust store.
+ 
+ ### Setup Instructions
+ 
+ 1.  **Configure Environment**:
+     Set `TRAEFIK_ACME_ENV_TYPE=local` in your `.env` file.
+ 
+ 2.  **Generate Certificates**:
+     Run the following commands in the project root:
+     ```bash
+     mkdir -p config/traefik/certs-local-dev
+     
+     mkcert -key-file config/traefik/certs-local-dev/local-key.pem \
+            -cert-file config/traefik/certs-local-dev/local-cert.pem \
+            "*.dev.local" "127.0.0.1"
+     ```
+     > **Note**: Adjust the domains in the `mkcert` command to match your development setup.
+ 
+ 3.  **Start the Stack**:
+     ```bash
+     ./start.sh
+     ```
+     The script will detect the certificates and configure Traefik to use them automatically. You will see a message confirming the generation of `local-certs.yaml`.
+ 
+ ---
+ 
+ ## Apache Legacy Configuration
 
 This section covers the configuration required for legacy Apache installations running directly on the host (not in Docker containers). When using the `apache-host` service type in `domains.csv`, Traefik proxies requests to Apache on `host.docker.internal:8080`. Additional configuration is needed to ensure proper functionality.
 

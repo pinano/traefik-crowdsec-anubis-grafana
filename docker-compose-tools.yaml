@@ -25,7 +25,7 @@ services:
       # Dashboard
       - "traefik.http.routers.dozzle.rule=Host(`dozzle.${DOMAIN}`)"
       - "traefik.http.routers.dozzle.entrypoints=websecure"
-      - "traefik.http.routers.dozzle.tls.certresolver=le"
+      - "traefik.http.routers.dozzle.tls.certresolver=${TRAEFIK_CERT_RESOLVER}"
       # Service: Tell Traefik that Dozzle listens on internal port 8080
       - "traefik.http.services.dozzle.loadbalancer.server.port=8080"
       # Basic Auth for Dozzle

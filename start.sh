@@ -258,6 +258,8 @@ fi
 # variable remains in the .env file.
 
 echo "🔒 Configuring ACME environment..."
+TRAEFIK_CERT_RESOLVER="le" # Default to 'le'
+
 if [ -n "$TRAEFIK_ACME_ENV_TYPE" ]; then
     case "$TRAEFIK_ACME_ENV_TYPE" in
         staging)
@@ -269,7 +271,8 @@ if [ -n "$TRAEFIK_ACME_ENV_TYPE" ]; then
             echo "   ✅ Let's Encrypt PRODUCTION environment."
             ;;
         local)
-            export TRAEFIK_ACME_CA_SERVER=""
+            export TRAEFIK_ACME_CA_SERVER="" # No CA for local
+            TRAEFIK_CERT_RESOLVER=""         # Disable resolver (no 'le')
             echo "   🏠 Local Development environment (Self-Signed Certs)."
             ;;
         *)
@@ -278,13 +281,21 @@ if [ -n "$TRAEFIK_ACME_ENV_TYPE" ]; then
     esac
 fi
 
-# Default to staging if TRAEFIK_ACME_CA_SERVER is still empty
-if [ -z "$TRAEFIK_ACME_CA_SERVER" ]; then
+# Default to staging if TRAEFIK_ACME_CA_SERVER is still empty AND we are NOT in local mode
+if [ -z "$TRAEFIK_ACME_CA_SERVER" ] && [ "$TRAEFIK_ACME_ENV_TYPE" != "local" ]; then
     export TRAEFIK_ACME_CA_SERVER="https://acme-staging-v02.api.letsencrypt.org/directory"
     echo "   ⚠️ Let's Encrypt STAGING environment (default)."
 elif [ -z "$TRAEFIK_ACME_ENV_TYPE" ]; then
     # Only show this if using manual override (TRAEFIK_ACME_ENV_TYPE is empty)
     echo "   🔧 Using custom TRAEFIK_ACME_CA_SERVER from .env."
+fi
+
+# Export the resolver choice so Docker Compose can use it
+export TRAEFIK_CERT_RESOLVER
+if [ -z "$TRAEFIK_CERT_RESOLVER" ]; then
+     echo "   ℹ️  TRAEFIK_CERT_RESOLVER is disabled (Local Mode)."
+else
+     echo "   ℹ️  TRAEFIK_CERT_RESOLVER set to: '$TRAEFIK_CERT_RESOLVER'"
 fi
 
 # =============================================================================
@@ -318,8 +329,47 @@ echo "🔧 Generating dynamic configuration..."
 python3 generate-config.py
 echo "   ✅ Dynamic configuration generated."
 
+
 # =============================================================================
-# PHASE 4B: Generate CrowdSec IP Whitelist
+# PHASE 4B: Local SSL Trust (mkcert)
+# =============================================================================
+# If local certificates are found, configure Traefik to use them as default.
+
+# =============================================================================
+# PHASE 4B: Local SSL Trust (mkcert)
+# =============================================================================
+# If local certificates are found AND we are in local mode, configure Traefik to use them.
+
+if [ "$TRAEFIK_ACME_ENV_TYPE" == "local" ]; then
+    echo "🔐 Checking for local trusted certificates (Local Mode)..."
+    CERTS_DIR="./config/traefik/certs-local-dev"
+    TRAEFIK_CERTS_CONF="./config/traefik/dynamic-config/local-certs.yaml"
+
+    if [ -f "$CERTS_DIR/local-cert.pem" ] && [ -f "$CERTS_DIR/local-key.pem" ]; then
+        echo "   📋 Local certificates found. Configuring Traefik to use them..."
+        cat > "$TRAEFIK_CERTS_CONF" << EOF
+# AUTOMATICALLY GENERATED - Local SSL Trust
+tls:
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /certs/local-cert.pem
+        keyFile: /certs/local-key.pem
+EOF
+        echo "   ✅ Generated local-certs.yaml."
+    else
+        echo "   ℹ️  No custom local certificates found."
+        if [ -f "$TRAEFIK_CERTS_CONF" ]; then
+            rm "$TRAEFIK_CERTS_CONF"
+            echo "   🗑️  Removed stale local-certs.yaml."
+        fi
+    fi
+else
+    echo "⏭️  Skipping local certificate check (TRAEFIK_ACME_ENV_TYPE != 'local')."
+fi
+
+# =============================================================================
+# PHASE 4C: Generate CrowdSec IP Whitelist
 # =============================================================================
 # If CROWDSEC_WHITELIST_IPS is set, generate the whitelist YAML file.
 # This file is mounted into CrowdSec and whitelisted IPs bypass all detection.
