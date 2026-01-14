@@ -410,11 +410,19 @@ fi
 # PHASE 6: Build Compose File List
 # =============================================================================
 
-COMPOSE_FILES="-f docker-compose-traefik-crowdsec-redis.yaml \
+com_files="-f docker-compose-traefik-crowdsec-redis.yaml \
                -f docker-compose-tools.yaml \
-               -f docker-compose-anubis-generated.yaml \
                -f docker-compose-grafana-loki-alloy.yaml \
                -f docker-compose-domain-manager.yaml"
+
+if [ -f "docker-compose-anubis-generated.yaml" ]; then
+    com_files="$com_files -f docker-compose-anubis-generated.yaml"
+    echo "   ✅ Included docker-compose-anubis-generated.yaml"
+else
+    echo "   ℹ️  docker-compose-anubis-generated.yaml not found (skipping)."
+fi
+
+COMPOSE_FILES="$com_files"
 
 # Include Apache host logs for legacy installations
 if [ -d "/var/log/apache2" ]; then

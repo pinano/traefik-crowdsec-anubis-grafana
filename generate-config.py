@@ -269,10 +269,10 @@ def generate_configs():
         return
 
     if not raw_entries:
-        print("    ❌ No valid entries found.")
-        return
-
-    print(f"    ✅ Successfully processed {len(raw_entries)} domains.")
+        print("    ℹ️  No valid entries found (domains.csv is empty or comments only). Generating empty configs.")
+        
+    else:
+        print(f"    ✅ Successfully processed {len(raw_entries)} domains.")
 
     if error_count > 0:
         print(f"    ⚠️ WARN: {error_count} lines were skipped due to format errors.")
