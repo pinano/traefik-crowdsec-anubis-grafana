@@ -16,7 +16,7 @@ set -a
 [ -f .env ] && source .env
 set +a
 
-# Default values for critical variables to avoid docker-compose warnings
+# Default values for critical variables to avoid docker-compose warnings 
 export TRAEFIK_CONFIG_HASH=${TRAEFIK_CONFIG_HASH:-""}
 export PROJECT_NAME=${PROJECT_NAME:-"stack"}
 
