@@ -10,12 +10,14 @@
 
 - [Introduction](#introduction)
 - [Architecture](#architecture)
-- [Components](#components)
-- [Project Structure](#project-structure)
 - [Installation & Setup](#installation--setup)
-- [Configuration Reference](#configuration-reference)
+- [Domain Management](#domain-management)
 - [Operations Manual](#operations-manual)
+- [Configuration Reference](#configuration-reference)
+- [Components (Technical Details)](#components)
+- [Project Structure](#project-structure)
 - [Apache Legacy Configuration](#apache-legacy-configuration)
+- [Trusted Local SSL (mkcert)](#trusted-local-ssl-mkcert)
 - [Troubleshooting](#troubleshooting)
 - [License](#license)
 
@@ -25,16 +27,16 @@
 
 High-traffic environments require robust defense mechanisms that do not compromise performance. This project provides a production-ready infrastructure stack designed to protect hundreds of domains running on a single Docker host or hybrid environments.
 
-It integrates industry-standard components to provide a multi-layered defense strategy:
+### Key Benefits
 
-1. **Traefik**: High-performance edge routing and SSL termination.
-2. **CrowdSec**: Collaborative Intrusion Prevention System (IPS) leveraging global threat intelligence.
-3. **Anubis**: Custom "ForwardAuth" middleware implementing Proof-of-Work (PoW) challenges to mitigate sophisticated bot attacks.
-4. **Alloy & Loki**: Modern, resource-efficient log aggregation and processing pipeline.
-5. **Grafana**: Centralized observability and analytics.
-6. **Domain Manager**: A secure web interface to manage domains, redirections, and security policies in real-time.
+- **🛡️ Multi-Layered Defense**: Combines IP reputation (CrowdSec), Layer 7 protection (Anubis PoW), and strict rate limiting.
+- **⚡ Performance First**: Optimized middleware chain designed for zero latency overhead.
+- **🤖 Fully Automated**: Configuration is dynamically generated from containers and a simple CSV file.
+- **📊 Complete Visibility**: Full observability stack with Grafana, Loki, and real-time log viewing.
+- **🏠 Hybrid Ready**: Protect Docker containers and legacy host-based services (like Apache/PHP) simultaneously.
+- **🔐 No-Hassle SSL**: Automated Let's Encrypt certificates or locally trusted certs for development.
 
-The system is fully automated. A Python orchestrator (`generate-config.py`) dynamically compiles complex Traefik configurations from your domain inventory, which can be managed via the **Domain Manager** UI or directly in `domains.csv`.
+The system is managed via the **Domain Manager** UI or directly in `domains.csv`, making it accessible for both technical admins and less experienced users.
 
 ---
 
@@ -82,7 +84,149 @@ graph TD
 
 ---
 
-## Components
+---
+
+## Installation & Setup
+
+### 1. Prerequisites
+
+- **Docker Engine** & **Docker Compose** (v2.x+)
+- **Python 3** with required modules:
+  ```bash
+  # Debian/Ubuntu
+  sudo apt install python3-yaml python3-tldextract
+  
+  # macOS
+  pip3 install pyyaml tldextract
+  ```
+- Ports `80` and `443` free on the host machine.
+
+### 2. Interactive Initialization
+
+The easiest way to start is using the built-in setup wizard. It will guide you through all necessary settings (credentials, domains, alerts).
+
+```bash
+chmod +x initialize-env.sh
+./initialize-env.sh
+```
+
+> [!NOTE]
+> **Auto-Initialization**: If you run `./start.sh` without a `.env` file, the system will automatically launch this wizard for you.
+
+### 3. Smart Credentials & Auto-Sync
+
+The stack manages security hashes for you. You don't need to manually generate `htpasswd` strings.
+
+1. **Manual Edit**: You can change any `_ADMIN_USER` or `_ADMIN_PASSWORD` directly in the `.env` file.
+2. **Auto-Detection**: When you run `./start.sh`, the script detects the change.
+3. **Instant Sync**: It regenerates the secure hashes and updates your `.env` and running containers immediately.
+
+---
+
+## Domain Management
+
+This is where you define which websites the stack will protect and how they should behave.
+
+### The Domain Inventory (`domains.csv`)
+
+The heart of the configuration is the `domains.csv` file. You can manage it manually or via the **Domain Manager** UI.
+
+| Column | Description | Mandatory |
+|:---|:---|:---:|
+| **domain** | The full domain (e.g., `shop.example.com`). | Yes |
+| **redirection** | Target URL if you want to redirect (e.g., `another-site.com`). | No |
+| **service** | Docker service name or `apache-host` for legacy servers. | Yes |
+| **anubis_sub** | Subdomain for the bot protection portal (e.g., `auth`). | No |
+| **rate_limit** | Max requests/sec for this specific domain. | No |
+| **burst** | Max peak requests for this specific domain. | No |
+| **concurrency** | Max active connections for this specific domain. | No |
+
+### Domain Manager UI
+
+Access the management interface at `https://domains.<your-domain>`.
+
+- **Live Preview**: See which Docker containers are currently running and selectable.
+- **Visual Grouping**: Domains are automatically grouped by their root (TLD) for easier management.
+- **Safety Defaults**: The UI enforces safe defaults to prevent accidental misconfiguration.
+
+---
+
+## Operations Manual
+
+### Common Commands
+
+| Action | Command |
+|---------|-------------|
+| **Start/Update Stack** | `./start.sh` |
+| **Stop Stack** | `./stop.sh` |
+| **View Live Logs** | `https://dozzle.<your-domain>` |
+| **Monitor Performance** | `docker compose -f docker-compose-tools.yaml run --rm ctop` |
+
+### Security First Boot Sequence
+
+When you run `./start.sh`, the stack follows a strict "Defense First" order:
+
+1. **Environment Sync**: Validates your `.env` and ensures no critical settings are missing.
+2. **Security Layer**: Boots **CrowdSec** and **Redis** first.
+3. **Health Check**: Traefik **will not start** until CrowdSec is fully healthy and ready to filter traffic.
+4. **Bouncer Sync**: Automatically registers the security keys between Traefik and CrowdSec.
+5. **Application Layer**: Finally, boots your apps and the routing engine.
+
+---
+
+---
+
+## Project Structure
+
+```
+.
+├── .env.dist                              # Environment template
+├── domains.csv.dist                       # Domain inventory template
+├── generate-config.py                     # Configuration generator
+├── initialize-env.sh                      # Interactive setup wizard
+├── start.sh                               # Deployment script
+├── stop.sh                                # Shutdown script
+│
+├── config/
+│   ├── alloy/                             # Alloy log collector config
+│   │   └── config.alloy
+│   ├── anubis/                            # Anubis bot defense
+│   │   └── assets/                        # Static assets (images, CSS)
+│   ├── crowdsec/                          # CrowdSec IPS
+│   │   ├── acquis.yaml
+│   │   ├── profiles.yaml
+│   │   └── parsers/                       # Custom parsers (IP whitelist)
+│   ├── domain-manager/                     # Admin UI backend (Python/Flask)
+│   │   ├── app.py
+│   │   ├── static/
+│   │   └── templates/
+│   ├── grafana/                           # Grafana datasources
+│   │   └── config.yaml
+│   ├── loki/                              # Loki log storage
+│   │   └── config.yaml
+│   ├── redis/                             # Redis/Valkey session store
+│   │   └── redis.conf
+│   ├── watchdog/                          # Monitoring scripts
+│   │   ├── Dockerfile
+│   │   ├── check-certs.sh
+│   │   ├── check-crowdsec.sh
+│   │   └── check-dns.sh
+│   └── traefik/                           # Traefik configuration
+│       ├── traefik.yaml.template           # Static config template
+│       └── dynamic-config/                # Generated routers/middlewares
+│
+└── Docker Compose Files:
+    ├── docker-compose-traefik-crowdsec-redis.yaml   # Core infrastructure
+    ├── docker-compose-tools.yaml                     # Tools & monitoring (Dozzle, watchdog, etc)
+    ├── docker-compose-grafana-loki-alloy.yaml        # Observability stack
+    ├── docker-compose-domain-manager.yaml            # Admin UI service
+    ├── docker-compose-anubis-base.yaml               # Anubis template
+    └── docker-compose-anubis-generated.yaml          # Auto-generated Anubis instances
+```
+
+---
+
+## Components (Technical Details)
 
 ### Traefik (Edge Router)
 
@@ -318,109 +462,6 @@ A lightweight utility service that monitors the stack and sends Telegram alerts.
 
 ---
 
-## Installation & Setup
-
-### 1. Prerequisites
-
-- **Docker Engine** & **Docker Compose** (v2.x+)
-- **Python 3** with required modules:
-  ```bash
-  # Debian/Ubuntu
-  sudo apt install python3-yaml python3-tldextract
-  
-  # macOS
-  pip3 install pyyaml tldextract
-  ```
-- Ports `80` and `443` free on the host machine.
-
-### 2. Environment Initialization
-
-Run the interactive setup wizard:
-
-```bash
-chmod +x initialize-env.sh
-./initialize-env.sh
-```
-
-> [!NOTE]
-> **Auto-Initialization**: If you run `./start.sh` without a `.env` file, the system will automatically launch this wizard for you.
-
-The wizard will prompt for:
-- **Admin credentials**: Applied to Grafana (plaintext) and hashed (bcrypt) for Traefik/Dozzle dashboards.
-- **Domain & Timezone**: Your primary domain and server timezone.
-- **Telegram alerts** (optional): Bot token and chat ID for notifications.
-- **ACME environment**: Staging (testing) or Production (real certificates).
-
-### 3. Domain Configuration
-
-Copy and edit the domain inventory:
-
-```bash
-cp domains.csv.dist domains.csv
-```
-
-**Columns:**
-
-| Column | Description | Mandatory |
-|:---|:---|:---:|
-| **domain** | The full public FQDN (e.g., `shop.example.com`). | Yes |
-| **redirection** | Target for 301/302 redirect. Leave empty for direct service access. | No |
-| **service** | Docker service name (as defined in Compose) or `apache-host` for legacy host backends. | Yes |
-| **anubis_sub** | The subdomain part of the auth portal (e.g., `auth`). Note: One Anubis instance is generated per root TLD. | No |
-| **rate_limit** | Avg requests per second. Falls back to `TRAEFIK_GLOBAL_RATE_AVG`. | No |
-| **burst** | Peak requests allowed. Falls back to `TRAEFIK_GLOBAL_RATE_BURST`. | No |
-| **concurrency** | Active connections per client. Falls back to `TRAEFIK_GLOBAL_CONCURRENCY`. | No |
-
-> [!IMPORTANT]
-> **Domain Grouping**: Anubis instances are grouped by root domain. If you protect `a.com` and `sub.a.com` with anubis_sub `auth`, they will share the same `auth.a.com` portal and session cookie.
-
-### 4. Deployment
-
-```bash
-./start.sh
-```
-
-This script:
-1. Synchronizes environment: Compares `.env` with `.env.dist`. It appends any missing variables from the template while preserving your current values and custom additions.
-2. Auto-Initialize: Runs `./initialize-env.sh` if the `.env` file is completely missing.
-3. Generates `traefik-generated.yaml` from template
-4. Runs `generate-config.py` to create routes
-5. Creates required networks
-6. Boots CrowdSec/Redis first (security layer)
-7. Waits for CrowdSec health check
-8. Registers the bouncer API key
-9. Deploys all remaining services
-
-> [!NOTE]
-> **Environment Validation**: The script validates your `.env` configuration before starting. It checks for:
-> - Empty `DOMAIN`.
-> - Invalid `TRAEFIK_ACME_ENV_TYPE`.
-> - Default `TRAEFIK_ACME_EMAIL` in production.
-> - Missing `CROWDSEC_API_KEY` if enabled.
-> 
-> If any check fails, the script aborts with a clear error message.
-
----
-
-### 5. Smart Credentials & Auto-Sync
-
-The stack uses independent credentials for each managed dashboard to follow the principle of least privilege.
-
-#### Separate Services
-- **Traefik Dashboard**: Hashed basic auth.
-- **Dozzle Log Viewer**: Hashed basic auth.
-- **Grafana**: Plaintext environment variables (managed internally by Grafana).
-
-#### How Synchronization Works
-To simplify manual management, we've implemented an **Auto-Sync Mechanism**:
-1. **Manual Edit**: You can change the `_ADMIN_USER` or `_ADMIN_PASSWORD` directly in the `.env` file.
-2. **Detection**: Upon running `./start.sh`, the script calculates a SHA1 checksum of your credentials.
-3. **Regeneration**: If the checksum differs from the stored sync variable (indicating a manual change), the script automatically regenerates the `htpasswd` bcrypt hash via a temporary Docker container and updates your `.env` file.
-4. **Immediate Update**: The new credentials are provided to Docker Compose in the same session, ensuring they take effect immediately.
-
-> [!TIP]
-> This means you don't need to manually run `htpasswd` or use an external generator when rotating passwords. Just update `.env` and run `./start.sh`.
-
 ---
 
 ## Configuration Reference
@@ -431,67 +472,71 @@ To simplify manual management, we've implemented an **Auto-Sync Mechanism**:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `DOMAIN` | Primary domain for admin dashboards | - |
-| `PROJECT_NAME` | Prefix for all Docker containers (e.g., `stack`) | `stack` |
-| `TZ` | Server timezone | `Europe/Madrid` |
->
-> **Validation Rules**:
-> - `DOMAIN` cannot be empty.
-> - `TRAEFIK_ACME_ENV_TYPE` must be `local`, `staging`, or `production`.
+| `DOMAIN` | Your primary/base domain (required for dashboards). | - |
+| `PROJECT_NAME` | Prefix for all Docker containers. Prevents conflicts with other projects. | `stack` |
+| `TZ` | Server timezone for logs and scheduled tasks. | `Europe/Madrid` |
 
-#### Anubis
+#### Anubis (Bot Defense)
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `ANUBIS_DIFFICULTY` | PoW challenge complexity (1-5) | `4` |
-| `ANUBIS_REDIS_PRIVATE_KEY` | Key for session signing | Auto-generated |
-| `ANUBIS_CPU_LIMIT` | CPU limit per instance | `0.10` |
-| `ANUBIS_MEM_LIMIT` | Memory limit per instance | `32M` |
+| `ANUBIS_DIFFICULTY` | Complexity of the Proof-of-Work challenge (1-5). Higher = more CPU for clients. | `4` |
+| `ANUBIS_REDIS_PRIVATE_KEY` | Hex key for session signing. | *Auto-generated* |
+| `ANUBIS_CPU_LIMIT` | Host CPU limit per Anubis instance (to prevent resource exhaustion). | `0.10` |
+| `ANUBIS_MEM_LIMIT` | RAM limit per Anubis instance. | `32M` |
 
-#### Redis
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `REDIS_PASSWORD` | Redis authentication password | Auto-generated |
-
-#### CrowdSec
+#### Redis & Security Layer
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `CROWDSEC_API_KEY` | Bouncer API key | Auto-generated |
-| `CROWDSEC_DISABLE` | Set to `true` to completely disable the CrowdSec firewall plugin | `false` |
-| `CROWDSEC_UPDATE_INTERVAL` | Blocklist refresh interval from LAPI (seconds) | `60` |
-| `CROWDSEC_ENROLLMENT_KEY` | Optional key to connect instance to CrowdSec Console | - |
-| `CROWDSEC_COLLECTIONS` | Space-separated list of CrowdSec collections to load | See [Installed Collections](#installed-collections) |
-| `CROWDSEC_WHITELIST_IPS` | Comma-separated list of trusted IPs/CIDRs to bypass detection | - |
+| `REDIS_PASSWORD` | Password for the session store. | *Auto-generated* |
+| `CROWDSEC_DISABLE` | Set to `true` to completely disable the IPS (firewall). | `false` |
+| `CROWDSEC_API_KEY` | Secure key for the Traefik-CrowdSec communication. | *Auto-generated* |
+| `CROWDSEC_WHITELIST_IPS` | Comma-separated IPs/CIDRs that bypass all security checks. | - |
+| `CROWDSEC_UPDATE_INTERVAL` | How often (seconds) to download the global blacklist. | `60` |
+| `CROWDSEC_COLLECTIONS` | List of security scenarios to load (Traefik, SSH, DDoS, etc.). | *Defaults included* |
+| `CROWDSEC_ENROLLMENT_KEY` | Optional key to connect to the [CrowdSec Console](https://app.crowdsec.net). | - |
 
-> [!TIP]
-> **IP Whitelisting**: Use `CROWDSEC_WHITELIST_IPS` to prevent false positives from trusted IPs (e.g., office networks, monitoring services). Example: `192.168.1.1,10.0.0.0/8,203.0.113.50`. The whitelist is regenerated on each `./start.sh` run.
-
-> [!WARNING]
-> **Changing Collections**: If you modify `CROWDSEC_COLLECTIONS`, you may need to remove CrowdSec's data volumes for the changes to take effect:
-> ```bash
-> docker compose -f docker-compose-traefik-crowdsec-redis.yaml down crowdsec
-> docker volume rm $(docker volume ls -q | grep crowdsec)
-> ./start.sh
-> ```
-> This will reset all CrowdSec state including current bans. Consider exporting decisions first with `docker exec crowdsec cscli decisions list -o json`.
-
-#### Traefik
+#### Traefik (Edge Routing)
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `TRAEFIK_LISTEN_IP` | IP to bind ports 80/443 | `0.0.0.0` |
-| `TRAEFIK_GLOBAL_RATE_AVG` | Default rate limit (req/s) | `60` |
-| `TRAEFIK_GLOBAL_RATE_BURST` | Default burst size | `120` |
-| `TRAEFIK_GLOBAL_CONCURRENCY` | Default concurrent connections | `25` |
-| `TRAEFIK_HSTS_MAX_AGE` | HSTS header duration (seconds) | `31536000` |
-| `TRAEFIK_ACME_EMAIL` | Let's Encrypt contact email | - |
-| `TRAEFIK_ACME_ENV_TYPE` | `staging`, `production`, or `local` (ignored if `TRAEFIK_ACME_CA_SERVER` is set) | `staging` |
-| `TRAEFIK_ACME_CA_SERVER` | Optional direct URL override for the ACME server | - |
-| `TRAEFIK_DASHBOARD_AUTH` | Basic auth for dashboard (htpasswd format) | - |
-| `TRAEFIK_BLOCKED_PATHS` | Comma-separated list of path prefixes to block globally (regex supported) | - |
-| `TRAEFIK_FRAME_ANCESTORS` | Comma-separated list of domains allowed to embed this site in an iframe | - |
+| `TRAEFIK_LISTEN_IP` | Host IP to bind ports 80/443. Use `0.0.0.0` for all interfaces. | `0.0.0.0` |
+| `TRAEFIK_ACME_EMAIL` | Email for Let's Encrypt certificate notices (required for SSL). | - |
+| `TRAEFIK_ACME_ENV_TYPE` | `production`, `staging` (testing), or `local` (mkcert). | `staging` |
+| `TRAEFIK_GLOBAL_RATE_AVG` | Default requests per second allowed per IP. | `60` |
+| `TRAEFIK_GLOBAL_RATE_BURST` | Peak requests allowed before blocking. | `120` |
+| `TRAEFIK_GLOBAL_CONCURRENCY` | Max simultaneous connections per IP. | `25` |
+| `TRAEFIK_HSTS_MAX_AGE` | HSTS header duration (seconds). | `31536000` |
+| `TRAEFIK_BLOCKED_PATHS` | Comma-separated list of paths to block globally (e.g., `/wp-admin`). | - |
+| `TRAEFIK_FRAME_ANCESTORS` | External domains allowed to embed your sites in iframes. | - |
+
+#### Traefik Timeouts
+
+Legacy applications or slow backends (e.g., heavy PHP/WordPress) may require adjusted timeouts. We provide two variables to control the entire pipeline (**Client** ↔ **Traefik** ↔ **Backend**).
+
+| Variable | Default | Function |
+|----------|---------|----------|
+| `TRAEFIK_TIMEOUT_ACTIVE` | `60` | **Execution Limit** (Seconds). Max time allowed for the request to complete or headers to be received. |
+| `TRAEFIK_TIMEOUT_IDLE` | `90` | **Connection Buffer** (Seconds). Max time to keep persistent connections open. |
+
+#### Administrative Access
+
+The stack uses independent credentials for each dashboard. These are synchronized automatically by `start.sh`.
+
+| Variable | Service | Default |
+|----------|---------|---------|
+| `TRAEFIK_ADMIN_USER` | Traefik Dashboard | `admin` |
+| `TRAEFIK_ADMIN_PASSWORD` | Traefik Dashboard | - |
+| `DOMAIN_MANAGER_ADMIN_USER` | Domain Manager UI | `admin` |
+| `DOMAIN_MANAGER_ADMIN_PASSWORD` | Domain Manager UI | - |
+| `DOZZLE_ADMIN_USER` | Dozzle Log Viewer | `admin` |
+| `DOZZLE_ADMIN_PASSWORD` | Dozzle Log Viewer | - |
+| `GRAFANA_ADMIN_USER` | Grafana Dashboards | `admin` |
+| `GRAFANA_ADMIN_PASSWORD` | Grafana Dashboards | - |
+
+> [!NOTE]
+> **Internal Variables**: Variables like `TRAEFIK_DASHBOARD_AUTH`, `DOZZLE_DASHBOARD_AUTH`, `DOMAIN_MANAGER_SECRET_KEY`, and `DOMAIN_MANAGER_APP_PATH_HOST` are managed automatically. You don't need to edit them manually.
 
 #### Traefik Timeouts
 
