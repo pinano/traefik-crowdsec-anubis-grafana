@@ -506,6 +506,13 @@ else
     echo "   ✅ anubis-backend network already exists."
 fi
 
+if ! docker network inspect traefik >/dev/null 2>&1; then
+    docker network create traefik
+    echo "   ✅ Created traefik network."
+else
+    echo "   ✅ traefik network already exists."
+fi
+
 # =============================================================================
 # PHASE 6: Build Compose File List
 # =============================================================================
