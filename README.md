@@ -721,23 +721,22 @@ The watchdog sends Telegram notifications for:
  1.  **Configure Environment**:
      Set `TRAEFIK_ACME_ENV_TYPE=local` in your `.env` file.
  
- 2.  **Generate Certificates**:
-     Run the following commands in the project root:
-     ```bash
-     mkdir -p config/traefik/certs-local-dev
-     
-     mkcert -key-file config/traefik/certs-local-dev/local-key.pem \
-            -cert-file config/traefik/certs-local-dev/local-cert.pem \
-            "*.dev.local" "*.localhost" "127.0.0.1"
-     ```
-     > **Note**: Adjust the domains in the `mkcert` command to match your development setup.
- 
- 3.  **Start the Stack**:
-     ```bash
-     ./start.sh
-     ```
-     The script will detect the certificates and configure Traefik to use them automatically. You will see a message confirming the generation of `local-certs.yaml`.
- 
+   2.  **Generate Certificates**:
+       The stack is designed to be plug-and-play. When you run `./start.sh` with `TRAEFIK_ACME_ENV_TYPE=local`, the system will:
+       - Automatically scan your `/etc/hosts` for any domains pointing to `127.0.0.1`.
+       - Filter out defaults like `localhost` and `broadcasthost`.
+       - Invoke `mkcert` to generate a single certificate covering all discovered domains.
+       - Store the results in `config/traefik/certs-local-dev/`.
+       - Dynamically configure Traefik to use these certificates as the default for all HTTPS traffic.
+
+       > [!TIP]
+       > **Manual execution**: If you add new entries to `/etc/hosts` and want to refresh the certificate without a full restart, you can run `./create-local-certs.sh` manually at any time.
+
+   3.  **Start the Stack**:
+       ```bash
+       ./start.sh
+       ```
+       You will see a message: `🔐 Local Mode detected. Automating certificate generation...` followed by the `mkcert` output and the confirmation that `local-certs.yaml` has been generated.
  ---
  
  ## Apache Legacy Configuration

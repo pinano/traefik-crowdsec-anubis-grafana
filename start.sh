@@ -391,6 +391,14 @@ echo "   ✅ Dynamic configuration generated."
 # If local certificates are found AND we are in local mode, configure Traefik to use them.
 
 if [ "$TRAEFIK_ACME_ENV_TYPE" == "local" ]; then
+    echo "🔐 Local Mode detected. Automating certificate generation..."
+    if [ -f "./create-local-certs.sh" ]; then
+        chmod +x ./create-local-certs.sh
+        ./create-local-certs.sh
+    else
+        echo "   ⚠️ Warning: ./create-local-certs.sh not found. Skipping auto-generation."
+    fi
+
     echo "🔐 Checking for local trusted certificates (Local Mode)..."
     CERTS_DIR="./config/traefik/certs-local-dev"
     TRAEFIK_CERTS_CONF="./config/traefik/dynamic-config/local-certs.yaml"
