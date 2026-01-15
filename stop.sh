@@ -20,6 +20,15 @@ set +a
 export TRAEFIK_CONFIG_HASH=${TRAEFIK_CONFIG_HASH:-""}
 export PROJECT_NAME=${PROJECT_NAME:-"stack"}
 
+# Verify TRAEFIK_CERT_RESOLVER to suppress warnings
+if [ -z "$TRAEFIK_CERT_RESOLVER" ]; then
+    if [ "$TRAEFIK_ACME_ENV_TYPE" == "local" ]; then
+        export TRAEFIK_CERT_RESOLVER=""
+    else
+        export TRAEFIK_CERT_RESOLVER="le"
+    fi
+fi
+
 set -e  # Exit on any error
 
 # =============================================================================

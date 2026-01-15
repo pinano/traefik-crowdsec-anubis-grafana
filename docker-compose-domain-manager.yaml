@@ -13,6 +13,7 @@ services:
       - DOMAIN_MANAGER_APP_PATH_HOST=${DOMAIN_MANAGER_APP_PATH_HOST}
       - TZ=${TZ}
       - DOMAIN_MANAGER_INTERNAL=true
+      - TRAEFIK_ACME_ENV_TYPE=${TRAEFIK_ACME_ENV_TYPE}
     working_dir: ${DOMAIN_MANAGER_APP_PATH_HOST}/config/domain-manager
     volumes:
       - ./domains.csv:${DOMAIN_MANAGER_APP_PATH_HOST}/domains.csv
@@ -30,6 +31,7 @@ services:
       - ./config:${DOMAIN_MANAGER_APP_PATH_HOST}/config
       - /var/run/docker.sock:/var/run/docker.sock
       - /var/log/apache2:/var/log/apache2:ro
+      - /etc/hosts:/etc/hosts-host:ro
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"

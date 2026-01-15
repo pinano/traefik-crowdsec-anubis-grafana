@@ -44,6 +44,7 @@ DOMAIN = os.environ.get('DOMAIN', 'localhost')
 TRAEFIK_RATE_AVG = os.environ.get('TRAEFIK_GLOBAL_RATE_AVG', '60')
 TRAEFIK_RATE_BURST = os.environ.get('TRAEFIK_GLOBAL_RATE_BURST', '120')
 TRAEFIK_CONCURRENCY = os.environ.get('TRAEFIK_GLOBAL_CONCURRENCY', '25')
+TRAEFIK_ACME_ENV_TYPE = os.environ.get('TRAEFIK_ACME_ENV_TYPE', 'production')
 ENV = os.environ.copy()
 ENV['TERM'] = 'xterm'
 
@@ -308,8 +309,37 @@ def resolve_domain(domain):
         # Get the IP address of the domain
         ip = socket.gethostbyname(domain)
         return ip
+        return None
     except Exception as e:
         return None
+
+def check_host_file(domain):
+    """
+    Checks if a domain exists in the mounted /etc/hosts-host file.
+    Used for local validation fallback.
+    """
+    hosts_path = '/etc/hosts-host'
+    if not os.path.exists(hosts_path):
+        return False
+        
+    try:
+        with open(hosts_path, 'r') as f:
+            for line in f:
+                # Remove comments
+                line = line.split('#', 1)[0].strip()
+                if not line:
+                    continue
+                
+                # Format: IP domain1 domain2 ...
+                parts = line.split()
+                if len(parts) >= 2:
+                    if domain in parts[1:]:
+                        return True
+    except Exception as e:
+        print(f"Error reading {hosts_path}: {e}")
+        return False
+        
+    return False
 
 @app.route('/api/check-domain', methods=['POST'])
 @limiter.exempt
@@ -333,8 +363,21 @@ def check_domain():
     host_domain = os.environ.get('DOMAIN')
     expected_ip = resolve_domain(host_domain)
     
+    # In local development, the container might not be able to resolve the host domain
+    # (e.g. dev.local defined in host /etc/hosts but not in container DNS).
+    # If we are in local mode, we relax this check but verify against /etc/hosts via mount
     if not expected_ip:
-        return jsonify({'status': 'error', 'message': 'Could not resolve host domain'})
+        if TRAEFIK_ACME_ENV_TYPE == 'local':
+             if check_host_file(host_domain):
+                 expected_ip = '127.0.0.1' # Dummy fallback for comparison logic
+             else:
+                 status_response['status'] = 'error'
+                 status_response['domain'] = {'status': 'error', 'message': f'Could not resolve host domain ({host_domain}) locally or in /etc/hosts'}
+                 return jsonify(status_response)
+        else:
+            status_response['status'] = 'error'
+            status_response['domain'] = {'status': 'error', 'message': f'Could not resolve host domain ({host_domain})'}
+            return jsonify(status_response)
     
     # 1. Domain Check
     if not domain_to_check:
@@ -343,8 +386,11 @@ def check_domain():
     else:
         actual_ip = resolve_domain(domain_to_check)
         if not actual_ip:
-             status_response['domain'] = {'status': 'error', 'message': 'Resolution failed'}
-             status_response['status'] = 'mismatch'
+             if TRAEFIK_ACME_ENV_TYPE == 'local' and check_host_file(domain_to_check):
+                 actual_ip = expected_ip
+             else:
+                 status_response['domain'] = {'status': 'error', 'message': 'Resolution failed'}
+                 status_response['status'] = 'mismatch'
         elif actual_ip != expected_ip:
              status_response['domain'] = {
                  'status': 'mismatch', 
@@ -359,8 +405,11 @@ def check_domain():
     if redirection_to_check:
         redir_ip = resolve_domain(redirection_to_check)
         if not redir_ip:
-             status_response['redirection'] = {'status': 'error', 'message': 'Resolution failed'}
-             status_response['status'] = 'mismatch'
+             if TRAEFIK_ACME_ENV_TYPE == 'local' and check_host_file(redirection_to_check):
+                 redir_ip = expected_ip
+             else:
+                 status_response['redirection'] = {'status': 'error', 'message': 'Resolution failed'}
+                 status_response['status'] = 'mismatch'
         elif redir_ip != expected_ip:
              status_response['redirection'] = {
                  'status': 'mismatch',
@@ -381,8 +430,13 @@ def check_domain():
             anubis_ip = resolve_domain(anubis_full_domain)
             
             if not anubis_ip:
-                status_response['anubis'] = {'status': 'error', 'message': f'Resolution failed for {anubis_full_domain}'}
-                status_response['status'] = 'mismatch'
+                # For Anubis, we generally expect the subdomain to be resolvable if the root is.
+                # However, if root is local, Anubis subdomain might also be in /etc/hosts
+                if TRAEFIK_ACME_ENV_TYPE == 'local' and check_host_file(anubis_full_domain):
+                    anubis_ip = expected_ip
+                else:
+                    status_response['anubis'] = {'status': 'error', 'message': f'Resolution failed for {anubis_full_domain}'}
+                    status_response['status'] = 'mismatch'
             elif anubis_ip != expected_ip:
                 status_response['anubis'] = {
                     'status': 'mismatch',

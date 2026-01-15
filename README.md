@@ -715,7 +715,7 @@ The watchdog sends Telegram notifications for:
      
      mkcert -key-file config/traefik/certs-local-dev/local-key.pem \
             -cert-file config/traefik/certs-local-dev/local-cert.pem \
-            "*.dev.local" "127.0.0.1"
+            "*.dev.local" "*.localhost" "127.0.0.1"
      ```
      > **Note**: Adjust the domains in the `mkcert` command to match your development setup.
  
