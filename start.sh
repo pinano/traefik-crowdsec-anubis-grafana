@@ -100,7 +100,57 @@ set -a
 source .env
 set +a
 
-# Calculated in Phase 0 after helper functions are defined
+# =============================================================================
+# VALIDATION: Check for Critical Configuration Errors
+# =============================================================================
+
+validate_env() {
+    local error_count=0
+
+    # 1. Check DOMAIN
+    if [ -z "$DOMAIN" ]; then
+        echo "❌ Error: DOMAIN variable cannot be empty."
+        ((error_count++))
+    fi
+
+    # 2. Check TRAEFIK_ACME_ENV_TYPE
+    if [[ ! "$TRAEFIK_ACME_ENV_TYPE" =~ ^(local|staging|production)$ ]]; then
+        echo "❌ Error: TRAEFIK_ACME_ENV_TYPE must be 'local', 'staging', or 'production'. Current: '$TRAEFIK_ACME_ENV_TYPE'"
+        ((error_count++))
+    fi
+
+    # 3. Check ACME Email (only if not local)
+    if [ "$TRAEFIK_ACME_ENV_TYPE" != "local" ]; then
+        # Check for default or empty email
+        if [[ "$TRAEFIK_ACME_EMAIL" == *"email@mydomain.com"* ]] || [[ "$TRAEFIK_ACME_EMAIL" == *"placeholder"* ]] || [ -z "$TRAEFIK_ACME_EMAIL" ]; then
+            echo "❌ Error: TRAEFIK_ACME_EMAIL is set to default or empty, but environment is '$TRAEFIK_ACME_ENV_TYPE'."
+            echo "   -> Please set a valid email in .env for Let's Encrypt notifications."
+            ((error_count++))
+        fi
+    fi
+
+    # 4. Check CrowdSec API Key (only if enabled)
+    # Normalize CROWDSEC_DISABLE for check (it's normalized again later, but we need it now)
+    local cs_disable=$(echo "${CROWDSEC_DISABLE:-false}" | tr '[:upper:]' '[:lower:]')
+    if [ "$cs_disable" != "true" ]; then
+        if [ "$CROWDSEC_API_KEY" == "REPLACE_ME" ] || [ -z "$CROWDSEC_API_KEY" ]; then
+            echo "❌ Error: CrowdSec is ENABLED but CROWDSEC_API_KEY is missing or set to default."
+            echo "   -> Either disable CrowdSec (CROWDSEC_DISABLE=true) or generate a key."
+            ((error_count++))
+        fi
+    fi
+
+    if [ $error_count -gt 0 ]; then
+        echo ""
+        echo "🛑 Validation failed with $error_count errors. Please fix your .env file."
+        exit 1
+    fi
+    echo "✅ Environment configuration valid."
+}
+
+# Run validation immediately
+validate_env
+
 
 # =============================================================================
 # PHASE 0: Synchronize Dashboard Hashes
