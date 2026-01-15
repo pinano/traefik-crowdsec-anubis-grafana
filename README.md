@@ -391,6 +391,15 @@ This script:
 8. Registers the bouncer API key
 9. Deploys all remaining services
 
+> [!NOTE]
+> **Environment Validation**: The script validates your `.env` configuration before starting. It checks for:
+> - Empty `DOMAIN`.
+> - Invalid `TRAEFIK_ACME_ENV_TYPE`.
+> - Default `TRAEFIK_ACME_EMAIL` in production.
+> - Missing `CROWDSEC_API_KEY` if enabled.
+> 
+> If any check fails, the script aborts with a clear error message.
+
 ---
 
 ### 5. Smart Credentials & Auto-Sync
@@ -425,6 +434,10 @@ To simplify manual management, we've implemented an **Auto-Sync Mechanism**:
 | `DOMAIN` | Primary domain for admin dashboards | - |
 | `PROJECT_NAME` | Prefix for all Docker containers (e.g., `stack`) | `stack` |
 | `TZ` | Server timezone | `Europe/Madrid` |
+>
+> **Validation Rules**:
+> - `DOMAIN` cannot be empty.
+> - `TRAEFIK_ACME_ENV_TYPE` must be `local`, `staging`, or `production`.
 
 #### Anubis
 
@@ -869,6 +882,20 @@ COMPOSE_FILES="$COMPOSE_FILES -f docker-compose-apache-logs.yml"
 - **Naming**: Verify the `service` name in `domains.csv` matches the container `container_name` or `service` key.
 - **Network**: Ensure the backend container is on the `traefik` network (`external: true`).
 - **Internal Ports**: If your service listens on a non-standard port (not 80), you must add individual Traefik labels for `loadbalancer.server.port`.
+
+### 504 Gateway Timeout
+
+- **Network Isolation**: This usually means Traefik cannot reach the backend. Ensure your backend container is connected to the `traefik` network.
+    ```yaml
+    networks:
+      - traefik
+    ```
+- **Firewall/Internal**: Check if the container itself is running and healthy.
+
+### Service "X" does not exist
+
+- **Dynamic Config**: If using `generate-config.py`, this error means the service defined in `domains.csv` (column `service`) does not match any running Docker container or the auto-generated service name.
+- **Tip**: Run `docker ps` to see the actual names of your containers.
 
 ### Credentials sync failed
 
