@@ -180,7 +180,7 @@ def process_router(entry, http_section, domain_to_cert_def):
     
     # Only use Let's Encrypt if NOT in local dev mode
     if not IS_LOCAL_DEV:
-        router_conf['tls']['certResolver'] = 'le'
+        router_conf['tls']['certResolver'] = os.getenv('TRAEFIK_CERT_RESOLVER', 'le')
 
     
     # Inject TLS domains if specific batch exists
@@ -503,9 +503,14 @@ def generate_configs():
             'entryPoints': ["websecure"],
             'service': "anubis-assets@docker", 
             'priority': 2000, 
-            'tls': {'certResolver': 'le', 'domains': [domain_to_cert_def.get(f"{auth_sub}.{root}", {})]},
+            'tls': { 'certResolver': os.getenv('TRAEFIK_CERT_RESOLVER', 'le') if not IS_LOCAL_DEV else None },
             'middlewares': ["security-headers", "anubis-assets-stripper", "global-compress"]
         }
+        
+        # Inject TLS domains if specific batch exists
+        auth_domain = f"{auth_sub}.{root}"
+        if not IS_LOCAL_DEV and auth_domain in domain_to_cert_def:
+             traefik_dynamic_conf['http']['routers'][assets_router_name]['tls']['domains'] = [domain_to_cert_def[auth_domain]]
 
         # 2. Anubis: Router for CSS
         css_router_name = f"anubis-assets-css-{safe_root}-{safe_auth}"
@@ -514,9 +519,12 @@ def generate_configs():
             'entryPoints': ["websecure"],
             'service': "anubis-assets@docker", 
             'priority': 2000, 
-            'tls': {'certResolver': 'le', 'domains': [domain_to_cert_def.get(f"{auth_sub}.{root}", {})]},
+            'tls': { 'certResolver': os.getenv('TRAEFIK_CERT_RESOLVER', 'le') if not IS_LOCAL_DEV else None },
             'middlewares': ["security-headers", "anubis-css-replace", "global-compress"]
         }
+
+        if not IS_LOCAL_DEV and auth_domain in domain_to_cert_def:
+             traefik_dynamic_conf['http']['routers'][css_router_name]['tls']['domains'] = [domain_to_cert_def[auth_domain]]
 
         # 3. Anubis: Main Router
         panel_router_name = f"anubis-panel-{safe_root}-{safe_auth}"
@@ -524,9 +532,12 @@ def generate_configs():
             'rule': f"Host(`{auth_sub}.{root}`)",
             'entryPoints': ["websecure"],
             'service': f"{anubis_service_name}@docker",
-            'tls': {'certResolver': 'le', 'domains': [domain_to_cert_def.get(f"{auth_sub}.{root}", {})]}, 
+            'tls': { 'certResolver': os.getenv('TRAEFIK_CERT_RESOLVER', 'le') if not IS_LOCAL_DEV else None }, 
             'middlewares': ["security-headers"]
         }
+
+        if not IS_LOCAL_DEV and auth_domain in domain_to_cert_def:
+             traefik_dynamic_conf['http']['routers'][panel_router_name]['tls']['domains'] = [domain_to_cert_def[auth_domain]]
 
     if services:
         compose_yaml = { 'services': services }

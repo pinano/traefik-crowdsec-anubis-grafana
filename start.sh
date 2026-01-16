@@ -556,23 +556,29 @@ if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
     $COMPOSE_CMD $COMPOSE_FILES up -d crowdsec redis
 
     # Wait for CrowdSec to be healthy (smart wait instead of blind sleep)
-    echo -n "   ⏳ Waiting for CrowdSec API"
-    timeout=60
-    # Dynamic lookup to support project prefixes (e.g. stack-crowdsec-1)
     CROWDSEC_ID=$(docker ps -aq --filter label=com.docker.compose.project=$PROJECT_NAME --filter label=com.docker.compose.service=crowdsec | head -n 1)
-    
-    while [ -z "$CROWDSEC_ID" ] || [ "$(docker inspect --format='{{.State.Health.Status}}' $CROWDSEC_ID 2>/dev/null)" != "healthy" ]; do
-        sleep 2
-        echo -n "."
-        ((timeout-=2))
-        if [ $timeout -le 0 ]; then
-            echo ""
-            echo "   ❌ Timeout waiting for CrowdSec to become healthy."
-            exit 1
-        fi
-    done
-    echo " ready!"
-    echo "   ✅ CrowdSec operational."
+    CS_STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$CROWDSEC_ID" 2>/dev/null || echo "none")
+
+    if [ "$CS_STATUS" == "healthy" ]; then
+        echo "   ✅ CrowdSec is already operational. Skipping wait."
+    else
+        echo -n "   ⏳ Waiting for CrowdSec API"
+        timeout=60
+        while [ -z "$CROWDSEC_ID" ] || [ "$(docker inspect --format='{{.State.Health.Status}}' $CROWDSEC_ID 2>/dev/null)" != "healthy" ]; do
+            sleep 2
+            echo -n "."
+            ((timeout-=2))
+            if [ $timeout -le 0 ]; then
+                echo ""
+                echo "   ❌ Timeout waiting for CrowdSec to become healthy."
+                exit 1
+            fi
+            # Re-fetch ID in case it was recreated
+            CROWDSEC_ID=$(docker ps -aq --filter label=com.docker.compose.project=$PROJECT_NAME --filter label=com.docker.compose.service=crowdsec | head -n 1)
+        done
+        echo " ready!"
+        echo "   ✅ CrowdSec operational."
+    fi
 
     # =============================================================================
     # PHASE 8: Register Bouncer API Key
