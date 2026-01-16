@@ -414,8 +414,8 @@ def generate_configs():
 
         # 2. Generate the chunked 'tls.domains' configuration
         for root_domain, subdomains in domains_by_root.items():
-            # Deduplicate and sort
-            subs_unicos = sorted(list(set(subdomains)))
+            # Deduplicate preserving order (Python 3.7+ dicts preserve insertion order)
+            subs_unicos = list(dict.fromkeys(subdomains))
             
             # Chunking loop in batches of TLS_BATCH_SIZE
             for i in range(0, len(subs_unicos), TLS_BATCH_SIZE):

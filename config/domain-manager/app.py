@@ -250,7 +250,46 @@ def api_domains():
                 'duplicates': duplicates
             }), 400
             
-        write_csv(data)
+        # --- MERGE STRATEGY: Preserve Order & Append New ---
+        
+        # 1. Read existing CSV to get current order
+        current_data = read_csv()
+        
+        # 2. Index new data by domain for fast lookup
+        # Key: domain (lowercase), Value: entry dict
+        incoming_map = {}
+        for entry in data:
+            d = entry.get('domain', '').strip().lower()
+            if d:
+                incoming_map[d] = entry
+
+        # 3. Construct new list
+        final_list = []
+        processed_domains = set()
+
+        # 3a. Update existing entries in their original order
+        for existing_entry in current_data:
+            d_existing = existing_entry.get('domain', '').strip().lower()
+            
+            # If this valid domain exists in internal map (even if commented out in CSV)
+            if d_existing in incoming_map:
+                # Update it with new values from UI
+                # We replace the entire text content with the new one
+                final_list.append(incoming_map[d_existing])
+                processed_domains.add(d_existing)
+            else:
+                # It's not in the new list -> It was deleted in UI
+                pass 
+
+        # 3b. Append NEW entries (those in incoming_map but not in processed_domains)
+        # We iterate over the 'data' list from UI to respect the user's *new* addition order among themselves
+        for entry in data:
+            d = entry.get('domain', '').strip().lower()
+            if d and d not in processed_domains:
+                final_list.append(entry)
+                processed_domains.add(d)
+        
+        write_csv(final_list)
         return jsonify({'status': 'success'})
 
 @app.route('/api/services', methods=['GET'])
