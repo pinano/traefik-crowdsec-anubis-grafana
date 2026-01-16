@@ -275,13 +275,19 @@ if [[ "$DISABLE_CS" != "true" ]]; then
         docker network create traefik
     fi
 
+    COMPOSE_FILE="docker-compose-traefik-crowdsec-redis.yaml"
     echo "   🚀 Starting CrowdSec container..."
-    docker compose -f docker-compose-traefik-crowdsec-redis.yaml up -d crowdsec
+    docker compose -f $COMPOSE_FILE up -d crowdsec
     
     echo "   ⏳ Waiting for CrowdSec API..."
     # Wait loop
     timeout=60
-    while [ "$(docker inspect --format='{{.State.Health.Status}}' crowdsec 2>/dev/null)" != "healthy" ]; do
+    while true; do
+        CS_CID=$(docker compose -f $COMPOSE_FILE ps -q crowdsec 2>/dev/null || true)
+        if [ -n "$CS_CID" ] && [ "$(docker inspect --format='{{.State.Health.Status}}' $CS_CID 2>/dev/null)" == "healthy" ]; then
+            break
+        fi
+        
         sleep 2
         echo -n "."
         ((timeout-=2))
@@ -292,12 +298,13 @@ if [[ "$DISABLE_CS" != "true" ]]; then
     done
     echo ""
 
-    if [ "$(docker inspect --format='{{.State.Health.Status}}' crowdsec 2>/dev/null)" == "healthy" ]; then
+    CS_CID=$(docker compose -f $COMPOSE_FILE ps -q crowdsec 2>/dev/null || true)
+    if [ -n "$CS_CID" ] && [ "$(docker inspect --format='{{.State.Health.Status}}' $CS_CID 2>/dev/null)" == "healthy" ]; then
         echo "   🔑 Generating CROWDSEC_API_KEY..."
         # First remove old one if exists to avoid error
-        docker exec crowdsec cscli bouncers delete traefik-bouncer >/dev/null 2>&1 || true
+        docker compose -f $COMPOSE_FILE exec -T crowdsec cscli bouncers delete traefik-bouncer >/dev/null 2>&1 || true
         # Add new one and capture output
-        CS_KEY=$(docker exec crowdsec cscli bouncers add traefik-bouncer -o raw)
+        CS_KEY=$(docker compose -f $COMPOSE_FILE exec -T crowdsec cscli bouncers add traefik-bouncer -o raw)
         
         if [ -n "$CS_KEY" ]; then
             replace_val "CROWDSEC_API_KEY" "$CS_KEY"

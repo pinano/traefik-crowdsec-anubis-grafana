@@ -503,76 +503,76 @@ The watchdog sends Telegram notifications for:
 All CrowdSec commands use `cscli` inside the container:
 
 ```bash
-docker exec crowdsec cscli <command>
+docker compose exec crowdsec cscli <command>
 ```
 
 #### Decision Management (Bans)
 
 ```bash
 # Ban an IP
-docker exec crowdsec cscli decisions add --ip <IP> --duration 24h --reason "Manual Ban"
+docker compose exec crowdsec cscli decisions add --ip <IP> --duration 24h --reason "Manual Ban"
 
 # Ban an IP range (CIDR)
-docker exec crowdsec cscli decisions add --range 192.168.1.0/24 --duration 24h --reason "Subnet ban"
+docker compose exec crowdsec cscli decisions add --range 192.168.1.0/24 --duration 24h --reason "Subnet ban"
 
 # Unban an IP
-docker exec crowdsec cscli decisions delete --ip <IP>
+docker compose exec crowdsec cscli decisions delete --ip <IP>
 
 # List active bans
-docker exec crowdsec cscli decisions list
+docker compose exec crowdsec cscli decisions list
 ```
 
 #### Metrics & Statistics
 
 ```bash
 # View real-time metrics
-docker exec crowdsec cscli metrics
+docker compose exec crowdsec cscli metrics
 
 # List recent alerts
-docker exec crowdsec cscli alerts list
+docker compose exec crowdsec cscli alerts list
 
 # View detailed alert information
-docker exec crowdsec cscli alerts inspect <ALERT_ID>
+docker compose exec crowdsec cscli alerts inspect <ALERT_ID>
 ```
 
 #### Hub Management
 
 ```bash
 # Update the hub index
-docker exec crowdsec cscli hub update
+docker compose exec crowdsec cscli hub update
 
 # Upgrade all installed components
-docker exec crowdsec cscli hub upgrade
+docker compose exec crowdsec cscli hub upgrade
 
 # Install a new collection (e.g., for WordPress)
-docker exec crowdsec cscli collections install crowdsecurity/wordpress
+docker compose exec crowdsec cscli collections install crowdsecurity/wordpress
 ```
 
 #### Bouncer Management
 
 ```bash
 # Check bouncer status
-docker exec crowdsec cscli bouncers list
+docker compose exec crowdsec cscli bouncers list
 
 # Delete a bouncer
-docker exec crowdsec cscli bouncers delete <bouncer_name>
+docker compose exec crowdsec cscli bouncers delete <bouncer_name>
 ```
 
 #### Diagnostic Commands
 
 ```bash
 # Check CrowdSec health
-docker exec crowdsec cscli lapi status
+docker compose exec crowdsec cscli lapi status
 
 # Validate configuration
-docker exec crowdsec cscli config show
+docker compose exec crowdsec cscli config show
 
 # Test log parsing (dry-run)
-docker exec crowdsec cscli explain --file /var/log/traefik/access.log --type traefik
+docker compose exec crowdsec cscli explain --file /var/log/traefik/access.log --type traefik
 ```
 
 > [!TIP]
-> Use `docker exec crowdsec cscli <command> --help` for detailed options on any command.
+> Use `docker compose exec crowdsec cscli <command> --help` for detailed options on any command.
 
 ---
 
