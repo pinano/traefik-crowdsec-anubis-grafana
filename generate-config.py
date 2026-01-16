@@ -503,9 +503,14 @@ def generate_configs():
             'entryPoints': ["websecure"],
             'service': "anubis-assets@docker", 
             'priority': 2000, 
-            'tls': { 'certResolver': os.getenv('TRAEFIK_CERT_RESOLVER', 'le') if not IS_LOCAL_DEV else None },
+            'tls': {},
             'middlewares': ["security-headers", "anubis-assets-stripper", "global-compress"]
         }
+        
+        # Configure TLS
+        if not IS_LOCAL_DEV:
+             traefik_dynamic_conf['http']['routers'][assets_router_name]['tls']['certResolver'] = os.getenv('TRAEFIK_CERT_RESOLVER', 'le')
+
         
         # Inject TLS domains if specific batch exists
         auth_domain = f"{auth_sub}.{root}"
@@ -519,9 +524,14 @@ def generate_configs():
             'entryPoints': ["websecure"],
             'service': "anubis-assets@docker", 
             'priority': 2000, 
-            'tls': { 'certResolver': os.getenv('TRAEFIK_CERT_RESOLVER', 'le') if not IS_LOCAL_DEV else None },
+            'tls': {},
             'middlewares': ["security-headers", "anubis-css-replace", "global-compress"]
         }
+
+        # Configure TLS
+        if not IS_LOCAL_DEV:
+             traefik_dynamic_conf['http']['routers'][css_router_name]['tls']['certResolver'] = os.getenv('TRAEFIK_CERT_RESOLVER', 'le')
+
 
         if not IS_LOCAL_DEV and auth_domain in domain_to_cert_def:
              traefik_dynamic_conf['http']['routers'][css_router_name]['tls']['domains'] = [domain_to_cert_def[auth_domain]]
@@ -532,9 +542,14 @@ def generate_configs():
             'rule': f"Host(`{auth_sub}.{root}`)",
             'entryPoints': ["websecure"],
             'service': f"{anubis_service_name}@docker",
-            'tls': { 'certResolver': os.getenv('TRAEFIK_CERT_RESOLVER', 'le') if not IS_LOCAL_DEV else None }, 
+            'tls': {}, 
             'middlewares': ["security-headers"]
         }
+
+        # Configure TLS
+        if not IS_LOCAL_DEV:
+             traefik_dynamic_conf['http']['routers'][panel_router_name]['tls']['certResolver'] = os.getenv('TRAEFIK_CERT_RESOLVER', 'le')
+
 
         if not IS_LOCAL_DEV and auth_domain in domain_to_cert_def:
              traefik_dynamic_conf['http']['routers'][panel_router_name]['tls']['domains'] = [domain_to_cert_def[auth_domain]]
