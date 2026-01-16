@@ -31,7 +31,6 @@ services:
       #- COOKIE_PREFIX=${ANUBIS_COOKIE_PREFIX:-anubis}
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - /etc/timezone:/etc/timezone:ro
       - ./config/anubis/botPolicy-generated.yaml:/botPolicy.yaml:ro
     healthcheck:
       disable: true

@@ -22,7 +22,6 @@ services:
       - TZ=${TZ}
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - /etc/timezone:/etc/timezone:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./config/traefik/acme.json:/acme.json
       - ./config/traefik/certs-local-dev:/certs:ro
@@ -68,7 +67,6 @@ services:
       TZ: ${TZ}
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - /etc/timezone:/etc/timezone:ro
       - crowdsec-db:/var/lib/crowdsec/data/
       - crowdsec-config:/etc/crowdsec/
       - ./config/crowdsec/acquis.yaml:/etc/crowdsec/acquis.yaml
@@ -105,7 +103,6 @@ services:
       - TZ=${TZ}
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - /etc/timezone:/etc/timezone:ro
       - ./config/redis/redis.conf:/redis.conf:ro
       - redis_data:/data
     networks:

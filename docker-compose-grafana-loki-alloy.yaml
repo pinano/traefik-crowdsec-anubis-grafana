@@ -16,7 +16,6 @@ services:
       - grafana_data:/var/lib/grafana
       - ./config/grafana/config.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
       - /etc/localtime:/etc/localtime:ro
-      - /etc/timezone:/etc/timezone:ro
     networks:
       - traefik
     deploy:
@@ -47,7 +46,6 @@ services:
     command: -config.file=/etc/loki/local-config.yaml
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - /etc/timezone:/etc/timezone:ro
       - ./config/loki/config.yaml:/etc/loki/local-config.yaml:ro
       - loki_data:/loki
     environment:
@@ -82,7 +80,6 @@ services:
       - ./config/alloy/config.alloy:/etc/alloy/config.alloy:ro
       - alloy_data:/var/lib/alloy
       - /etc/localtime:/etc/localtime:ro
-      - /etc/timezone:/etc/timezone:ro
     # Alloy needs the 'run' argument and also to point at the config file
     command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
     networks:
