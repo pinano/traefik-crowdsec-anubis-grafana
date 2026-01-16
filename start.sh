@@ -552,18 +552,22 @@ fi
 # layer is ready when Traefik starts.
 
 if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
-    echo "🛡️  Booting security layer (CrowdSec + Redis)..."
-    $COMPOSE_CMD $COMPOSE_FILES up -d crowdsec redis
-
-    # Wait for CrowdSec to be healthy (smart wait instead of blind sleep)
+    # Smart check: Is it already running and healthy?
     CROWDSEC_ID=$(docker ps -aq --filter label=com.docker.compose.project=$PROJECT_NAME --filter label=com.docker.compose.service=crowdsec | head -n 1)
     CS_STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$CROWDSEC_ID" 2>/dev/null || echo "none")
 
     if [ "$CS_STATUS" == "healthy" ]; then
-        echo "   ✅ CrowdSec is already operational. Skipping wait."
+        echo "🛡️  Security layer (CrowdSec) is already operational. Skipping boot phase."
     else
+        echo "🛡️  Booting security layer (CrowdSec + Redis)..."
+        $COMPOSE_CMD $COMPOSE_FILES up -d crowdsec redis
+
+        # Wait for CrowdSec to be healthy
         echo -n "   ⏳ Waiting for CrowdSec API"
         timeout=60
+        # Refresh ID in case it was just created
+        CROWDSEC_ID=$(docker ps -aq --filter label=com.docker.compose.project=$PROJECT_NAME --filter label=com.docker.compose.service=crowdsec | head -n 1)
+        
         while [ -z "$CROWDSEC_ID" ] || [ "$(docker inspect --format='{{.State.Health.Status}}' $CROWDSEC_ID 2>/dev/null)" != "healthy" ]; do
             sleep 2
             echo -n "."
@@ -573,7 +577,6 @@ if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
                 echo "   ❌ Timeout waiting for CrowdSec to become healthy."
                 exit 1
             fi
-            # Re-fetch ID in case it was recreated
             CROWDSEC_ID=$(docker ps -aq --filter label=com.docker.compose.project=$PROJECT_NAME --filter label=com.docker.compose.service=crowdsec | head -n 1)
         done
         echo " ready!"
@@ -612,9 +615,14 @@ if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
         fi
     fi
 else
-    echo "🛡️  Booting Redis (CrowdSec is disabled)..."
-    $COMPOSE_CMD $COMPOSE_FILES up -d redis
-    echo "   ✅ Redis operational."
+    REDIS_ID=$(docker ps -aq --filter label=com.docker.compose.project=$PROJECT_NAME --filter label=com.docker.compose.service=redis | head -n 1)
+    if [ -n "$REDIS_ID" ] && [ "$(docker inspect --format='{{.State.Running}}' $REDIS_ID 2>/dev/null)" == "true" ]; then
+        echo "🛡️  Redis is already operational. Skipping boot phase."
+    else
+        echo "🛡️  Booting Redis (CrowdSec is disabled)..."
+        $COMPOSE_CMD $COMPOSE_FILES up -d redis
+        echo "   ✅ Redis operational."
+    fi
 fi
 
 # =============================================================================
