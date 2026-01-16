@@ -708,8 +708,11 @@ This stack supports locally trusted certificates to prevent browser security war
 ├── domains.csv.dist                       # Domain inventory template
 ├── generate-config.py                     # Configuration generator
 ├── initialize-env.sh                      # Interactive setup wizard
+├── create-local-certs.sh                  # Local SSL certificate generator (mkcert)
 ├── start.sh                               # Deployment script
 ├── stop.sh                                # Shutdown script
+│
+├── certs/                                 # SSL certificates directory
 │
 ├── config/
 │   ├── alloy/                             # Alloy log collector config
@@ -737,6 +740,7 @@ This stack supports locally trusted certificates to prevent browser security war
 │   │   └── check-dns.sh
 │   └── traefik/                           # Traefik configuration
 │       ├── traefik.yaml.template          # Static config template
+│       ├── certs-local-dev/               # Local mkcert certificates
 │       └── dynamic-config/                # Generated routers/middlewares
 │
 └── Docker Compose Files:
