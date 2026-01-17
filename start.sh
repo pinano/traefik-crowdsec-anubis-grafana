@@ -9,6 +9,12 @@
 
 set -e  # Exit on any error
 
+# 0. Check if Docker is running
+if ! docker info >/dev/null 2>&1; then
+    echo "❌ Error: Docker is not running. Please start Docker and try again."
+    exit 1
+fi
+
 # =============================================================================
 # TERMINAL RESTORATION
 # =============================================================================
@@ -413,7 +419,9 @@ if [ ! -f "domains.csv" ]; then
     echo "# domain, redirection, service, anubis_subdomain, rate, burst, concurrency" > domains.csv
 fi
 
+echo ""
 python3 generate-config.py
+echo ""
 
 echo "--------------------------------------------------------"
 echo "✅ END: DYNAMIC CONFIGURATION GENERATION"
@@ -626,10 +634,10 @@ if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
     # =============================================================================
     # PHASE 8: Register Bouncer API Key
     # =============================================================================
-    # Re-register the bouncer key on each start to ensure consistency.
+    # Re-register the Traefik Bouncer key on each start to ensure consistency.
     # Delete first (silently) in case it already exists, then add fresh.
 
-    echo "👮 Synchronizing Bouncer..."
+    echo "👮 Synchronizing Traefik Bouncer..."
     docker exec "$CROWDSEC_ID" cscli bouncers delete traefik-bouncer > /dev/null 2>&1 || true
     docker exec "$CROWDSEC_ID" cscli bouncers add traefik-bouncer --key "${CROWDSEC_API_KEY}" > /dev/null
 
@@ -671,11 +679,11 @@ fi
 # Now that the security layer is ready, deploy everything else.
 # --remove-orphans cleans up any old containers not in current config.
 
-echo "🚀 Deploying Traefik and remaining services..."
+echo "🚀 Deploying remaining services..."
 
 # If running inside domain-manager, exclude it from the 'up' command to avoid killing this script
 if [[ "$DOMAIN_MANAGER_INTERNAL" == "true" ]]; then
-    echo "   ℹ️  Internal run detected. Excluding domain-manager from self-restart to ensure completion."
+    echo "   ℹ️  Internal run detected. Excluding domain-manager from self-restart."
     # Get all services from all compose files, then filter out domain-manager
     SERVICES=$($COMPOSE_CMD $COMPOSE_FILES ps --services | grep -v "domain-manager" | xargs)
     $COMPOSE_CMD $COMPOSE_FILES up -d --remove-orphans $SERVICES
@@ -688,5 +696,13 @@ fi
 # =============================================================================
 
 echo ""
-echo "✅ Deployment complete!"
+echo "========================================================"
+echo "✅ DEPLOYMENT COMPLETE!"
+echo "========================================================"
+echo "🌐 Core Services:"
+echo "   ➜ Traefik Dashboard: https://traefik.$DOMAIN"
+echo "   ➜ Domain Manager:    https://domains.$DOMAIN"
+echo "   ➜ Dozzle (Logs):     https://dozzle.$DOMAIN"
+echo "   ➜ Grafana (Metrics): https://grafana.$DOMAIN"
+echo "========================================================"
 echo ""

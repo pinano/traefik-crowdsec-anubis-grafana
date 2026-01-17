@@ -216,68 +216,88 @@ def generate_configs():
 
     raw_entries = []
     error_count = 0
+    stats = {'standard': 0, 'anubis': 0, 'apache': 0}
 
     print(f"    📂 Reading {INPUT_FILE}...")
     try:
         with open(INPUT_FILE, 'r') as f:
-            reader = csv.reader(f, skipinitialspace=True)
-            for line_num, row in enumerate(reader, 1):
-                if not row or row[0].strip().startswith('#'):
-                    continue
+            # Use DictReader to handle headers more robustly
+            # We first peek to skip comments and detect headers
+            lines = [line for line in f if line.strip() and not line.strip().startswith('#')]
+            if not lines:
+                print("    ℹ️  No valid entries found (domains.csv is empty or comments only).")
+            else:
+                # Use csv.reader but manually handle indices for flexibility
+                reader = csv.reader(lines, skipinitialspace=True)
+                for line_num, row in enumerate(reader, 1):
+                    # Clean the row
+                    row = [col.strip() for col in row]
+                    
+                    if not row: continue
 
-                if len(row) < 3:
-                    print(f"    ⚠️ WARN [Line {line_num}] Ignored: Insufficient data.")
-                    error_count += 1
-                    continue
+                    if len(row) < 3:
+                        print(f"    ⚠️  Line {line_num}: Ignored (Missing mandatory columns: domain, redirection/blank, service).")
+                        error_count += 1
+                        continue
 
-                domain = row[0].strip()
-                redirection = row[1].strip()
-                service = row[2].strip().lower() 
-                anubis_sub = row[3].strip().lower() if len(row) > 3 else ""
+                    domain = row[0]
+                    redirection = row[1] if row[1] else ""
+                    service = row[2].lower() 
+                    anubis_sub = row[3].lower() if len(row) > 3 else ""
 
-                # --- Robustness Check: Docker Service Name Format ---
-                if service != 'apache-host' and not VALID_SERVICE_NAME_REGEX.match(service):
-                    print(f"    ❌ [Line {line_num}] Error: Service name '{service}' must only contain lowercase letters, numbers, and hyphens ('-'). Entry skipped.")
-                    error_count += 1
-                    continue
+                    if not domain:
+                        print(f"    ⚠️  Line {line_num}: Ignored (Empty domain field).")
+                        error_count += 1
+                        continue
 
-                extra = {}
-                def get_int(idx):
-                    if len(row) > idx and row[idx].strip():
-                        try: return int(row[idx].strip())
-                        except ValueError: return None
-                    return None
+                    # --- Robustness Check: Docker Service Name Format ---
+                    if service != 'apache-host' and not VALID_SERVICE_NAME_REGEX.match(service):
+                        print(f"    ❌ Line {line_num}: Error - Service name '{service}' invalid. Use only a-z, 0-9 and hyphens.")
+                        error_count += 1
+                        continue
 
-                rate = get_int(4)
-                if rate: extra['rate'] = rate
-                burst = get_int(5)
-                if burst: extra['burst'] = burst
-                concurrency = get_int(6)
-                if concurrency: extra['concurrency'] = concurrency
+                    extra = {}
+                    def get_int(idx):
+                        if len(row) > idx and row[idx]:
+                            try: return int(row[idx])
+                            except ValueError: return None
+                        return None
 
-                raw_entries.append({
-                    'domain': domain,
-                    'redirection': redirection,
-                    'service': service,
-                    'anubis_sub': anubis_sub,
-                    'extra': extra,
-                    'root': get_root_domain(domain)
-                })
+                    rate = get_int(4)
+                    if rate: extra['rate'] = rate
+                    burst = get_int(5)
+                    if burst: extra['burst'] = burst
+                    concurrency = get_int(6)
+                    if concurrency: extra['concurrency'] = concurrency
+
+                    raw_entries.append({
+                        'domain': domain,
+                        'redirection': redirection,
+                        'service': service,
+                        'anubis_sub': anubis_sub,
+                        'extra': extra,
+                        'root': get_root_domain(domain)
+                    })
+
+                    # Stats tracking
+                    if service == 'apache-host': stats['apache'] += 1
+                    if anubis_sub: stats['anubis'] += 1
+                    else: stats['standard'] += 1
 
     except Exception as e:
         print(f"    ❌ Error reading CSV: {e}")
         return
 
-    if not raw_entries:
-        print("    ℹ️  No valid entries found (domains.csv is empty or comments only). Generating empty configs.")
-        
-    else:
-        print(f"    ✅ Successfully processed {len(raw_entries)} domains.")
-
+    if raw_entries:
+        print(f"    ✅ Successfully processed {len(raw_entries)} domains:")
+        if stats['standard'] > 0: print(f"       ➜ {stats['standard']} Standard Traefik proxies")
+        if stats['anubis'] > 0:    print(f"       ➜ {stats['anubis']} Anubis protected instances")
+        if stats['apache'] > 0:    print(f"       ➜ {stats['apache']} Apache legacy hosts")
+    
     if error_count > 0:
-        print(f"    ⚠️ WARN: {error_count} lines were skipped due to format errors.")
+        print(f"    ⚠️  Total: {error_count} lines skipped due to errors.")
 
-    print(f"    ⚙️ Global Config: Rate={G_RATE_AVG}/{G_RATE_BURST}, HSTS={HSTS_SECONDS}s")
+    print(f"    ⚙️  Global Config: Rate={G_RATE_AVG}/{G_RATE_BURST}, HSTS={HSTS_SECONDS}s")
 
     services = {}
 
