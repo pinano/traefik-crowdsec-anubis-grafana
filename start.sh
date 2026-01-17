@@ -375,12 +375,30 @@ if [ -f "./config/traefik/traefik-generated.yaml" ]; then
 fi
 
 # Generate dynamic configuration with Python script
-echo "🔧 Generating dynamic configuration..."
+echo "--------------------------------------------------------"
+echo "⚙️  START: DYNAMIC CONFIGURATION GENERATION"
+echo "--------------------------------------------------------"
+
+# Safety check: Cleanup generated files to avoid PermissionError (Docker root ownership)
+# NOTE: In Linux, if you own the directory, you can delete root-owned files.
+# If the directory itself is root-owned, this will fail and we will guide the user.
+echo "🧹 Cleaning up old generated configurations..."
+{
+    rm -f ./config/traefik/dynamic-config/routers-generated.yaml
+    rm -f ./config/anubis/botPolicy-generated.yaml
+} || {
+    echo "❌ Error: Could not clean up generated files due to permissions."
+    echo "   This usually happens if Docker created the directories as root."
+    echo "   Please run: sudo chown -R $(id -u):$(id -g) ."
+    exit 1
+}
 
 # Safety check: if docker-compose-anubis-generated.yaml is a directory (Docker artifact), remove it
 if [ -d "docker-compose-anubis-generated.yaml" ]; then
     echo "⚠️  Cleaning up directory collision: docker-compose-anubis-generated.yaml"
     rm -rf docker-compose-anubis-generated.yaml
+else
+    rm -f docker-compose-anubis-generated.yaml
 fi
 
 # Safety check: if domains.csv is a directory (Docker artifact), remove it
@@ -396,7 +414,10 @@ if [ ! -f "domains.csv" ]; then
 fi
 
 python3 generate-config.py
-echo "   ✅ Dynamic configuration generated."
+
+echo "--------------------------------------------------------"
+echo "✅ END: DYNAMIC CONFIGURATION GENERATION"
+echo "--------------------------------------------------------"
 
 
 # =============================================================================
