@@ -69,7 +69,7 @@ fi
 COMPOSE_FILES="$com_files"
 
 # Include Apache host logs for legacy installations (same condition as start.sh)
-if [ [ -d "/var/log/apache2" ] ]; then
+if [ -d "/var/log/apache2" ]; then
     COMPOSE_FILES="$COMPOSE_FILES -f docker-compose-apache-logs.yaml"
 fi
 
