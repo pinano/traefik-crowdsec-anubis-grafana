@@ -56,6 +56,12 @@ if [ -d "docker-compose-anubis-generated.yaml" ]; then
     rm -rf docker-compose-anubis-generated.yaml
 fi
 
+# Safety check: if domains.csv is a directory (Docker artifact), remove it
+if [ -d "domains.csv" ]; then
+    echo "⚠️  Cleaning up directory collision: domains.csv"
+    rm -rf domains.csv
+fi
+
 com_files="-f docker-compose-traefik-crowdsec-redis.yaml \
                -f docker-compose-tools.yaml \
                -f docker-compose-grafana-loki-alloy.yaml \
@@ -79,7 +85,7 @@ fi
 # --remove-orphans cleans containers for domains that were deleted from the CSV
 # and no longer exist in the generated docker-compose files.
 
-echo "🛑 Stopping and cleaning the entire fleet..."
+echo "🛑 Stopping and cleaning the entire stack..."
 
 # Enforce project name to avoid missing containers
 COMPOSE_CMD="docker compose -p $PROJECT_NAME --profile crowdsec"
