@@ -23,7 +23,7 @@ send_telegram() {
     # Use backticks instead of square brackets for SERVER_DOMAIN to avoid Markdown parsing issues
     curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
         -d chat_id="${TELEGRAM_RECIPIENT_ID}" \
-        -d text="🛡️ *CROWDSEC ALERT* [\`${SERVER_DOMAIN}\`] 🛡️%0A%0A${MSG}" \
+        -d text="🛡️ *CROWDSEC ALERT* 🛡️%0A[\`${SERVER_DOMAIN}\`]%0A%0A${MSG}" \
         -d parse_mode="Markdown" > /dev/null
 }
 
@@ -117,8 +117,12 @@ else
         IS_REALLY_OLD=0
         
         if [ -n "$last_pull" ] && [ "$last_pull" != "null" ]; then
-            LAST_PULL_TS=$(date -d "$last_pull" +%s 2>/dev/null)
-            if [ -n "$LAST_PULL_TS" ]; then
+            # Handle possible multiple instances by taking the first one if jq returned multiple
+            last_pull_actual=$(echo "$last_pull" | head -n 1)
+            LAST_PULL_TS=$(date -d "$last_pull_actual" +%s 2>/dev/null)
+            
+            # Only proceed if we got a valid timestamp
+            if [ -n "$LAST_PULL_TS" ] && echo "$LAST_PULL_TS" | grep -q '^[0-9]\+$'; then
                 DIFF=$((CURRENT_TIME - LAST_PULL_TS))
                 [ $DIFF -le $STALE_THRESHOLD ] && IS_STALE=0
                 [ $DIFF -gt $PRUNE_THRESHOLD ] && IS_REALLY_OLD=1
@@ -151,11 +155,23 @@ else
         if [ ! -f "$GROUP_DIR/${base_name}.active" ]; then
             while read -r name; do
                 # Find the specific minutes for this name to include in alert
-                last_pull=$(echo "$BOUNCERS" | jq -r ".[] | select(.name==\"$name\") | .last_pull")
-                LAST_PULL_TS=$(date -d "$last_pull" +%s 2>/dev/null)
-                MINUTES=$(((CURRENT_TIME - LAST_PULL_TS) / 60))
-                STALE_ALERTS="${STALE_ALERTS}• *$name*: last pull was $MINUTES minutes ago%0A"
-                echo -e "${YELLOW}⚠️ Bouncer '$name' is STALE (Group '$base_name' has NO active instances)${NC}"
+                last_pull=$(echo "$BOUNCERS" | jq -r ".[] | select(.name==\"$name\") | .last_pull" | head -n 1)
+                
+                MSG_TIME=""
+                if [ -n "$last_pull" ] && [ "$last_pull" != "null" ]; then
+                    LAST_PULL_TS=$(date -d "$last_pull" +%s 2>/dev/null)
+                    if [ -n "$LAST_PULL_TS" ] && echo "$LAST_PULL_TS" | grep -q '^[0-9]\+$'; then
+                        MINUTES=$(((CURRENT_TIME - LAST_PULL_TS) / 60))
+                        MSG_TIME="${MINUTES} minutes ago"
+                    else
+                        MSG_TIME="unknown time"
+                    fi
+                else
+                    MSG_TIME="never"
+                fi
+                
+                STALE_ALERTS="${STALE_ALERTS}• *$name*: last pull was ${MSG_TIME}%0A"
+                echo -e "${YELLOW}⚠️ Bouncer '$name' is STALE (last pull: ${MSG_TIME})${NC}"
             done < "$group_file"
         else
             echo -e "${GREEN}✅ Group '$base_name' is active (some instances are stale but at least one is healthy)${NC}"

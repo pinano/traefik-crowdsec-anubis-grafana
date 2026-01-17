@@ -376,6 +376,13 @@ fi
 
 # Generate dynamic configuration with Python script
 echo "🔧 Generating dynamic configuration..."
+
+# Safety check: if docker-compose-anubis-generated.yaml is a directory (Docker artifact), remove it
+if [ -d "docker-compose-anubis-generated.yaml" ]; then
+    echo "⚠️  Cleaning up directory collision: docker-compose-anubis-generated.yaml"
+    rm -rf docker-compose-anubis-generated.yaml
+fi
+
 python3 generate-config.py
 echo "   ✅ Dynamic configuration generated."
 

@@ -50,14 +50,26 @@ trap cleanup EXIT INT TERM
 # =============================================================================
 # Must match the same files used in start.sh to ensure all containers are stopped.
 
-COMPOSE_FILES="-f docker-compose-traefik-crowdsec-redis.yaml \
+# Safety check: if docker-compose-anubis-generated.yaml is a directory (Docker artifact), remove it
+if [ -d "docker-compose-anubis-generated.yaml" ]; then
+    echo "⚠️  Cleaning up directory collision: docker-compose-anubis-generated.yaml"
+    rm -rf docker-compose-anubis-generated.yaml
+fi
+
+com_files="-f docker-compose-traefik-crowdsec-redis.yaml \
                -f docker-compose-tools.yaml \
-               -f docker-compose-anubis-generated.yaml \
                -f docker-compose-grafana-loki-alloy.yaml \
                -f docker-compose-domain-manager.yaml"
 
+if [ -f "docker-compose-anubis-generated.yaml" ]; then
+    com_files="$com_files -f docker-compose-anubis-generated.yaml"
+    echo "   ✅ Included docker-compose-anubis-generated.yaml"
+fi
+
+COMPOSE_FILES="$com_files"
+
 # Include Apache host logs for legacy installations (same condition as start.sh)
-if [ -d "/var/log/apache2" ]; then
+if [ [ -d "/var/log/apache2" ] ]; then
     COMPOSE_FILES="$COMPOSE_FILES -f docker-compose-apache-logs.yaml"
 fi
 
