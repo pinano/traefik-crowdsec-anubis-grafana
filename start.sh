@@ -268,6 +268,33 @@ else
 fi
 
 # =============================================================================
+# PHASE 0b: Core DNS Verification
+# =============================================================================
+# Checks if the required subdomains for core services are resolvable.
+
+echo "🔍 Verifying Core DNS records..."
+CORE_SUBS=("traefik" "domains" "dozzle" "grafana")
+MISSING_DNS=()
+
+for sub in "${CORE_SUBS[@]}"; do
+    TARGET_FQDN="$sub.$DOMAIN"
+    # Using getent ahosts as it's standard and doesn't require extra packages like dnsutils
+    if ! getent ahosts "$TARGET_FQDN" >/dev/null 2>&1; then
+        MISSING_DNS+=("$TARGET_FQDN")
+    fi
+done
+
+if [ ${#MISSING_DNS[@]} -gt 0 ]; then
+    echo "   ⚠️  The following core subdomains are not resolvable:"
+    for m in "${MISSING_DNS[@]}"; do
+        echo "      ➜ $m"
+    done
+    echo "   👉 ACTION REQUIRED: Please create these DNS records (Type A) pointing to this server."
+else
+    echo "   ✅ All core DNS records verified."
+fi
+
+# =============================================================================
 # PHASE 1: Prepare Anubis Assets
 # =============================================================================
 # Copy default assets (.dist files) if user hasn't provided custom ones.
