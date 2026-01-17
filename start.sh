@@ -9,11 +9,20 @@
 
 set -e  # Exit on any error
 
+# ⏲️ Start Timer
+START_TIME=$(date +%s)
+
 # 0. Check if Docker is running
 if ! docker info >/dev/null 2>&1; then
     echo "❌ Error: Docker is not running. Please start Docker and try again."
     exit 1
 fi
+
+echo ""
+echo "========================================================"
+echo "🚀 DEPLOYMENT STARTING..."
+echo "========================================================"
+echo ""
 
 # =============================================================================
 # TERMINAL RESTORATION
@@ -381,6 +390,7 @@ if [ -f "./config/traefik/traefik-generated.yaml" ]; then
 fi
 
 # Generate dynamic configuration with Python script
+echo ""
 echo "--------------------------------------------------------"
 echo "⚙️  START: DYNAMIC CONFIGURATION GENERATION"
 echo "--------------------------------------------------------"
@@ -426,6 +436,7 @@ echo ""
 echo "--------------------------------------------------------"
 echo "✅ END: DYNAMIC CONFIGURATION GENERATION"
 echo "--------------------------------------------------------"
+echo ""
 
 
 # =============================================================================
@@ -695,10 +706,15 @@ fi
 # DONE
 # =============================================================================
 
+# ⏲️ Calculate Duration
+END_TIME=$(date +%s)
+DURATION=$((END_TIME - START_TIME))
+
 echo ""
 echo "========================================================"
-echo "✅ DEPLOYMENT COMPLETE!"
+echo "✅ DEPLOYMENT COMPLETE! (Total time: ${DURATION}s)"
 echo "========================================================"
+echo ""
 echo "🌐 Core Services:"
 echo "   ➜ Traefik Dashboard: https://traefik.$DOMAIN"
 echo "   ➜ Domain Manager:    https://domains.$DOMAIN"
