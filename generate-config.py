@@ -581,9 +581,10 @@ def generate_configs():
             yaml.dump(compose_yaml, f, Dumper=IndentDumper, default_flow_style=False, sort_keys=False)
         print(f"    ✅ Docker Compose generated with {len(services)} Anubis instances.")
     else:
-        if os.path.exists(OUTPUT_COMPOSE):
-            os.remove(OUTPUT_COMPOSE)
-        print("    ℹ️ No Anubis protected domains found. (Generated file removed/skipped)")
+        with open(OUTPUT_COMPOSE, 'w') as f:
+            f.write("# AUTOMATICALLY GENERATED - NO ANUBIS INSTANCES\n")
+            yaml.dump({'services': {}}, f, Dumper=IndentDumper, default_flow_style=False)
+        print("    ℹ️ No Anubis protected domains found. (Empty file generated)")
 
     os.makedirs(os.path.dirname(OUTPUT_TRAEFIK), exist_ok=True)
     with open(OUTPUT_TRAEFIK, 'w') as f:
