@@ -601,14 +601,28 @@ COMPOSE_FILES="$com_files"
 
 # Include Apache host logs for legacy installations
 # Debian/Ubuntu only: check if apache2 is properly installed via dpkg-query
-# If dpkg-query is missing (e.g. macOS), we assume Apache is not available
-if command -v dpkg-query >/dev/null 2>&1 && \
-   dpkg-query -W -f='${Status}' apache2 2>/dev/null | grep -q "ok installed"; then
+APACHE_FLAG_FILE=".apache_host_available"
+
+# If we are in the host (dpkg-query exists), do the real check
+if command -v dpkg-query >/dev/null 2>&1; then
+    if dpkg-query -W -f='${Status}' apache2 2>/dev/null | grep -q "ok installed"; then
+        export APACHE_HOST_AVAILABLE="true"
+        touch "$APACHE_FLAG_FILE"
+    else
+        export APACHE_HOST_AVAILABLE="false"
+        rm -f "$APACHE_FLAG_FILE"
+    fi
+# If we are in the container (no dpkg-query), rely on the flag file created by the host
+elif [ -f "$APACHE_FLAG_FILE" ]; then
     export APACHE_HOST_AVAILABLE="true"
-    COMPOSE_FILES="$COMPOSE_FILES -f docker-compose-apache-logs.yaml"
-    echo "   📋 Apache legacy installation detected, including logs extension."
 else
     export APACHE_HOST_AVAILABLE="false"
+fi
+
+# Enable logs extension if Apache is available
+if [ "$APACHE_HOST_AVAILABLE" == "true" ]; then
+    COMPOSE_FILES="$COMPOSE_FILES -f docker-compose-apache-logs.yaml"
+    echo "   📋 Apache legacy installation detected, including logs extension."
 fi
 
 # =============================================================================

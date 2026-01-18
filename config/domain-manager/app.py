@@ -335,7 +335,9 @@ def get_external_services():
     final_list = sorted(list(set(external_services)))
 
     # Append 'apache-host' if legacy installation is detected on the host
-    if os.environ.get("APACHE_HOST_AVAILABLE") == "true":
+    # We check both the env var and a persistent flag file to be robust across container restarts
+    apache_flag = os.path.join(BASE_DIR, ".apache_host_available")
+    if os.environ.get("APACHE_HOST_AVAILABLE") == "true" or os.path.exists(apache_flag):
         # Put it at the beginning of the list for easy access if it exists
         final_list.insert(0, "apache-host")
         
