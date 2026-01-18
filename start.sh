@@ -599,10 +599,10 @@ fi
 COMPOSE_FILES="$com_files"
 
 # Include Apache host logs for legacy installations
-# Industry-standard detection for Debian/Ubuntu: check if package is installed via dpkg-query
-# Fallback to direct executable check on standard paths as backup
-if dpkg-query -W -f='${Status}' apache2 2>/dev/null | grep -q "ok installed" || \
-   [ -x "/usr/sbin/apache2" ] || [ -x "/usr/bin/apache2" ]; then
+# Debian/Ubuntu only: check if apache2 is properly installed via dpkg-query
+# If dpkg-query is missing (e.g. macOS), we assume Apache is not available
+if command -v dpkg-query >/dev/null 2>&1 && \
+   dpkg-query -W -f='${Status}' apache2 2>/dev/null | grep -q "ok installed"; then
     export APACHE_HOST_AVAILABLE="true"
     COMPOSE_FILES="$COMPOSE_FILES -f docker-compose-apache-logs.yaml"
     echo "   📋 Apache legacy installation detected, including logs extension."
