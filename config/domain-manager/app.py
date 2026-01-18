@@ -334,8 +334,8 @@ def get_external_services():
         
     final_list = sorted(list(set(external_services)))
 
-    # Append 'apache-host' if legacy installation is detected
-    if os.path.exists("/var/log/apache2"):
+    # Append 'apache-host' if legacy installation is detected on the host
+    if os.environ.get("APACHE_HOST_AVAILABLE") == "true":
         # Put it at the beginning of the list for easy access if it exists
         final_list.insert(0, "apache-host")
         
