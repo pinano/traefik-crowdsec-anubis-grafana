@@ -38,7 +38,7 @@ if (BLOCKED_PATHS_STR.startswith('"') and BLOCKED_PATHS_STR.endswith('"')) or \
 BLOCKED_PATHS = [p.strip().strip('"').strip("'") for p in BLOCKED_PATHS_STR.split(',') if p.strip()]
 
 # TLS Chunking Limit (Let's Encrypt max is 100)
-TLS_BATCH_SIZE = 90
+TLS_BATCH_SIZE = 30
 
 # CrowdSec & Traefik Settings (with defaults)
 try:
