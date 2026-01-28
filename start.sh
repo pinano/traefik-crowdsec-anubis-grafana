@@ -508,9 +508,15 @@ if [[ "$CROWDSEC_DISABLE" != "true" ]] && [ -n "$CROWDSEC_WHITELIST_IPS" ]; then
 # ============================================================================
 
 name: custom/ip-whitelist
-description: "User-defined trusted IPs from environment variable"
+description: "User-defined trusted IPs from environment variable and internal network ranges"
 whitelist:
-  reason: "Trusted IP configured via CROWDSEC_WHITELIST_IPS"
+  reason: "Trusted internal network or configured via CROWDSEC_WHITELIST_IPS"
+  ip:
+    - "127.0.0.1"
+  cidr:
+    - "172.16.0.0/12"
+    - "10.0.0.0/8"
+    - "192.168.0.0/16"
 EOF
     
     # Parse comma-separated IPs and separate them into IPs and CIDRs

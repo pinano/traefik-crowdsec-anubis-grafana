@@ -411,7 +411,27 @@ def generate_configs():
                     'crowdsecLapiHost': 'crowdsec:8080',
                     'crowdsecLapiKey': CROWDSEC_API_KEY,
                     'crowdsecMode': 'stream',
-                    'updateIntervalSeconds': CS_UPDATE_INTERVAL
+                    'updateIntervalSeconds': CS_UPDATE_INTERVAL,
+                    # Redis Caching (highly recommended for high traffic)
+                    # We use the existing Redis service (Valkey) as backend
+                    'redisCacheEnabled': true,
+                    'redisCacheHost': 'redis:6379',
+                    'redisCachePassword': REDIS_PASSWORD,
+                    # Trust internal IP headers from Docker network
+                    'forwardedHeadersTrustedIPs': [
+                        '127.0.0.1/32',
+                        '172.16.0.0/12',
+                        '10.0.0.0/8',
+                        '192.168.0.0/16'
+                    ],
+                    # Immediate Whitelist (Client IP)
+                    # These IPs bypass LAPI checks entirely
+                    'clientTrustedIPs': [
+                        '127.0.0.1/32',
+                        '172.16.0.0/12',
+                        '10.0.0.0/8',
+                        '192.168.0.0/16'
+                    ]
                 }
             }
         }
