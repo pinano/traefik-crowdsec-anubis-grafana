@@ -4,7 +4,7 @@ services:
   #  TRAEFIK
   # ===========================
   traefik:
-    image: traefik:v3.6.6
+    image: traefik:v3.6.7
     restart: always
     ports:
       - "${TRAEFIK_LISTEN_IP:-0.0.0.0}:80:80"
@@ -57,7 +57,7 @@ services:
   #  CROWDSEC
   # ===========================
   crowdsec:
-    image: crowdsecurity/crowdsec:v1.7.4
+    image: crowdsecurity/crowdsec:v1.7.6
     restart: unless-stopped
     profiles:
       - crowdsec

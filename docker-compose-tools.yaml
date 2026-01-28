@@ -4,7 +4,7 @@ services:
   #  DOZZLE
   # ===========================
   dozzle:
-    image: amir20/dozzle:latest
+    image: amir20/dozzle:v9.0.3
     restart: always
     networks:
       - traefik
