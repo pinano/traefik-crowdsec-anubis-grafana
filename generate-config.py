@@ -414,7 +414,7 @@ def generate_configs():
                     'updateIntervalSeconds': CS_UPDATE_INTERVAL,
                     # Redis Caching (highly recommended for high traffic)
                     # We use the existing Redis service (Valkey) as backend
-                    'redisCacheEnabled': true,
+                    'redisCacheEnabled': True,
                     'redisCacheHost': 'redis:6379',
                     'redisCachePassword': REDIS_PASSWORD,
                     # Trust internal IP headers from Docker network
