@@ -107,6 +107,7 @@ services:
       - redis_data:/data
     networks:
       - anubis-backend
+      - traefik
     deploy:
       resources:
         limits:
