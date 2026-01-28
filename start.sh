@@ -498,6 +498,28 @@ WHITELIST_FILE="./config/crowdsec/parsers/ip-whitelist.yaml"
 if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
     echo "   📋 Generating whitelist (including internal network ranges)..."
     
+    # Initialize lists with default internal ranges
+    declare -a IPS_LIST=("127.0.0.1")
+    declare -a CIDRS_LIST=("172.16.0.0/12" "10.0.0.0/8" "192.168.0.0/16")
+    
+    # Add custom entries from .env if present
+    if [ -n "$CROWDSEC_WHITELIST_IPS" ]; then
+        echo "   ➕ Processing custom IPs from CROWDSEC_WHITELIST_IPS..."
+        IFS=',' read -ra ENTRIES <<< "$CROWDSEC_WHITELIST_IPS"
+        for entry in "${ENTRIES[@]}"; do
+            entry=$(echo "$entry" | xargs) # Trim
+            if [ -n "$entry" ]; then
+                if [[ "$entry" == *"/"* ]]; then
+                    CIDRS_LIST+=("$entry")
+                    echo "      ➜ Added CIDR: $entry"
+                else
+                    IPS_LIST+=("$entry")
+                    echo "      ➜ Added IP: $entry"
+                fi
+            fi
+        done
+    fi
+
     # Build the YAML whitelist file
     cat > "$WHITELIST_FILE" << 'EOF'
 # ============================================================================
@@ -510,57 +532,25 @@ name: custom/ip-whitelist
 description: "Internal network ranges and user-defined trusted IPs"
 whitelist:
   reason: "Internal network or configured via CROWDSEC_WHITELIST_IPS"
-  ip:
-    - "127.0.0.1"
-  cidr:
-    - "172.16.0.0/12"
-    - "10.0.0.0/8"
-    - "192.168.0.0/16"
 EOF
-    
-    # Parse comma-separated IPs and separate them into IPs and CIDRs ONLY if CROWDSEC_WHITELIST_IPS is NOT empty
-    if [ -n "$CROWDSEC_WHITELIST_IPS" ]; then
-        echo "   ➕ Adding custom IPs from CROWDSEC_WHITELIST_IPS..."
-        declare -a IPS_LIST
-        declare -a CIDRS_LIST
-        
-        IFS=',' read -ra ENTRIES <<< "$CROWDSEC_WHITELIST_IPS"
-        for entry in "${ENTRIES[@]}"; do
-            # Trim whitespace
-            entry=$(echo "$entry" | xargs)
-            if [ -n "$entry" ]; then
-                if [[ "$entry" == *"/"* ]]; then
-                    CIDRS_LIST+=("$entry")
-                else
-                    IPS_LIST+=("$entry")
-                fi
-            fi
+
+    # Write IP section
+    if [ ${#IPS_LIST[@]} -gt 0 ]; then
+        echo "  ip:" >> "$WHITELIST_FILE"
+        for ip in "${IPS_LIST[@]}"; do
+            echo "    - \"$ip\"" >> "$WHITELIST_FILE"
         done
+    fi
 
-        # Append IPs if present
-        if [ ${#IPS_LIST[@]} -gt 0 ]; then
-            # We don't add the 'ip:' tag again, just append to the existing one if we can, 
-            # or more safely, use a temporary file to rebuild it correctly.
-            # But since we want to keep it simple, let's just use a loop to append.
-            for ip in "${IPS_LIST[@]}"; do
-                echo "    - \"$ip\"" >> "$WHITELIST_FILE"
-                echo "   ✅ Whitelisted custom IP: $ip"
-                IP_COUNT=$((IP_COUNT + 1))
-            done
-        fi
-
-        # Append CIDRs if present
-        if [ ${#CIDRS_LIST[@]} -gt 0 ]; then
-            # The CIDR section already exists, we append to it
-            for cidr in "${CIDRS_LIST[@]}"; do
-                echo "    - \"$cidr\"" >> "$WHITELIST_FILE"
-                echo "   ✅ Whitelisted custom CIDR: $cidr"
-                IP_COUNT=$((IP_COUNT + 1))
-            done
-        fi
+    # Write CIDR section
+    if [ ${#CIDRS_LIST[@]} -gt 0 ]; then
+        echo "  cidr:" >> "$WHITELIST_FILE"
+        for cidr in "${CIDRS_LIST[@]}"; do
+            echo "    - \"$cidr\"" >> "$WHITELIST_FILE"
+        done
     fi
     
-    echo "   ✅ Whitelist generated successfully."
+    echo "   ✅ Whitelist generated successfully with $((${#IPS_LIST[@]} + ${#CIDRS_LIST[@]})) entries."
 else
     echo "   ℹ️ CrowdSec is disabled, skipping whitelist generation."
     # Remove old whitelist if it exists to avoid stale entries
