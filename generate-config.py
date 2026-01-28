@@ -417,6 +417,7 @@ def generate_configs():
                     'redisCacheEnabled': True,
                     'redisCacheHost': 'redis:6379',
                     'redisCachePassword': REDIS_PASSWORD,
+                    'redisCacheDatabase': "0",
                     # Trust internal IP headers from Docker network
                     'forwardedHeadersTrustedIPs': [
                         '127.0.0.1/32',
@@ -628,10 +629,10 @@ def generate_policy_file():
             policy_data = yaml.safe_load(f)
 
         if REDIS_PASSWORD:
-            policy_data['store']['parameters']['url'] = f"redis://:{REDIS_PASSWORD}@redis:6379/0"
+            policy_data['store']['parameters']['url'] = f"redis://:{REDIS_PASSWORD}@redis:6379/1"
         else:
             print("    ⚠️ WARN: REDIS_PASSWORD not set. Redis will be exposed.")
-            policy_data['store']['parameters']['url'] = "redis://redis:6379/0"
+            policy_data['store']['parameters']['url'] = "redis://redis:6379/1"
 
         with open(output_policy, 'w') as f:
             f.write("# AUTOMATICALLY GENERATED - DO NOT EDIT\n")
