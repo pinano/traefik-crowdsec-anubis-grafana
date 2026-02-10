@@ -2,7 +2,7 @@
 # Block 1: Traefik
 source: docker
 container_name_regexp:
- - ".*-traefik-.*"
+ - ".*traefik.*"
 labels:
   type: traefik
 
@@ -12,7 +12,7 @@ labels:
 # Block 2: SFTP (Sidecar)
 source: docker
 container_name_regexp:
- - ".*-sftp-.*"
+ - ".*sftp.*"
 labels:
   type: syslog
 
