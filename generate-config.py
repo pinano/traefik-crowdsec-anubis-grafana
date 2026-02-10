@@ -472,12 +472,13 @@ def generate_configs():
         # Map domain -> certificate definition (batch)
         for batch in tls_configs:
             domains_in_batch = [batch['main']] + batch.get('sans', [])
-            # DEBUG: Print the generated batch
-            print(f"    🔍 Grouped Batch: Main={batch['main']}, SANs={batch.get('sans', [])}")
+            # DEBUG: Print a summary of the batch
+            san_count = len(batch.get('sans', []))
+            print(f"    🔐 Grouped Batch: Main={batch['main']} + {san_count} SANs")
             for d in domains_in_batch:
                 domain_to_cert_def[d] = batch
                 
-        print(f"    🔐 TLS Config: Generated {len(tls_configs)} certificates grouped (Batch size: {TLS_BATCH_SIZE}).")
+        print(f"    🔐 TLS Config: Generated {len(tls_configs)} certificates grouped by root domain (Batch size: {TLS_BATCH_SIZE}).")
     else:
         print("    🏠 Local Dev Mode: Skipping Let's Encrypt TLS grouping (Self-Signed).")
 
