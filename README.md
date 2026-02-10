@@ -500,79 +500,82 @@ The watchdog sends Telegram notifications for:
 
 ### CrowdSec Operations
 
-All CrowdSec commands use `cscli` inside the container:
+All CrowdSec commands use `cscli` inside the container. Since the stack uses multiple Compose files, the most direct way to run commands is using `docker exec`:
 
 ```bash
-docker compose exec crowdsec cscli <command>
+docker exec -it stack-crowdsec-1 cscli <command>
 ```
+
+> [!NOTE]
+> If you changed `PROJECT_NAME` in your `.env`, replace `stack` with your project name.
 
 #### Decision Management (Bans)
 
 ```bash
 # Ban an IP
-docker compose exec crowdsec cscli decisions add --ip <IP> --duration 24h --reason "Manual Ban"
+docker exec -it stack-crowdsec-1 cscli decisions add --ip <IP> --duration 24h --reason "Manual Ban"
 
 # Ban an IP range (CIDR)
-docker compose exec crowdsec cscli decisions add --range 192.168.1.0/24 --duration 24h --reason "Subnet ban"
+docker exec -it stack-crowdsec-1 cscli decisions add --range 192.168.1.0/24 --duration 24h --reason "Subnet ban"
 
 # Unban an IP
-docker compose exec crowdsec cscli decisions delete --ip <IP>
+docker exec -it stack-crowdsec-1 cscli decisions delete --ip <IP>
 
 # List active bans
-docker compose exec crowdsec cscli decisions list
+docker exec -it stack-crowdsec-1 cscli decisions list
 ```
 
 #### Metrics & Statistics
 
 ```bash
 # View real-time metrics
-docker compose exec crowdsec cscli metrics
+docker exec -it stack-crowdsec-1 cscli metrics
 
 # List recent alerts
-docker compose exec crowdsec cscli alerts list
+docker exec -it stack-crowdsec-1 cscli alerts list
 
 # View detailed alert information
-docker compose exec crowdsec cscli alerts inspect <ALERT_ID>
+docker exec -it stack-crowdsec-1 cscli alerts inspect <ALERT_ID>
 ```
 
 #### Hub Management
 
 ```bash
 # Update the hub index
-docker compose exec crowdsec cscli hub update
+docker exec -it stack-crowdsec-1 cscli hub update
 
 # Upgrade all installed components
-docker compose exec crowdsec cscli hub upgrade
+docker exec -it stack-crowdsec-1 cscli hub upgrade
 
 # Install a new collection (e.g., for WordPress)
-docker compose exec crowdsec cscli collections install crowdsecurity/wordpress
+docker exec -it stack-crowdsec-1 cscli collections install crowdsecurity/wordpress
 ```
 
 #### Bouncer Management
 
 ```bash
 # Check bouncer status
-docker compose exec crowdsec cscli bouncers list
+docker exec -it stack-crowdsec-1 cscli bouncers list
 
 # Delete a bouncer
-docker compose exec crowdsec cscli bouncers delete <bouncer_name>
+docker exec -it stack-crowdsec-1 cscli bouncers delete <bouncer_name>
 ```
 
 #### Diagnostic Commands
 
 ```bash
 # Check CrowdSec health
-docker compose exec crowdsec cscli lapi status
+docker exec -it stack-crowdsec-1 cscli lapi status
 
 # Validate configuration
-docker compose exec crowdsec cscli config show
+docker exec -it stack-crowdsec-1 cscli config show
 
 # Test log parsing (dry-run)
-docker compose exec crowdsec cscli explain --file /var/log/traefik/access.log --type traefik
+docker exec -it stack-crowdsec-1 cscli explain --file /var/log/traefik/access.log --type traefik
 ```
 
 > [!TIP]
-> Use `docker compose exec crowdsec cscli <command> --help` for detailed options on any command.
+> Use `docker exec -it stack-crowdsec-1 cscli <command> --help` for detailed options on any command.
 
 ---
 
