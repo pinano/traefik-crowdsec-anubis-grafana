@@ -2,7 +2,7 @@
 # Block 1: Traefik
 source: docker
 container_name:
- - traefik
+ - stack-traefik-1
 labels:
   type: traefik
 
@@ -12,7 +12,7 @@ labels:
 # Block 2: SFTP (Sidecar)
 source: docker
 container_name:
- - sftp-access
+ - stack-sftp-access-1
 labels:
   type: syslog
 
