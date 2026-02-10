@@ -472,6 +472,8 @@ def generate_configs():
         # Map domain -> certificate definition (batch)
         for batch in tls_configs:
             domains_in_batch = [batch['main']] + batch.get('sans', [])
+            # DEBUG: Print the generated batch
+            print(f"    🔍 Grouped Batch: Main={batch['main']}, SANs={batch.get('sans', [])}")
             for d in domains_in_batch:
                 domain_to_cert_def[d] = batch
                 
