@@ -1,3 +1,0 @@
-# Keep this file empty - directory placeholder for custom CrowdSec parsers
-# The ip-whitelist.yaml file will be generated here by start.sh when
-# CROWDSEC_WHITELIST_IPS is configured in the .env file.
