@@ -566,7 +566,7 @@ fi
 # If CROWDSEC_BAD_USER_AGENTS is set, generate the custom blacklist file.
 
 echo "🛡️  Checking CrowdSec User-Agent blacklist..."
-UA_BLACKLIST_FILE="./config/crowdsec/scenarios/user_agent_blacklist.regex.txt"
+UA_BLACKLIST_FILE="./config/crowdsec/scenarios/user-agent-blacklist.regex.txt"
 
 if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
     echo "   📋 Generating User-Agent blacklist from .env..."
