@@ -1,0 +1,13 @@
+# CrowdSec User-Agent Blacklist Scenario
+type: trigger
+name: custom/http-bad-user-agent
+description: "Detect usage of bad User Agent (Local List)"
+filter: "evt.Meta.log_type == 'traefik' && RegexpInFile(evt.Parsed.request_User_Agent, 'custom_user_agent_blacklist.regex.txt')"
+groupby: "evt.Meta.source_ip"
+blackhole: 1m
+labels:
+  service: http
+  remediation: true
+data:
+  - dest_file: custom_bad_bots.regex.txt
+    type: regexp
