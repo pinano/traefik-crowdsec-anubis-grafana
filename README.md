@@ -123,12 +123,14 @@ graph TD
     User((User/Bot)):::user -->|HTTPS :443| T_Entry[Traefik EntryPoint]:::traefik
 
     subgraph "Traefik Middleware Chain"
-        T_Entry --> MW_CS{1. CrowdSec Check}:::security
-        MW_CS -- Blocked IP --> Block[403 Forbidden]:::security
-        MW_CS -- Allowed --> MW_Sec["2. Security Headers"]:::traefik
-        MW_Sec --> MW_RL["3. Rate Limiting"]:::traefik
-        MW_RL --> MW_Comp["4. Compression"]:::traefik
-        MW_Comp --> MW_Auth{5. Auth Required?}:::traefik
+        T_Entry --> MW_UA{1. UA Blacklist}:::security
+        MW_UA -- Matched Bot --> Block[403 Forbidden]:::security
+        MW_UA -- Allowed --> MW_CS{2. CrowdSec Check}:::security
+        MW_CS -- Blocked IP --> Block
+        MW_CS -- Allowed --> MW_Sec["3. Security Headers"]:::traefik
+        MW_Sec --> MW_RL["4. Rate Limiting"]:::traefik
+        MW_RL --> MW_Comp["5. Compression"]:::traefik
+        MW_Comp --> MW_Auth{6. Auth Required?}:::traefik
     end
 
     subgraph "Anubis Logic (Bot Defense)"
@@ -234,6 +236,7 @@ Access the management interface at `https://domains.<your-domain>`.
 | `TRAEFIK_GLOBAL_CONCURRENCY` | Max simultaneous connections per IP. | `25` |
 | `TRAEFIK_HSTS_MAX_AGE` | HSTS header duration (seconds). | `31536000` |
 | `TRAEFIK_BLOCKED_PATHS` | Comma-separated list of paths to block globally (e.g., `/wp-admin`). | - |
+| `TRAEFIK_BAD_USER_AGENTS` | Comma-separated list of User-Agent regex patterns to block natively (e.g., `(?i).*curl.*`). | - |
 | `TRAEFIK_FRAME_ANCESTORS` | External domains allowed to embed your sites in iframes. | - |
 
 #### Traefik Timeouts
@@ -294,13 +297,14 @@ Every request passes through a sequential chain of middlewares designed to filte
 
 | Order | Middleware | Purpose | Security Benefit |
 |:---:|:---|:---|:---|
-| 1 | **CrowdSec Check** | Consults the local CrowdSec database for the client IP. | **Instant Mitigation**: Blocks known malicious IPs at the entry point. |
-| 2 | **Global Buffering** | Reads the entire request into memory before passing it to the backend. | **Slowloris Defense**: Prevents attackers from exhausting server sockets. |
-| 3 | **Security Headers** | Injects recommended browser security headers (HSTS, XSS, Frame-Options). | **Client Hardening**: Protects users from clickjacking and protocol downgrade attacks. |
-| 4 | **Rate Limiting** | Throttles requests based on average and burst thresholds. | **Flood Protection**: Mitigates automated scraping and brute-force attempts. |
-| 5 | **Concurrency** | Limits the number of simultaneous active connections per client. | **Resource Preservation**: Ensures one heavy/malicious user cannot consume all backend threads. |
-| 6 | **ForwardAuth (Anubis)** | (Optional) Intercepts requests to verify or challenge the session. | **Bot Defense**: Forces suspicious traffic to solve a Proof-of-Work challenge. |
-| 7 | **Compression** | Dynamically compresses response bodies (Gzip) for supported clients. | **Performance**: Reduces bandwidth usage and improves load times. |
+| 1 | **UA Blacklist** | Matches requests against a list of bad User-Agent regex patterns. | **Native Blocking**: Rejects known bots/scrapers instantly via Traefik. |
+| 2 | **CrowdSec Check** | Consults the local CrowdSec database for the client IP. | **Instant Mitigation**: Blocks known malicious IPs at the entry point. |
+| 3 | **Global Buffering** | Reads the entire request into memory before passing it to the backend. | **Slowloris Defense**: Prevents attackers from exhausting server sockets. |
+| 4 | **Security Headers** | Injects recommended browser security headers (HSTS, XSS, Frame-Options). | **Client Hardening**: Protects users from clickjacking and protocol downgrade attacks. |
+| 5 | **Rate Limiting** | Throttles requests based on average and burst thresholds. | **Flood Protection**: Mitigates automated scraping and brute-force attempts. |
+| 6 | **Concurrency** | Limits the number of simultaneous active connections per client. | **Resource Preservation**: Ensures one heavy/malicious user cannot consume all backend threads. |
+| 7 | **ForwardAuth (Anubis)** | (Optional) Intercepts requests to verify or challenge the session. | **Bot Defense**: Forces suspicious traffic to solve a Proof-of-Work challenge. |
+| 8 | **Compression** | Dynamically compresses response bodies (Gzip) for supported clients. | **Performance**: Reduces bandwidth usage and improves load times. |
 
 #### Specialized Middlewares
 
