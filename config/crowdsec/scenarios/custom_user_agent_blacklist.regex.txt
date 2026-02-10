@@ -1,4 +1,0 @@
-# Bad User Agents List - Edit this to add more
-# One regex per line. Matches are case-insensitive by default if you use (?i)
-(?i).*curl.*
-(?i).*EvilCrawler.*

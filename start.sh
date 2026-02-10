@@ -561,6 +561,52 @@ else
 fi
 
 # =============================================================================
+# PHASE 4D: Generate CrowdSec User-Agent Blacklist
+# =============================================================================
+# If CROWDSEC_BAD_USER_AGENTS is set, generate the custom blacklist file.
+
+echo "🛡️  Checking CrowdSec User-Agent blacklist..."
+UA_BLACKLIST_FILE="./config/crowdsec/scenarios/user_agent_blacklist.regex.txt"
+
+if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
+    echo "   📋 Generating User-Agent blacklist from .env..."
+    
+    # Header for the file
+    cat > "$UA_BLACKLIST_FILE" << 'EOF'
+# ============================================================================
+# CrowdSec User-Agent Blacklist - Auto-generated
+# ============================================================================
+# One regex per line. Configure via CROWDSEC_BAD_USER_AGENTS in .env
+# ============================================================================
+EOF
+
+    if [ -n "$CROWDSEC_BAD_USER_AGENTS" ]; then
+        # Use comma as delimiter to split the string
+        IFS=',' read -ra UA_ENTRIES <<< "$CROWDSEC_BAD_USER_AGENTS"
+        UA_COUNT=0
+        for entry in "${UA_ENTRIES[@]}"; do
+            entry=$(echo "$entry" | xargs) # Trim
+            # Strip potential surrounding quotes
+            entry="${entry%\"}"
+            entry="${entry#\"}"
+            entry="${entry%\'}"
+            entry="${entry#\'}"
+            
+            if [ -n "$entry" ]; then
+                echo "$entry" >> "$UA_BLACKLIST_FILE"
+                echo "      ➜ Added Pattern: $entry"
+                UA_COUNT=$((UA_COUNT + 1))
+            fi
+        done
+        echo "   ✅ Blacklist generated with $UA_COUNT patterns."
+    else
+        echo "   ℹ️ CROWDSEC_BAD_USER_AGENTS is empty. Blacklist will be inactive."
+    fi
+else
+    echo "   ℹ️ CrowdSec is disabled, skipping UA blacklist generation."
+fi
+
+# =============================================================================
 # PHASE 5: Prepare Docker Networks
 # =============================================================================
 # Create isolated internal network for Anubis backend communication.
