@@ -1,0 +1,10 @@
+# Custom Parser for Traefik JSON logs
+# This ensures fields like request_User-Agent are extracted from JSON correctly.
+name: custom/traefik-json-parser
+description: "Parse Traefik JSON access logs"
+filter: "evt.Meta.log_type == 'traefik'"
+onsuccess: next_stage
+nodes:
+  - filter: "IsJson(evt.Line.Raw)"
+    expression: "JsonExtractLib(evt.Line.Raw)"
+    target: "evt.Parsed"
