@@ -49,7 +49,7 @@ loki.process "pipelines" {
     // TRAEFIK PIPELINE
     // ============================================
     stage.match {
-        selector = "{container=\"traefik\"}"
+        selector = "{container=~\".*traefik.*\"}"
         
         stage.json {
             expressions = {

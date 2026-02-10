@@ -1,8 +1,8 @@
 # --- Docker Containers Surveillance (stdout) ---
 # Block 1: Traefik
 source: docker
-container_name:
- - stack-traefik-1
+container_name_regexp:
+ - ".*-traefik-.*"
 labels:
   type: traefik
 
@@ -11,8 +11,8 @@ labels:
 # --- SFTP Container Surveillance (stdout) ---
 # Block 2: SFTP (Sidecar)
 source: docker
-container_name:
- - stack-sftp-access-1
+container_name_regexp:
+ - ".*-sftp-.*"
 labels:
   type: syslog
 
