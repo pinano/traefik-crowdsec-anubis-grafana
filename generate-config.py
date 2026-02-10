@@ -27,6 +27,9 @@ IS_LOCAL_DEV = (TRAEFIK_ENV_TYPE == 'local')
 # Blocked Paths (Comma-separated list of regex patterns)
 BLOCKED_PATHS_STR = os.getenv('TRAEFIK_BLOCKED_PATHS', '').strip()
 
+# Bad User Agents (Comma-separated list of regex patterns)
+UA_BLACKLIST_STR = os.getenv('TRAEFIK_BAD_USER_AGENTS', '').strip()
+
 # Frame Ancestors (for iframes)
 FRAME_ANCESTORS = os.getenv('TRAEFIK_FRAME_ANCESTORS', '').strip()
 
@@ -35,7 +38,12 @@ if (BLOCKED_PATHS_STR.startswith('"') and BLOCKED_PATHS_STR.endswith('"')) or \
    (BLOCKED_PATHS_STR.startswith("'") and BLOCKED_PATHS_STR.endswith("'")):
     BLOCKED_PATHS_STR = BLOCKED_PATHS_STR[1:-1]
 
+if (UA_BLACKLIST_STR.startswith('"') and UA_BLACKLIST_STR.endswith('"')) or \
+   (UA_BLACKLIST_STR.startswith("'") and UA_BLACKLIST_STR.endswith("'")):
+    UA_BLACKLIST_STR = UA_BLACKLIST_STR[1:-1]
+
 BLOCKED_PATHS = [p.strip().strip('"').strip("'") for p in BLOCKED_PATHS_STR.split(',') if p.strip()]
+UA_BLACKLIST = [p.strip().strip('"').strip("'") for p in UA_BLACKLIST_STR.split(',') if p.strip()]
 
 # TLS Chunking Limit (Let's Encrypt max is 100)
 TLS_BATCH_SIZE = 30
@@ -188,7 +196,6 @@ def process_router(entry, http_section, domain_to_cert_def):
         router_conf['tls']['domains'] = [domain_to_cert_def[domain]]
 
     http_section['routers'][router_name] = router_conf
-
     # -------------------------------------------------------------------------
     # Path Blocking Router (Per-Domain)
     # -------------------------------------------------------------------------
@@ -203,6 +210,22 @@ def process_router(entry, http_section, domain_to_cert_def):
             'priority': 11000,
             'tls': router_conf.get('tls', {}),
             'middlewares': ["block-unwanted-paths"]
+        }
+
+    # -------------------------------------------------------------------------
+    # User-Agent Blocking Router (Per-Domain)
+    # -------------------------------------------------------------------------
+    if UA_BLACKLIST:
+        ua_block_router_name = f"ua-blocker-{safe_domain}"
+        # Match any of the regex patterns in the User-Agent header
+        ua_rules = " || ".join([f"HeaderRegexp(`User-Agent`, `{p}`)" for p in UA_BLACKLIST])
+        http_section['routers'][ua_block_router_name] = {
+            'rule': f"Host(`{domain}`) && ({ua_rules})",
+            'entryPoints': ["websecure"],
+            'service': "api@internal",
+            'priority': 12000, # Higher than path blocker (11000)
+            'tls': router_conf.get('tls', {}),
+            'middlewares': ["block-bad-bots-ua"]
         }
 
 # =============================================================================
@@ -398,6 +421,14 @@ def generate_configs():
         traefik_dynamic_conf['http']['middlewares']['block-unwanted-paths'] = {
             'ipAllowList': {
                 'sourceRange': ['127.0.0.1/32']
+            }
+        }
+
+    # Blocked User Agents Middleware (If configured)
+    if UA_BLACKLIST:
+        traefik_dynamic_conf['http']['middlewares']['block-bad-bots-ua'] = {
+            'ipAllowList': {
+                'sourceRange': ['127.0.0.1/32'] # Reject everyone (except technically localhost if it hit this router)
             }
         }
 
