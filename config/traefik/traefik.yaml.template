@@ -95,10 +95,11 @@ accessLog:
 
   fields:
     defaultMode: keep
-    names:
-      # We keep UserAgent and Referer, vital for CrowdSec to detect bots.
-      UserAgent: keep
-      Referer: keep
+    headers:
+      defaultMode: drop
+      names:
+        User-Agent: keep
+        Referer: keep
 
 experimental:
   plugins:
