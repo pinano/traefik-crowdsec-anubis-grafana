@@ -56,8 +56,8 @@ if [ ! -f "$ENV_FILE" ]; then
     fi
 fi
 
-# 2. Sync variables from .env.dist to .env, preserving order
-echo "🔄 Synchronizing $ENV_FILE with $DIST_FILE..."
+# 1. Environment Preparation
+echo " [1/6] 📋 Preparing environment..."
 TEMP_ENV=$(mktemp)
 ADDED_VARS=0
 cp "$ENV_FILE" "${ENV_FILE}.bak"
@@ -164,15 +164,12 @@ validate_env() {
 }
 
 # Run validation immediately
-validate_env
+validate_env | sed 's/^/   /'
 
 
-# =============================================================================
-# PHASE 0: Synchronize Dashboard Hashes
-# =============================================================================
-# Checks if admin credentials have changed manually in .env and updates hashes.
 
-echo "🔐 Checking admin credentials sync..."
+echo " [2/6] 🔐 Synchronizing credentials & paths..."
+echo "   🛡️ Checking admin credentials sync..."
 
 SYNC_NEEDED=0
 
@@ -245,7 +242,7 @@ fi
 # Calculate the absolute path of the project on the host and ensure it is set 
 # in .env. This is critical for Docker's working_dir and volume mirroring.
 
-echo "📍 Configuring project absolute path..."
+echo "   📍 Configuring project absolute path..."
 # Use realpath if available, otherwise fallback to readlink -f or pwd -P
 if command -v realpath >/dev/null 2>&1; then
     DETECTED_PATH=$(realpath .)
@@ -272,19 +269,14 @@ fi
 
 COMPOSE_CMD="$COMPOSE_BASE"
 if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
-    COMPOSE_CMD="$COMPOSE_BASE --profile crowdsec"
-    echo "🛡️  CrowdSec firewall is ENABLED."
+    echo "   🛡️  CrowdSec firewall is ENABLED."
 else
-    echo "⚠️  CrowdSec firewall is DISABLED."
+    echo "   ⚠️  CrowdSec firewall is DISABLED."
 fi
 
-# =============================================================================
-# PHASE 1: Prepare Anubis Assets
-# =============================================================================
-# Copy default assets (.dist files) if user hasn't provided custom ones.
-# This allows customization while maintaining defaults in version control.
 
-echo "🎨 Checking Anubis assets..."
+echo " [3/6] 🎨 Preparing application assets..."
+echo "   🛡️ Checking Anubis assets..."
 
 ANUBIS_ASSETS_DIR="./config/anubis/assets"
 ANUBIS_ASSETS_IMG_DIR="$ANUBIS_ASSETS_DIR/static/img"
@@ -311,13 +303,8 @@ for img in happy.webp pensive.webp reject.webp; do
     fi
 done
 
-# =============================================================================
-# PHASE 2: Prepare Traefik Certificate Storage
-# =============================================================================
-# Create acme.json with restrictive permissions if it doesn't exist.
-# This file stores Let's Encrypt certificates and must be chmod 600.
 
-echo "🔐 Checking Traefik certificate storage..."
+echo "   �️ Checking Traefik cert storage & ACME..."
 if [ ! -f ./config/traefik/acme.json ]; then
     touch ./config/traefik/acme.json
     chmod 600 ./config/traefik/acme.json
@@ -326,14 +313,8 @@ else
     echo "   ✅ acme.json already exists."
 fi
 
-# =============================================================================
-# PHASE 3: Configure ACME Environment
-# =============================================================================
-# Priority: TRAEFIK_ACME_ENV_TYPE > TRAEFIK_ACME_CA_SERVER (from .env)
-# This ensures TRAEFIK_ACME_ENV_TYPE is respected even if an old TRAEFIK_ACME_CA_SERVER
-# variable remains in the .env file.
 
-echo "🔒 Configuring ACME environment..."
+# echo "🔒 Configuring ACME environment..."
 TRAEFIK_CERT_RESOLVER="le" # Default to 'le'
 
 if [ -n "$TRAEFIK_ACME_ENV_TYPE" ]; then
@@ -374,12 +355,9 @@ else
      echo "   ℹ️  TRAEFIK_CERT_RESOLVER set to: '$TRAEFIK_CERT_RESOLVER'"
 fi
 
-# =============================================================================
-# PHASE 4: Generate Configuration Files
-# =============================================================================
 
 # Generate traefik-generated.yaml from template
-echo "🔧 Generating traefik-generated.yaml from template..."
+echo "   �️ Generating static & dynamic configurations..."
 if [ -f "./config/traefik/traefik.yaml.template" ]; then
     sed -e "s#TRAEFIK_ACME_EMAIL_PLACEHOLDER#${TRAEFIK_ACME_EMAIL}#g" \
         -e "s#TRAEFIK_ACME_CASERVER_PLACEHOLDER#${TRAEFIK_ACME_CA_SERVER}#g" \
@@ -407,10 +385,7 @@ echo "--------------------------------------------------------"
 echo "⚙️  START: DYNAMIC CONFIGURATION GENERATION"
 echo "--------------------------------------------------------"
 
-# Safety check: Cleanup generated files to avoid PermissionError (Docker root ownership)
-# NOTE: In Linux, if you own the directory, you can delete root-owned files.
-# If the directory itself is root-owned, this will fail and we will guide the user.
-echo "🧹 Cleaning up old generated configurations..."
+echo "      🧹 Cleaning up old generated configurations..."
 {
     : > ./config/traefik/dynamic-config/routers-generated.yaml
     : > ./config/anubis/botPolicy-generated.yaml
@@ -498,13 +473,9 @@ else
     echo "⏭️  Skipping local certificate check (TRAEFIK_ACME_ENV_TYPE != 'local')."
 fi
 
-# =============================================================================
-# PHASE 4C: Generate CrowdSec IP Whitelist
-# =============================================================================
-# If CROWDSEC_WHITELIST_IPS is set, generate the whitelist YAML file.
-# This file is mounted into CrowdSec and whitelisted IPs bypass all detection.
 
-echo "🛡️  Checking CrowdSec IP whitelist..."
+echo " [4/6] 🌐 Preparing network & security layer..."
+echo "   🛡️ Checking CrowdSec IP whitelist..."
 WHITELIST_FILE="./config/crowdsec/parsers/ip-whitelist.yaml"
 
 if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
@@ -583,13 +554,8 @@ else
     echo "   ℹ️ TRAEFIK_BAD_USER_AGENTS is empty. No native UA blocking applied."
 fi
 
-# =============================================================================
-# PHASE 5: Prepare Docker Networks
-# =============================================================================
-# Create isolated internal network for Anubis backend communication.
-# --internal flag ensures no external host traffic can reach this network.
 
-echo "🌐 Checking Docker networks..."
+   echo "   🛡️ Checking Docker networks..."
 if ! docker network inspect anubis-backend >/dev/null 2>&1; then
     docker network create --internal anubis-backend
     echo "   ✅ Created anubis-backend network (internal)."
@@ -648,21 +614,17 @@ if [ "$APACHE_HOST_AVAILABLE" == "true" ]; then
     echo "   📋 Apache legacy installation detected, including logs extension."
 fi
 
-# =============================================================================
-# PHASE 7: Boot Security Layer First
-# =============================================================================
-# Start CrowdSec and Redis before other services to ensure the security
-# layer is ready when Traefik starts.
+echo " [5/6] 👮 Booting security layer..."
 
 if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
     # Smart check: Is it already running and healthy?
     CROWDSEC_ID=$(docker ps -aq --filter label=com.docker.compose.project=$PROJECT_NAME --filter label=com.docker.compose.service=crowdsec | head -n 1)
     CS_STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$CROWDSEC_ID" 2>/dev/null || echo "none")
 
-    if [ "$CS_STATUS" == "healthy" ]; then
-        echo "🛡️  Security layer (CrowdSec) is already operational. Skipping boot phase."
-    else
-        echo "🛡️  Booting security layer (CrowdSec + Redis)..."
+        echo "   🛡️  CrowdSec is already operational. Skipping boot."
+else
+    echo " [5/6] 👮 Booting security layer..."
+echo "   🛡️  Booting CrowdSec + Redis..."
         $COMPOSE_CMD $COMPOSE_FILES up -d crowdsec redis
 
         # Wait for CrowdSec to be healthy
@@ -720,9 +682,9 @@ if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
 else
     REDIS_ID=$(docker ps -aq --filter label=com.docker.compose.project=$PROJECT_NAME --filter label=com.docker.compose.service=redis | head -n 1)
     if [ -n "$REDIS_ID" ] && [ "$(docker inspect --format='{{.State.Running}}' $REDIS_ID 2>/dev/null)" == "true" ]; then
-        echo "🛡️  Redis is already operational. Skipping boot phase."
+        echo "   🛡️  Redis is already operational. Skipping boot."
     else
-        echo "🛡️  Booting Redis (CrowdSec is disabled)..."
+        echo "   🛡️  Booting Redis (CrowdSec is disabled)..."
         $COMPOSE_CMD $COMPOSE_FILES up -d redis
         echo "   ✅ Redis operational."
     fi
@@ -734,7 +696,7 @@ fi
 # Now that the security layer is ready, deploy everything else.
 # --remove-orphans cleans up any old containers not in current config.
 
-echo "🚀 Deploying remaining services..."
+echo " [6/6] 🚀 Deploying application services..."
 
 # If running inside domain-manager, exclude it from the 'up' command to avoid killing this script
 if [[ "$DOMAIN_MANAGER_INTERNAL" == "true" ]]; then
@@ -746,12 +708,8 @@ else
     $COMPOSE_CMD $COMPOSE_FILES up -d --remove-orphans
 fi
 
-# =============================================================================
-# PHASE 11: Final Checks & DNS Verification
-# =============================================================================
-# Checks if the required subdomains for core services are resolvable.
 
-echo "🔍 Verifying Core DNS records..."
+echo "   🔍 Verifying Core DNS records..."
 CORE_SUBS=("traefik" "domains" "dozzle" "grafana")
 MISSING_DNS=()
 
