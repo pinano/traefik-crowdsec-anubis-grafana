@@ -237,7 +237,13 @@ Access the management interface at `https://domains.<your-domain>`.
 | `TRAEFIK_HSTS_MAX_AGE` | HSTS header duration (seconds). | `31536000` |
 | `TRAEFIK_BLOCKED_PATHS` | Comma-separated list of paths to block globally (e.g., `/wp-admin`). | - |
 | `TRAEFIK_BAD_USER_AGENTS` | Comma-separated list of User-Agent regex patterns to block natively (e.g., `(?i).*curl.*`). | - |
+| `TRAEFIK_ACCESS_LOG_BUFFER` | Number of log lines to buffer before writing to disk/stdout. | `1000` |
 | `TRAEFIK_FRAME_ANCESTORS` | External domains allowed to embed your sites in iframes. | - |
+
+#### When to adjust Log Buffering (`TRAEFIK_ACCESS_LOG_BUFFER`)
+
+- **Value `1000` (Production)**: Batches log writes to improve performance and reduce I/O under high traffic.
+- **Value `0` or `1` (Testing/Debugging)**: Disables buffering, making every request appear in the logs **instantly**. Use this while testing native blocking (User-Agent or Paths) to verify it's working.
 
 #### Traefik Timeouts
 
