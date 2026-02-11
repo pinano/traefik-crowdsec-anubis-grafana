@@ -166,8 +166,6 @@ validate_env() {
 # Run validation immediately
 validate_env | sed 's/^/   /'
 
-
-
 echo " [2/6] 🔐 Synchronizing credentials & paths..."
 echo "   🛡️ Checking admin credentials sync..."
 
@@ -274,7 +272,6 @@ else
     echo "   ⚠️  CrowdSec firewall is DISABLED."
 fi
 
-
 echo " [3/6] 🎨 Preparing application assets..."
 echo "   🛡️ Checking Anubis assets..."
 
@@ -303,7 +300,6 @@ for img in happy.webp pensive.webp reject.webp; do
     fi
 done
 
-
 echo "   �️ Checking Traefik cert storage & ACME..."
 if [ ! -f ./config/traefik/acme.json ]; then
     touch ./config/traefik/acme.json
@@ -312,7 +308,6 @@ if [ ! -f ./config/traefik/acme.json ]; then
 else
     echo "   ✅ acme.json already exists."
 fi
-
 
 # echo "🔒 Configuring ACME environment..."
 TRAEFIK_CERT_RESOLVER="le" # Default to 'le'
@@ -354,7 +349,6 @@ if [ -z "$TRAEFIK_CERT_RESOLVER" ]; then
 else
      echo "   ℹ️  TRAEFIK_CERT_RESOLVER set to: '$TRAEFIK_CERT_RESOLVER'"
 fi
-
 
 # Generate traefik-generated.yaml from template
 echo "   �️ Generating static & dynamic configurations..."
@@ -426,7 +420,6 @@ echo "✅ END: DYNAMIC CONFIGURATION GENERATION"
 echo "--------------------------------------------------------"
 echo ""
 
-
 # =============================================================================
 # PHASE 4B: Local SSL Trust (mkcert)
 # =============================================================================
@@ -472,7 +465,6 @@ EOF
 else
     echo "⏭️  Skipping local certificate check (TRAEFIK_ACME_ENV_TYPE != 'local')."
 fi
-
 
 echo " [4/6] 🌐 Preparing network & security layer..."
 echo "   🛡️ Checking CrowdSec IP whitelist..."
@@ -555,7 +547,7 @@ else
 fi
 
 
-   echo "   🛡️ Checking Docker networks..."
+   echo "   🛡 Checking Docker networks..."
 if ! docker network inspect anubis-backend >/dev/null 2>&1; then
     docker network create --internal anubis-backend
     echo "   ✅ Created anubis-backend network (internal)."
@@ -624,9 +616,9 @@ if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
     if [ "$CS_STATUS" == "healthy" ]; then
         echo "   🛡️  CrowdSec is already operational. Skipping boot."
     else
-        echo " [5/6] 👮 Booting security layer..."
-        echo "   🛡️  Booting CrowdSec + Redis..."
-        $COMPOSE_CMD $COMPOSE_FILES up -d --progress plain crowdsec redis
+        echo "   🛡 Booting CrowdSec + Redis..."
+        $COMPOSE_CMD $COMPOSE_FILES up -d crowdsec redis
+        sleep 1 # Allow terminal to settle
 
         # Wait for CrowdSec to be healthy
         echo -n "   ⏳ Waiting for CrowdSec API"
@@ -686,7 +678,8 @@ else
         echo "   🛡️  Redis is already operational. Skipping boot."
     else
         echo "   🛡️  Booting Redis (CrowdSec is disabled)..."
-        $COMPOSE_CMD $COMPOSE_FILES up -d --progress plain redis
+        $COMPOSE_CMD $COMPOSE_FILES up -d redis
+        sleep 1
         echo "   ✅ Redis operational."
     fi
 fi
@@ -704,11 +697,11 @@ if [[ "$DOMAIN_MANAGER_INTERNAL" == "true" ]]; then
     echo "   ℹ️  Internal run detected. Excluding domain-manager from self-restart."
     # Get all services from all compose files, then filter out domain-manager exactly
     SERVICES=$($COMPOSE_CMD $COMPOSE_FILES ps --services | grep -vxE "domain-manager" | xargs)
-    $COMPOSE_CMD $COMPOSE_FILES up -d --progress plain --remove-orphans $SERVICES
+    $COMPOSE_CMD $COMPOSE_FILES up -d --remove-orphans $SERVICES
 else
-    $COMPOSE_CMD $COMPOSE_FILES up -d --progress plain --remove-orphans
+    $COMPOSE_CMD $COMPOSE_FILES up -d --remove-orphans
 fi
-
+sleep 1
 
 echo "   🔍 Verifying Core DNS records..."
 CORE_SUBS=("traefik" "domains" "dozzle" "grafana")
