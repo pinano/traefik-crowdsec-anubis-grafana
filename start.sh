@@ -621,10 +621,11 @@ if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
     CROWDSEC_ID=$(docker ps -aq --filter label=com.docker.compose.project=$PROJECT_NAME --filter label=com.docker.compose.service=crowdsec | head -n 1)
     CS_STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$CROWDSEC_ID" 2>/dev/null || echo "none")
 
+    if [ "$CS_STATUS" == "healthy" ]; then
         echo "   🛡️  CrowdSec is already operational. Skipping boot."
-else
-    echo " [5/6] 👮 Booting security layer..."
-echo "   🛡️  Booting CrowdSec + Redis..."
+    else
+        echo " [5/6] 👮 Booting security layer..."
+        echo "   🛡️  Booting CrowdSec + Redis..."
         $COMPOSE_CMD $COMPOSE_FILES up -d crowdsec redis
 
         # Wait for CrowdSec to be healthy
@@ -654,7 +655,7 @@ echo "   🛡️  Booting CrowdSec + Redis..."
     # Re-register the Traefik Bouncer key on each start to ensure consistency.
     # Delete first (silently) in case it already exists, then add fresh.
 
-    echo "👮 Synchronizing Traefik Bouncer..."
+    echo "   �️ Synchronizing Traefik Bouncer..."
     docker exec "$CROWDSEC_ID" cscli bouncers delete traefik-bouncer > /dev/null 2>&1 || true
     docker exec "$CROWDSEC_ID" cscli bouncers add traefik-bouncer --key "${CROWDSEC_API_KEY}" > /dev/null
 
