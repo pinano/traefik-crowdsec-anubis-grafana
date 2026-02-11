@@ -167,6 +167,7 @@ validate_env() {
 validate_env | sed 's/^/   /'
 
 
+
 echo " [2/6] 🔐 Synchronizing credentials & paths..."
 echo "   🛡️ Checking admin credentials sync..."
 
@@ -274,6 +275,7 @@ else
 fi
 
 
+
 echo " [3/6] 🎨 Preparing application assets..."
 echo "   🛡️ Checking Anubis assets..."
 
@@ -361,7 +363,7 @@ if [ -f "./config/traefik/traefik.yaml.template" ]; then
         -e "s#TRAEFIK_TIMEOUT_IDLE_PLACEHOLDER#${TRAEFIK_TIMEOUT_IDLE:-90}s#g" \
         -e "s#TRAEFIK_ACCESS_LOG_BUFFER_PLACEHOLDER#${TRAEFIK_ACCESS_LOG_BUFFER:-1000}#g" \
         ./config/traefik/traefik.yaml.template > ./config/traefik/traefik-generated.yaml
-    echo "   ✅ traefik-generated.yaml produced."
+    echo "      ✅ traefik-generated.yaml produced."
 else
     echo "❌ Error: config/traefik/traefik.yaml.template not found!"
     exit 1
@@ -372,7 +374,7 @@ fi
 if [ -f "./config/traefik/traefik-generated.yaml" ]; then
     TRAEFIK_CONFIG_HASH=$(cat ./config/traefik/traefik-generated.yaml | generate_hash)
     export TRAEFIK_CONFIG_HASH
-    echo "   #️⃣ Traefik Config Hash: $TRAEFIK_CONFIG_HASH"
+    echo "      #️⃣ Traefik Config Hash: $TRAEFIK_CONFIG_HASH"
 fi
 
 # Generate dynamic configuration with Python script
@@ -465,8 +467,9 @@ EOF
         fi
     fi
 else
-    echo "⏭️ Skipping local certificate check (TRAEFIK_ACME_ENV_TYPE != 'local')."
+    echo "   ⏭️ Skipping local certificate check (TRAEFIK_ACME_ENV_TYPE != 'local')."
 fi
+
 
 
 echo " [4/6] 🌐 Preparing network & security layer..."
@@ -482,17 +485,17 @@ if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
     
     # Add custom entries from .env if present
     if [ -n "$CROWDSEC_WHITELIST_IPS" ]; then
-        echo "   ➕ Processing custom IPs from CROWDSEC_WHITELIST_IPS..."
+        echo "      ➕ Processing custom IPs from CROWDSEC_WHITELIST_IPS..."
         IFS=',' read -ra ENTRIES <<< "$CROWDSEC_WHITELIST_IPS"
         for entry in "${ENTRIES[@]}"; do
             entry=$(echo "$entry" | xargs) # Trim
             if [ -n "$entry" ]; then
                 if [[ "$entry" == *"/"* ]]; then
                     CIDRS_LIST+=("$entry")
-                    echo "      ➜ Added CIDR: $entry"
+                    echo "         ➜ Added CIDR: $entry"
                 else
                     IPS_LIST+=("$entry")
-                    echo "      ➜ Added IP: $entry"
+                    echo "         ➜ Added IP: $entry"
                 fi
             fi
         done
@@ -528,7 +531,7 @@ EOF
         done
     fi
     
-    echo "   ✅ Whitelist generated successfully with $((${#IPS_LIST[@]} + ${#CIDRS_LIST[@]})) entries."
+    echo "      ✅ Whitelist generated successfully with $((${#IPS_LIST[@]} + ${#CIDRS_LIST[@]})) entries."
 else
     echo "   ℹ️ CrowdSec is disabled, skipping whitelist generation."
     # Remove old whitelist if it exists to avoid stale entries
@@ -608,6 +611,7 @@ if [ "$APACHE_HOST_AVAILABLE" == "true" ]; then
     COMPOSE_FILES="$COMPOSE_FILES -f docker-compose-apache-logs.yaml"
     echo "   📋 Apache legacy installation detected, including logs extension."
 fi
+
 
 
 echo " [5/6] 👮 Booting security layer..."
@@ -695,6 +699,7 @@ fi
 # --remove-orphans cleans up any old containers not in current config.
 
 
+
 echo " [6/6] 🚀 Deploying application services..."
 
 # If running inside domain-manager, exclude it from the 'up' command to avoid killing this script
@@ -720,13 +725,13 @@ for sub in "${CORE_SUBS[@]}"; do
 done
 
 if [ ${#MISSING_DNS[@]} -gt 0 ]; then
-    echo "   ⚠️ The following core subdomains are not resolvable:"
+    echo "      ⚠️ The following core subdomains are not resolvable:"
     for m in "${MISSING_DNS[@]}"; do
-        echo "      ➜ $m"
+        echo "         ➜ $m"
     done
-    echo "   👉 ACTION REQUIRED: Please create these DNS records (Type A) pointing to this server."
+    echo "      👉 ACTION REQUIRED: Please create these DNS records (Type A) pointing to this server."
 else
-    echo "   ✅ All core DNS records verified."
+    echo "      ✅ All core DNS records verified."
 fi
 
 # =============================================================================
