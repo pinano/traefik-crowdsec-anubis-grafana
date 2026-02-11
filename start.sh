@@ -166,6 +166,7 @@ validate_env() {
 # Run validation immediately
 validate_env | sed 's/^/   /'
 
+
 echo " [2/6] 🔐 Synchronizing credentials & paths..."
 echo "   🛡️ Checking admin credentials sync..."
 
@@ -272,6 +273,7 @@ else
     echo "   ⚠️ CrowdSec firewall is DISABLED."
 fi
 
+
 echo " [3/6] 🎨 Preparing application assets..."
 echo "   🛡️ Checking Anubis assets..."
 
@@ -300,7 +302,7 @@ for img in happy.webp pensive.webp reject.webp; do
     fi
 done
 
-echo "   �️ Checking Traefik cert storage & ACME..."
+echo "   🔒 Checking Traefik cert storage & ACME..."
 if [ ! -f ./config/traefik/acme.json ]; then
     touch ./config/traefik/acme.json
     chmod 600 ./config/traefik/acme.json
@@ -351,7 +353,7 @@ else
 fi
 
 # Generate traefik-generated.yaml from template
-echo "   �️ Generating static & dynamic configurations..."
+echo "   ⚙️ Generating static & dynamic configurations..."
 if [ -f "./config/traefik/traefik.yaml.template" ]; then
     sed -e "s#TRAEFIK_ACME_EMAIL_PLACEHOLDER#${TRAEFIK_ACME_EMAIL}#g" \
         -e "s#TRAEFIK_ACME_CASERVER_PLACEHOLDER#${TRAEFIK_ACME_CA_SERVER}#g" \
@@ -465,6 +467,7 @@ EOF
 else
     echo "⏭️ Skipping local certificate check (TRAEFIK_ACME_ENV_TYPE != 'local')."
 fi
+
 
 echo " [4/6] 🌐 Preparing network & security layer..."
 echo "   🛡️ Checking CrowdSec IP whitelist..."
@@ -606,6 +609,7 @@ if [ "$APACHE_HOST_AVAILABLE" == "true" ]; then
     echo "   📋 Apache legacy installation detected, including logs extension."
 fi
 
+
 echo " [5/6] 👮 Booting security layer..."
 
 if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
@@ -647,7 +651,7 @@ if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
     # Re-register the Traefik Bouncer key on each start to ensure consistency.
     # Delete first (silently) in case it already exists, then add fresh.
 
-    echo "   �️ Synchronizing Traefik Bouncer..."
+    echo "   🔄 Synchronizing Traefik Bouncer..."
     docker exec "$CROWDSEC_ID" cscli bouncers delete traefik-bouncer > /dev/null 2>&1 || true
     docker exec "$CROWDSEC_ID" cscli bouncers add traefik-bouncer --key "${CROWDSEC_API_KEY}" > /dev/null
 
@@ -689,6 +693,7 @@ fi
 # =============================================================================
 # Now that the security layer is ready, deploy everything else.
 # --remove-orphans cleans up any old containers not in current config.
+
 
 echo " [6/6] 🚀 Deploying application services..."
 
