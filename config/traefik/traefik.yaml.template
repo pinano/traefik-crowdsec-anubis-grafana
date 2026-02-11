@@ -71,7 +71,7 @@ log:
 accessLog:
   format: json
   # Memory buffer so as not to hammer the disk with each line (batch writing)
-  bufferingSize: 1000
+  bufferingSize: TRAEFIK_ACCESS_LOG_BUFFER_PLACEHOLDER
 
   filters:
     # 1. Code Filter:

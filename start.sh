@@ -374,6 +374,7 @@ if [ -f "./config/traefik/traefik.yaml.template" ]; then
         -e "s|TRAEFIK_ACME_CASERVER_PLACEHOLDER|${TRAEFIK_ACME_CA_SERVER}|g" \
         -e "s|TRAEFIK_TIMEOUT_ACTIVE_PLACEHOLDER|${TRAEFIK_TIMEOUT_ACTIVE:-60}s|g" \
         -e "s|TRAEFIK_TIMEOUT_IDLE_PLACEHOLDER|${TRAEFIK_TIMEOUT_IDLE:-90}s|g" \
+        -e "s|TRAEFIK_ACCESS_LOG_BUFFER_PLACEHOLDER|${TRAEFIK_ACCESS_LOG_BUFFER:-1000}|g" \
         ./config/traefik/traefik.yaml.template > ./config/traefik/traefik-generated.yaml
     echo "   ✅ traefik-generated.yaml produced."
 else
