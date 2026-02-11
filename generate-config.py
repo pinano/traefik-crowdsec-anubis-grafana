@@ -547,7 +547,8 @@ def generate_configs():
 
         all_subdomains = [e['domain'] for e in entries]
         redirect_domains_str = ",".join(all_subdomains)
-        public_url = f"https://{auth_sub}.{root}"
+        auth_domain = f"{auth_sub}.{root}"
+        public_url = f"https://{auth_domain}"
 
         services[anubis_service_name] = {
             'extends': {
