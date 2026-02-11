@@ -626,7 +626,7 @@ if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
     else
         echo " [5/6] 👮 Booting security layer..."
         echo "   🛡️  Booting CrowdSec + Redis..."
-        $COMPOSE_CMD $COMPOSE_FILES up -d crowdsec redis
+        $COMPOSE_CMD $COMPOSE_FILES up -d --progress plain crowdsec redis
 
         # Wait for CrowdSec to be healthy
         echo -n "   ⏳ Waiting for CrowdSec API"
@@ -673,7 +673,7 @@ if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
     # for access to community blocklists and centralized management.
 
     if [ -n "$CROWDSEC_ENROLLMENT_KEY" ] && [ "$CROWDSEC_ENROLLMENT_KEY" != "REPLACE_ME" ]; then
-        echo "🌐 Enrolling CrowdSec to Console..."
+        echo "   🌐 Enrolling CrowdSec to Console..."
         if docker exec "$CROWDSEC_ID" cscli console enroll "$CROWDSEC_ENROLLMENT_KEY" --name "$(hostname)" 2>/dev/null; then
             echo "   ✅ Successfully enrolled in CrowdSec Console."
         else
@@ -686,7 +686,7 @@ else
         echo "   🛡️  Redis is already operational. Skipping boot."
     else
         echo "   🛡️  Booting Redis (CrowdSec is disabled)..."
-        $COMPOSE_CMD $COMPOSE_FILES up -d redis
+        $COMPOSE_CMD $COMPOSE_FILES up -d --progress plain redis
         echo "   ✅ Redis operational."
     fi
 fi
@@ -704,9 +704,9 @@ if [[ "$DOMAIN_MANAGER_INTERNAL" == "true" ]]; then
     echo "   ℹ️  Internal run detected. Excluding domain-manager from self-restart."
     # Get all services from all compose files, then filter out domain-manager exactly
     SERVICES=$($COMPOSE_CMD $COMPOSE_FILES ps --services | grep -vxE "domain-manager" | xargs)
-    $COMPOSE_CMD $COMPOSE_FILES up -d --remove-orphans $SERVICES
+    $COMPOSE_CMD $COMPOSE_FILES up -d --progress plain --remove-orphans $SERVICES
 else
-    $COMPOSE_CMD $COMPOSE_FILES up -d --remove-orphans
+    $COMPOSE_CMD $COMPOSE_FILES up -d --progress plain --remove-orphans
 fi
 
 
