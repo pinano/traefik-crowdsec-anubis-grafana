@@ -107,7 +107,7 @@ if [ $ADDED_VARS -gt 0 ]; then
     echo "   ✅ Added $ADDED_VARS new variables from .env.dist."
 fi
 if [ $EXTRA_VARS -gt 0 ]; then
-    echo "   ℹ️  Preserved $EXTRA_VARS custom variables."
+    echo "   ℹ️ Preserved $EXTRA_VARS custom variables."
 fi
 
 # Load variables
@@ -267,9 +267,9 @@ fi
 
 COMPOSE_CMD="$COMPOSE_BASE"
 if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
-    echo "   🛡️  CrowdSec firewall is ENABLED."
+    echo "   🛡️ CrowdSec firewall is ENABLED."
 else
-    echo "   ⚠️  CrowdSec firewall is DISABLED."
+    echo "   ⚠️ CrowdSec firewall is DISABLED."
 fi
 
 echo " [3/6] 🎨 Preparing application assets..."
@@ -296,7 +296,7 @@ for img in happy.webp pensive.webp reject.webp; do
             echo "   ✅ Copied default $img"
         fi
     else
-        echo "   ℹ️  Using custom $img"
+        echo "   ℹ️ Using custom $img"
     fi
 done
 
@@ -345,9 +345,9 @@ fi
 # Export the resolver choice so Docker Compose can use it
 export TRAEFIK_CERT_RESOLVER
 if [ -z "$TRAEFIK_CERT_RESOLVER" ]; then
-     echo "   ℹ️  TRAEFIK_CERT_RESOLVER is disabled (Local Mode)."
+     echo "   ℹ️ TRAEFIK_CERT_RESOLVER is disabled (Local Mode)."
 else
-     echo "   ℹ️  TRAEFIK_CERT_RESOLVER set to: '$TRAEFIK_CERT_RESOLVER'"
+     echo "   ℹ️ TRAEFIK_CERT_RESOLVER set to: '$TRAEFIK_CERT_RESOLVER'"
 fi
 
 # Generate traefik-generated.yaml from template
@@ -370,7 +370,7 @@ fi
 if [ -f "./config/traefik/traefik-generated.yaml" ]; then
     TRAEFIK_CONFIG_HASH=$(cat ./config/traefik/traefik-generated.yaml | generate_hash)
     export TRAEFIK_CONFIG_HASH
-    echo "   #️⃣  Traefik Config Hash: $TRAEFIK_CONFIG_HASH"
+    echo "   #️⃣ Traefik Config Hash: $TRAEFIK_CONFIG_HASH"
 fi
 
 # Generate dynamic configuration with Python script
@@ -392,7 +392,7 @@ echo "      🧹 Cleaning up old generated configurations..."
 
 # Safety check: if docker-compose-anubis-generated.yaml is a directory (Docker artifact), try to remove it
 if [ -d "docker-compose-anubis-generated.yaml" ]; then
-    echo "⚠️  Cleaning up directory collision: docker-compose-anubis-generated.yaml"
+    echo "⚠️ Cleaning up directory collision: docker-compose-anubis-generated.yaml"
     rm -rf docker-compose-anubis-generated.yaml || echo "   ⚠️  Warning: Could not remove directory 'docker-compose-anubis-generated.yaml'. If it's a mount point, this is expected."
 else
     # Instead of rm, we truncate to avoid "Resource busy" if the file is mounted
@@ -401,7 +401,7 @@ fi
 
 # Safety check: if domains.csv is a directory (Docker artifact), remove it
 if [ -d "domains.csv" ]; then
-    echo "⚠️  Cleaning up directory collision: domains.csv"
+    echo "⚠️ Cleaning up directory collision: domains.csv"
     rm -rf domains.csv
 fi
 
@@ -456,14 +456,14 @@ tls:
 EOF
         echo "   ✅ Generated local-certs.yaml."
     else
-        echo "   ℹ️  No custom local certificates found."
+        echo "   ℹ️ No custom local certificates found."
         if [ -f "$TRAEFIK_CERTS_CONF" ]; then
             rm "$TRAEFIK_CERTS_CONF"
             echo "   🗑️  Removed stale local-certs.yaml."
         fi
     fi
 else
-    echo "⏭️  Skipping local certificate check (TRAEFIK_ACME_ENV_TYPE != 'local')."
+    echo "⏭️ Skipping local certificate check (TRAEFIK_ACME_ENV_TYPE != 'local')."
 fi
 
 echo " [4/6] 🌐 Preparing network & security layer..."
@@ -531,7 +531,7 @@ else
     # Remove old whitelist if it exists to avoid stale entries
     if [ -f "$WHITELIST_FILE" ]; then
         rm -f "$WHITELIST_FILE"
-        echo "   🗑️  Removed old whitelist file."
+        echo "   🗑️ Removed old whitelist file."
     fi
 fi
 
@@ -540,7 +540,7 @@ fi
 # =============================================================================
 # This variable is used by generate-config.py to create native Traefik blocking rules.
 if [ -n "$TRAEFIK_BAD_USER_AGENTS" ]; then
-    echo "🛡️  User-Agent blacklist configured in Traefik side."
+    echo "🛡️ User-Agent blacklist configured in Traefik side."
     export TRAEFIK_BAD_USER_AGENTS
 else
     echo "   ℹ️ TRAEFIK_BAD_USER_AGENTS is empty. No native UA blocking applied."
@@ -575,7 +575,7 @@ if [ -f "docker-compose-anubis-generated.yaml" ]; then
     com_files="$com_files -f docker-compose-anubis-generated.yaml"
     echo "   ✅ Included docker-compose-anubis-generated.yaml"
 else
-    echo "   ℹ️  docker-compose-anubis-generated.yaml not found (skipping)."
+    echo "   ℹ️ docker-compose-anubis-generated.yaml not found (skipping)."
 fi
 
 COMPOSE_FILES="$com_files"
@@ -614,7 +614,7 @@ if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
     CS_STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$CROWDSEC_ID" 2>/dev/null || echo "none")
 
     if [ "$CS_STATUS" == "healthy" ]; then
-        echo "   🛡️  CrowdSec is already operational. Skipping boot."
+        echo "   🛡️ CrowdSec is already operational. Skipping boot."
     else
         echo "   🛡 Booting CrowdSec + Redis..."
         $COMPOSE_CMD $COMPOSE_FILES up -d crowdsec redis
@@ -675,9 +675,9 @@ if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
 else
     REDIS_ID=$(docker ps -aq --filter label=com.docker.compose.project=$PROJECT_NAME --filter label=com.docker.compose.service=redis | head -n 1)
     if [ -n "$REDIS_ID" ] && [ "$(docker inspect --format='{{.State.Running}}' $REDIS_ID 2>/dev/null)" == "true" ]; then
-        echo "   🛡️  Redis is already operational. Skipping boot."
+        echo "   🛡️ Redis is already operational. Skipping boot."
     else
-        echo "   🛡️  Booting Redis (CrowdSec is disabled)..."
+        echo "   🛡️ Booting Redis (CrowdSec is disabled)..."
         $COMPOSE_CMD $COMPOSE_FILES up -d redis
         sleep 1
         echo "   ✅ Redis operational."
@@ -694,7 +694,7 @@ echo " [6/6] 🚀 Deploying application services..."
 
 # If running inside domain-manager, exclude it from the 'up' command to avoid killing this script
 if [[ "$DOMAIN_MANAGER_INTERNAL" == "true" ]]; then
-    echo "   ℹ️  Internal run detected. Excluding domain-manager from self-restart."
+    echo "   ℹ️ Internal run detected. Excluding domain-manager from self-restart."
     # Get all services from all compose files, then filter out domain-manager exactly
     SERVICES=$($COMPOSE_CMD $COMPOSE_FILES ps --services | grep -vxE "domain-manager" | xargs)
     $COMPOSE_CMD $COMPOSE_FILES up -d --remove-orphans $SERVICES
@@ -715,7 +715,7 @@ for sub in "${CORE_SUBS[@]}"; do
 done
 
 if [ ${#MISSING_DNS[@]} -gt 0 ]; then
-    echo "   ⚠️  The following core subdomains are not resolvable:"
+    echo "   ⚠️ The following core subdomains are not resolvable:"
     for m in "${MISSING_DNS[@]}"; do
         echo "      ➜ $m"
     done

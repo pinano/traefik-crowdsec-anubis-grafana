@@ -255,7 +255,7 @@ def generate_configs():
             # We first peek to skip comments and detect headers
             lines = [line for line in f if line.strip() and not line.strip().startswith('#')]
             if not lines:
-                print("    ℹ️  No valid entries found (domains.csv is empty or comments only).")
+                print("    ℹ️ No valid entries found (domains.csv is empty or comments only).")
             else:
                 # Use csv.reader but manually handle indices for flexibility
                 reader = csv.reader(lines, skipinitialspace=True)
@@ -266,7 +266,7 @@ def generate_configs():
                     if not row: continue
 
                     if len(row) < 3:
-                        print(f"    ⚠️  Line {line_num}: Ignored (Missing mandatory columns: domain, redirection/blank, service).")
+                        print(f"    ⚠️ Line {line_num}: Ignored (Missing mandatory columns: domain, redirection/blank, service).")
                         error_count += 1
                         continue
 
@@ -276,7 +276,7 @@ def generate_configs():
                     anubis_sub = row[3].lower() if len(row) > 3 else ""
 
                     if not domain:
-                        print(f"    ⚠️  Line {line_num}: Ignored (Empty domain field).")
+                        print(f"    ⚠️ Line {line_num}: Ignored (Empty domain field).")
                         error_count += 1
                         continue
 
@@ -325,9 +325,9 @@ def generate_configs():
         if stats['apache'] > 0:   print(f"      ➜ {stats['apache']} Apache legacy hosts")
     
     if error_count > 0:
-        print(f"    ⚠️  Total: {error_count} lines skipped due to errors.")
+        print(f"    ⚠️ Total: {error_count} lines skipped due to errors.")
 
-    print(f"   ⚙️  Global Config: Rate={G_RATE_AVG}/{G_RATE_BURST}, HSTS={HSTS_SECONDS}s")
+    print(f"   ⚙️ Global Config: Rate={G_RATE_AVG}/{G_RATE_BURST}, HSTS={HSTS_SECONDS}s")
 
     services = {}
 
@@ -630,7 +630,7 @@ def generate_configs():
         with open(OUTPUT_COMPOSE, 'w') as f:
             f.write("# AUTOMATICALLY GENERATED - NO ANUBIS INSTANCES\n")
             yaml.dump({'services': {}}, f, Dumper=IndentDumper, default_flow_style=False)
-        print("       ℹ️  Docker Compose: No Anubis instances needed.")
+        print("       ℹ️ Docker Compose: No Anubis instances needed.")
 
     os.makedirs(os.path.dirname(OUTPUT_TRAEFIK), exist_ok=True)
     with open(OUTPUT_TRAEFIK, 'w') as f:
