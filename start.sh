@@ -176,20 +176,31 @@ echo "🔐 Checking admin credentials sync..."
 
 SYNC_NEEDED=0
 
-# Helper to update a variable in .env
+# Helper to perform common hashing (portability between Linux/macOS)
+# Usage: echo -n "string" | generate_hash  OR  cat file | generate_hash
+generate_hash() {
+    if command -v sha1sum >/dev/null 2>&1; then
+        sha1sum | cut -d' ' -f1
+    else
+        shasum | cut -d' ' -f1
+    fi
+}
+
+# Helper to update variables in .env efficiently
+# Use a temporary file to batch updates if needed
 update_env_var() {
     local var_name=$1
     local new_val=$2
-    # Use a temporary file and 'cat' to preserve the inode and avoid 'Resource busy' 
-    # errors when the file is mounted into a Docker container.
     local TMP_ENV=$(mktemp)
-    sed "s|^${var_name}=.*|${var_name}=${new_val}|" "$ENV_FILE" > "$TMP_ENV"
+    
+    # Use '#' as delimiter for safety with paths/hashes
+    sed "s#^${var_name}=.*#${var_name}=${new_val}#" "$ENV_FILE" > "$TMP_ENV"
     cat "$TMP_ENV" > "$ENV_FILE"
     rm "$TMP_ENV"
 }
 
 # 1. Traefik Credentials Sync
-CURRENT_TRAEFIK_SYNC=$(echo -n "${TRAEFIK_ADMIN_USER}:${TRAEFIK_ADMIN_PASSWORD}" | sha1sum | cut -d' ' -f1)
+CURRENT_TRAEFIK_SYNC=$(echo -n "${TRAEFIK_ADMIN_USER}:${TRAEFIK_ADMIN_PASSWORD}" | generate_hash)
 if [ "$CURRENT_TRAEFIK_SYNC" != "$TRAEFIK_ADMIN_CREDS_SYNC" ]; then
     echo "   🔄 Traefik credentials changed. Regenerating hash..."
     T_HASH=$(docker run --rm httpd:alpine htpasswd -Bbn "$TRAEFIK_ADMIN_USER" "$TRAEFIK_ADMIN_PASSWORD")
@@ -200,7 +211,7 @@ if [ "$CURRENT_TRAEFIK_SYNC" != "$TRAEFIK_ADMIN_CREDS_SYNC" ]; then
 fi
 
 # 2. Dozzle Credentials Sync
-CURRENT_DOZZLE_SYNC=$(echo -n "${DOZZLE_ADMIN_USER}:${DOZZLE_ADMIN_PASSWORD}" | sha1sum | cut -d' ' -f1)
+CURRENT_DOZZLE_SYNC=$(echo -n "${DOZZLE_ADMIN_USER}:${DOZZLE_ADMIN_PASSWORD}" | generate_hash)
 if [ "$CURRENT_DOZZLE_SYNC" != "$DOZZLE_ADMIN_CREDS_SYNC" ]; then
     echo "   🔄 Dozzle credentials changed. Regenerating hash..."
     D_HASH=$(docker run --rm httpd:alpine htpasswd -Bbn "$DOZZLE_ADMIN_USER" "$DOZZLE_ADMIN_PASSWORD")
@@ -370,11 +381,11 @@ fi
 # Generate traefik-generated.yaml from template
 echo "🔧 Generating traefik-generated.yaml from template..."
 if [ -f "./config/traefik/traefik.yaml.template" ]; then
-    sed -e "s|TRAEFIK_ACME_EMAIL_PLACEHOLDER|${TRAEFIK_ACME_EMAIL}|g" \
-        -e "s|TRAEFIK_ACME_CASERVER_PLACEHOLDER|${TRAEFIK_ACME_CA_SERVER}|g" \
-        -e "s|TRAEFIK_TIMEOUT_ACTIVE_PLACEHOLDER|${TRAEFIK_TIMEOUT_ACTIVE:-60}s|g" \
-        -e "s|TRAEFIK_TIMEOUT_IDLE_PLACEHOLDER|${TRAEFIK_TIMEOUT_IDLE:-90}s|g" \
-        -e "s|TRAEFIK_ACCESS_LOG_BUFFER_PLACEHOLDER|${TRAEFIK_ACCESS_LOG_BUFFER:-1000}|g" \
+    sed -e "s#TRAEFIK_ACME_EMAIL_PLACEHOLDER#${TRAEFIK_ACME_EMAIL}#g" \
+        -e "s#TRAEFIK_ACME_CASERVER_PLACEHOLDER#${TRAEFIK_ACME_CA_SERVER}#g" \
+        -e "s#TRAEFIK_TIMEOUT_ACTIVE_PLACEHOLDER#${TRAEFIK_TIMEOUT_ACTIVE:-60}s#g" \
+        -e "s#TRAEFIK_TIMEOUT_IDLE_PLACEHOLDER#${TRAEFIK_TIMEOUT_IDLE:-90}s#g" \
+        -e "s#TRAEFIK_ACCESS_LOG_BUFFER_PLACEHOLDER#${TRAEFIK_ACCESS_LOG_BUFFER:-1000}#g" \
         ./config/traefik/traefik.yaml.template > ./config/traefik/traefik-generated.yaml
     echo "   ✅ traefik-generated.yaml produced."
 else
@@ -385,7 +396,7 @@ fi
 # Calculate hash of the generated config to force restart on changes
 # relying on Docker Compose to detect env var changes
 if [ -f "./config/traefik/traefik-generated.yaml" ]; then
-    TRAEFIK_CONFIG_HASH=$(python3 -c "import hashlib; print(hashlib.sha1(open('./config/traefik/traefik-generated.yaml', 'rb').read()).hexdigest())")
+    TRAEFIK_CONFIG_HASH=$(cat ./config/traefik/traefik-generated.yaml | generate_hash)
     export TRAEFIK_CONFIG_HASH
     echo "   #️⃣  Traefik Config Hash: $TRAEFIK_CONFIG_HASH"
 fi
@@ -432,7 +443,7 @@ if [ ! -f "domains.csv" ]; then
 fi
 
 echo ""
-python3 generate-config.py
+python3 generate-config.py | sed 's/^/   /'
 echo ""
 
 echo "--------------------------------------------------------"
@@ -728,8 +739,8 @@ echo "🚀 Deploying remaining services..."
 # If running inside domain-manager, exclude it from the 'up' command to avoid killing this script
 if [[ "$DOMAIN_MANAGER_INTERNAL" == "true" ]]; then
     echo "   ℹ️  Internal run detected. Excluding domain-manager from self-restart."
-    # Get all services from all compose files, then filter out domain-manager
-    SERVICES=$($COMPOSE_CMD $COMPOSE_FILES ps --services | grep -v "domain-manager" | xargs)
+    # Get all services from all compose files, then filter out domain-manager exactly
+    SERVICES=$($COMPOSE_CMD $COMPOSE_FILES ps --services | grep -vxE "domain-manager" | xargs)
     $COMPOSE_CMD $COMPOSE_FILES up -d --remove-orphans $SERVICES
 else
     $COMPOSE_CMD $COMPOSE_FILES up -d --remove-orphans
