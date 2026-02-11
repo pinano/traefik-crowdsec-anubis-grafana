@@ -23,12 +23,13 @@ REDIS_PASSWORD = os.getenv('REDIS_PASSWORD')
 CROWDSEC_DISABLE = os.getenv('CROWDSEC_DISABLE', 'false').lower() == 'true'
 TRAEFIK_ENV_TYPE = os.getenv('TRAEFIK_ACME_ENV_TYPE', 'staging')
 IS_LOCAL_DEV = (TRAEFIK_ENV_TYPE == 'local')
+TRAEFIK_CERT_RESOLVER = os.getenv('TRAEFIK_CERT_RESOLVER', 'le')
 
 # Blocked Paths (Comma-separated list of regex patterns)
 BLOCKED_PATHS_STR = os.getenv('TRAEFIK_BLOCKED_PATHS', '').strip()
 
 # Bad User Agents (Comma-separated list of regex patterns)
-UA_BLACKLIST_STR = os.getenv('TRAEFIK_BAD_USER_AGENTS', '').strip()
+BLOCKED_USER_AGENTS_STR = os.getenv('TRAEFIK_BAD_USER_AGENTS', '').strip()
 
 # Frame Ancestors (for iframes)
 FRAME_ANCESTORS = os.getenv('TRAEFIK_FRAME_ANCESTORS', '').strip()
@@ -38,12 +39,12 @@ if (BLOCKED_PATHS_STR.startswith('"') and BLOCKED_PATHS_STR.endswith('"')) or \
    (BLOCKED_PATHS_STR.startswith("'") and BLOCKED_PATHS_STR.endswith("'")):
     BLOCKED_PATHS_STR = BLOCKED_PATHS_STR[1:-1]
 
-if (UA_BLACKLIST_STR.startswith('"') and UA_BLACKLIST_STR.endswith('"')) or \
-   (UA_BLACKLIST_STR.startswith("'") and UA_BLACKLIST_STR.endswith("'")):
-    UA_BLACKLIST_STR = UA_BLACKLIST_STR[1:-1]
+if (BLOCKED_USER_AGENTS_STR.startswith('"') and BLOCKED_USER_AGENTS_STR.endswith('"')) or \
+   (BLOCKED_USER_AGENTS_STR.startswith("'") and BLOCKED_USER_AGENTS_STR.endswith("'")):
+    BLOCKED_USER_AGENTS_STR = BLOCKED_USER_AGENTS_STR[1:-1]
 
 BLOCKED_PATHS = [p.strip().strip('"').strip("'") for p in BLOCKED_PATHS_STR.split(',') if p.strip()]
-UA_BLACKLIST = [p.strip().strip('"').strip("'") for p in UA_BLACKLIST_STR.split(',') if p.strip()]
+BLOCKED_USER_AGENTS = [p.strip().strip('"').strip("'") for p in BLOCKED_USER_AGENTS_STR.split(',') if p.strip()]
 
 # TLS Chunking Limit (Let's Encrypt max is 100)
 TLS_BATCH_SIZE = 30
@@ -74,7 +75,7 @@ VALID_SERVICE_NAME_REGEX = re.compile(r'^[a-z0-9-]+$')
 # Validation
 # -----------------------------------------------------------------------------
 
-if not CROWDSEC_API_KEY:
+if not CROWDSEC_DISABLE and not CROWDSEC_API_KEY:
     print("    ❌ FATAL ERROR: CROWDSEC_API_KEY environment variable not found.")
     exit(1)
 
@@ -98,9 +99,21 @@ def get_root_domain(domain):
         return f"{extracted.domain}.{extracted.suffix}"
     return domain
 
-# This is only for router/middleware naming internally in Traefik, less strict than service naming
 def sanitize_name(name):
     return name.replace('.', '-').replace('_', '-').lower()
+
+# Unifies SSL/TLS configuration for any router
+def apply_tls_config(router_conf, domain, domain_to_cert_def):
+    # Only use Let's Encrypt if NOT in local dev mode
+    if not IS_LOCAL_DEV:
+        router_conf['tls']['certResolver'] = TRAEFIK_CERT_RESOLVER
+        
+        # Inject TLS domains if specific batch exists
+        if domain in domain_to_cert_def:
+            router_conf['tls']['domains'] = [domain_to_cert_def[domain]]
+    else:
+        # Defaults for local dev (self-signed)
+        router_conf['tls'] = {}
 
 def process_router(entry, http_section, domain_to_cert_def):
     domain = entry['domain']
@@ -164,7 +177,7 @@ def process_router(entry, http_section, domain_to_cert_def):
             
         http_section['middlewares'][redirect_mw_name] = {
             'redirectRegex': {
-                'regex': f"^https?://{domain}/(.*)",
+                'regex': f"^https?://{domain.replace('.', r'\.')}/(.*)",
                 'replacement': f"{target}/${{1}}",
                 'permanent': True
             }
@@ -173,7 +186,7 @@ def process_router(entry, http_section, domain_to_cert_def):
 
     if service == 'apache-host':
         mw_list.append('apache-forward-headers')
-        target_service = 'apache-host-8080@file'
+        target_service = 'apache-host-8080'
     else:
         target_service = f"{service}@docker"
 
@@ -182,18 +195,12 @@ def process_router(entry, http_section, domain_to_cert_def):
         'rule': f"Host(`{domain}`)",
         'entryPoints': ["websecure"],
         'service': target_service,
-        'tls': {}, # Default to empty TLS (self-signed)
+        'tls': {}, 
         'middlewares': mw_list
     }
     
-    # Only use Let's Encrypt if NOT in local dev mode
-    if not IS_LOCAL_DEV:
-        router_conf['tls']['certResolver'] = os.getenv('TRAEFIK_CERT_RESOLVER', 'le')
-
-    
-    # Inject TLS domains if specific batch exists
-    if domain in domain_to_cert_def:
-        router_conf['tls']['domains'] = [domain_to_cert_def[domain]]
+    # Apply SSL/TLS settings
+    apply_tls_config(router_conf, domain, domain_to_cert_def)
 
     http_section['routers'][router_name] = router_conf
     # -------------------------------------------------------------------------
@@ -201,31 +208,31 @@ def process_router(entry, http_section, domain_to_cert_def):
     # -------------------------------------------------------------------------
     # Creates a higher priority router to intercept blocked paths
     if BLOCKED_PATHS:
-        block_router_name = f"blocker-{safe_domain}"
+        path_block_router_name = f"path-blocker-{safe_domain}"
         paths_rule = " || ".join([f"PathRegexp(`.*{p}.*`)" for p in BLOCKED_PATHS])
-        http_section['routers'][block_router_name] = {
+        http_section['routers'][path_block_router_name] = {
             'rule': f"Host(`{domain}`) && ({paths_rule})",
             'entryPoints': ["websecure"],
             'service': "api@internal",
             'priority': 11000,
-            'tls': router_conf.get('tls', {}),
+            'tls': router_conf['tls'],
             'middlewares': ["block-unwanted-paths"]
         }
 
     # -------------------------------------------------------------------------
     # User-Agent Blocking Router (Per-Domain)
     # -------------------------------------------------------------------------
-    if UA_BLACKLIST:
+    if BLOCKED_USER_AGENTS:
         ua_block_router_name = f"ua-blocker-{safe_domain}"
         # Match any of the regex patterns in the User-Agent header
-        ua_rules = " || ".join([f"HeaderRegexp(`User-Agent`, `{p}`)" for p in UA_BLACKLIST])
+        ua_rules = " || ".join([f"HeaderRegexp(`User-Agent`, `{p}`)" for p in BLOCKED_USER_AGENTS])
         http_section['routers'][ua_block_router_name] = {
             'rule': f"Host(`{domain}`) && ({ua_rules})",
             'entryPoints': ["websecure"],
             'service': "api@internal",
             'priority': 12000, # Higher than path blocker (11000)
-            'tls': router_conf.get('tls', {}),
-            'middlewares': ["block-bad-bots-ua"]
+            'tls': router_conf['tls'],
+            'middlewares': ["block-unwanted-user-agents"]
         }
 
 # =============================================================================
@@ -314,8 +321,8 @@ def generate_configs():
     if raw_entries:
         print(f"    ✅ Successfully processed {len(raw_entries)} domains:")
         if stats['standard'] > 0: print(f"       ➜ {stats['standard']} Standard Traefik proxies")
-        if stats['anubis'] > 0:    print(f"       ➜ {stats['anubis']} Anubis protected instances")
-        if stats['apache'] > 0:    print(f"       ➜ {stats['apache']} Apache legacy hosts")
+        if stats['anubis'] > 0:   print(f"       ➜ {stats['anubis']} Anubis protected instances")
+        if stats['apache'] > 0:   print(f"       ➜ {stats['apache']} Apache legacy hosts")
     
     if error_count > 0:
         print(f"    ⚠️  Total: {error_count} lines skipped due to errors.")
@@ -339,7 +346,18 @@ def generate_configs():
                 }
             },
             'middlewares': {
-                # 1. Browser Security (Parameterized Headers)
+                # --- The Golden Chain (Execution Order) ---
+                
+                # 2. DDoS Protection: Buffering (Protects against Slowloris)
+                'global-buffering': {
+                    'buffering': {
+                        'maxRequestBodyBytes': 0, # No limit for body (handled by other layers)
+                        'memRequestBodyBytes': 2097152, # 2MB in memory
+                        'maxResponseBodyBytes': 0,
+                        'memResponseBodyBytes': 2097152 # 2MB in memory
+                    }
+                },
+                # 3. Browser Security (Headers)
                 'security-headers': {
                     'headers': {
                         'frameDeny': not bool(FRAME_ANCESTORS),
@@ -353,10 +371,6 @@ def generate_configs():
                         'contentSecurityPolicy': f"frame-ancestors 'self' {FRAME_ANCESTORS.replace(',', ' ')}" if FRAME_ANCESTORS else None
                     }
                 },
-                # 3. Global Compression
-                'global-compress': {
-                    'compress': {'minResponseBodyBytes': 1024}
-                },
                 # 4. Traefik Rate Limit
                 'global-ratelimit': {
                     'rateLimit': {
@@ -368,7 +382,11 @@ def generate_configs():
                 'global-concurrency': {
                     'inFlightReq': {'amount': G_CONCURRENCY}
                 },
-                # 6. Protocol Forwarder (For Apache/WordPress HTTP->HTTPS redirect fix)
+                # 7. Global Compression (Applied late)
+                'global-compress': {
+                    'compress': {'minResponseBodyBytes': 1024}
+                },
+                # 9. Protocol Forwarder (For legacy Apache)
                 'apache-forward-headers': {
                     'headers': {
                         'customRequestHeaders': {
@@ -376,28 +394,19 @@ def generate_configs():
                         }
                     }
                 },
-                # 7. Anubis Assets Stripper
-                # Cleans the internal Go path so Nginx receives a clean path.
+
+                # --- Specialized Helper Middlewares ---
+
+                # 6. Anubis Assets Stripper
                 'anubis-assets-stripper': {
                     'stripPrefix': {
                         'prefixes': ['/.within.website/x/cmd/anubis']
                     }
                 },
                 # 8. Anubis CSS Replacement
-                # Transforms the unusual Go request into your local file name
                 'anubis-css-replace': {
                     'replacePath': {
                         'path': '/custom.css'
-                    }
-                },
-                # 9. DDoS Protection: Buffering
-                # Protects against Slowloris attacks
-                'global-buffering': {
-                    'buffering': {
-                        'maxRequestBodyBytes': 0, # No limit for body (handled by other layers)
-                        'memRequestBodyBytes': 2097152, # 2MB in memory
-                        'maxResponseBodyBytes': 0,
-                        'memResponseBodyBytes': 2097152 # 2MB in memory
                     }
                 },
             },
@@ -416,23 +425,7 @@ def generate_configs():
         }
     }
 
-    # Blocked Paths Middleware (If configured)
-    if BLOCKED_PATHS:
-        traefik_dynamic_conf['http']['middlewares']['block-unwanted-paths'] = {
-            'ipAllowList': {
-                'sourceRange': ['127.0.0.1/32']
-            }
-        }
-
-    # Blocked User Agents Middleware (If configured)
-    if UA_BLACKLIST:
-        traefik_dynamic_conf['http']['middlewares']['block-bad-bots-ua'] = {
-            'ipAllowList': {
-                'sourceRange': ['127.0.0.1/32'] # Reject everyone (except technically localhost if it hit this router)
-            }
-        }
-
-    # 10. CrowdSec API Check Plugin (Only if enabled)
+    # 1. CrowdSec API Check Plugin (The very first line of defense)
     if not CROWDSEC_DISABLE:
         traefik_dynamic_conf['http']['middlewares']['crowdsec-check'] = {
             'plugin': {
@@ -465,6 +458,22 @@ def generate_configs():
                         '192.168.0.0/16'
                     ]
                 }
+            }
+        }
+
+    # Blocked Paths Middleware (Conditional)
+    if BLOCKED_PATHS:
+        traefik_dynamic_conf['http']['middlewares']['block-unwanted-paths'] = {
+            'ipAllowList': {
+                'sourceRange': ['127.0.0.1/32']
+            }
+        }
+
+    # Blocked User Agents Middleware (Conditional)
+    if BLOCKED_USER_AGENTS:
+        traefik_dynamic_conf['http']['middlewares']['block-unwanted-user-agents'] = {
+            'ipAllowList': {
+                'sourceRange': ['127.0.0.1/32'] # Reject everyone (except technically localhost if it hit this router)
             }
         }
 
@@ -581,16 +590,7 @@ def generate_configs():
             'tls': {},
             'middlewares': ["security-headers", "anubis-assets-stripper", "global-compress"]
         }
-        
-        # Configure TLS
-        if not IS_LOCAL_DEV:
-             traefik_dynamic_conf['http']['routers'][assets_router_name]['tls']['certResolver'] = os.getenv('TRAEFIK_CERT_RESOLVER', 'le')
-
-        
-        # Inject TLS domains if specific batch exists
-        auth_domain = f"{auth_sub}.{root}"
-        if not IS_LOCAL_DEV and auth_domain in domain_to_cert_def:
-             traefik_dynamic_conf['http']['routers'][assets_router_name]['tls']['domains'] = [domain_to_cert_def[auth_domain]]
+        apply_tls_config(traefik_dynamic_conf['http']['routers'][assets_router_name], auth_domain, domain_to_cert_def)
 
         # 2. Anubis: Router for CSS
         css_router_name = f"anubis-assets-css-{safe_root}-{safe_auth}"
@@ -602,14 +602,7 @@ def generate_configs():
             'tls': {},
             'middlewares': ["security-headers", "anubis-css-replace", "global-compress"]
         }
-
-        # Configure TLS
-        if not IS_LOCAL_DEV:
-             traefik_dynamic_conf['http']['routers'][css_router_name]['tls']['certResolver'] = os.getenv('TRAEFIK_CERT_RESOLVER', 'le')
-
-
-        if not IS_LOCAL_DEV and auth_domain in domain_to_cert_def:
-             traefik_dynamic_conf['http']['routers'][css_router_name]['tls']['domains'] = [domain_to_cert_def[auth_domain]]
+        apply_tls_config(traefik_dynamic_conf['http']['routers'][css_router_name], auth_domain, domain_to_cert_def)
 
         # 3. Anubis: Main Router
         panel_router_name = f"anubis-panel-{safe_root}-{safe_auth}"
@@ -620,14 +613,7 @@ def generate_configs():
             'tls': {}, 
             'middlewares': ["security-headers"]
         }
-
-        # Configure TLS
-        if not IS_LOCAL_DEV:
-             traefik_dynamic_conf['http']['routers'][panel_router_name]['tls']['certResolver'] = os.getenv('TRAEFIK_CERT_RESOLVER', 'le')
-
-
-        if not IS_LOCAL_DEV and auth_domain in domain_to_cert_def:
-             traefik_dynamic_conf['http']['routers'][panel_router_name]['tls']['domains'] = [domain_to_cert_def[auth_domain]]
+        apply_tls_config(traefik_dynamic_conf['http']['routers'][panel_router_name], auth_domain, domain_to_cert_def)
 
     if services:
         compose_yaml = { 'services': services }
