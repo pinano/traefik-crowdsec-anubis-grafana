@@ -384,7 +384,8 @@ echo "⚙️  START: DYNAMIC CONFIGURATION GENERATION"
 echo "--------------------------------------------------------"
 
 echo "      🧹 Cleaning up old generated configurations..."
-{
+    mkdir -p ./config/traefik/dynamic-config
+    mkdir -p ./config/anubis
     : > ./config/traefik/dynamic-config/routers-generated.yaml
     : > ./config/anubis/botPolicy-generated.yaml
 } || {
