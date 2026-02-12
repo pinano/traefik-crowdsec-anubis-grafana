@@ -175,9 +175,10 @@ def process_router(entry, http_section, domain_to_cert_def):
         if not target.startswith("http"):
             target = f"https://{target}"
             
+        escaped_domain = domain.replace('.', r'\.')
         http_section['middlewares'][redirect_mw_name] = {
             'redirectRegex': {
-                'regex': f"^https?://{domain.replace('.', r'\.')}/(.*)",
+                'regex': f"^https?://{escaped_domain}/(.*)",
                 'replacement': f"{target}/${{1}}",
                 'permanent': True
             }
