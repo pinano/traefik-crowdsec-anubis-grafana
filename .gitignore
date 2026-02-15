@@ -26,3 +26,4 @@ config/anubis/assets/static/img/reject.webp
 
 # Python cache files
 __pycache__
+.venv/

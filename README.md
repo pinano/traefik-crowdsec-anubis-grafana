@@ -52,12 +52,12 @@ mkcert -install
 # 2. Add domains to /etc/hosts
 echo "127.0.0.1 myapp.local auth.myapp.local" | sudo tee -a /etc/hosts
 
-# 3. Run the interactive setup wizard
-./initialize-env.sh
+# 3. Initialize the environment
+make init
 # When prompted for environment, choose: local
 
 # 4. Start the stack
-./start.sh
+make start
 ```
 
 > [!TIP]
@@ -70,12 +70,12 @@ Uses Let's Encrypt **staging** certificates. Safe for testing without hitting ra
 ```bash
 # 1. Point your domain DNS to this server's public IP
 
-# 2. Run the interactive setup wizard
-./initialize-env.sh
+# 2. Initialize the environment
+make init
 # When prompted for environment, choose: staging
 
 # 3. Start the stack
-./start.sh
+make start
 ```
 
 > [!WARNING]
@@ -92,12 +92,10 @@ Uses real Let's Encrypt certificates. **Only use after successful staging test.*
 TRAEFIK_ACME_ENV_TYPE=production
 
 # 3. Clear old staging certificates
-rm config/traefik/acme.json
-touch config/traefik/acme.json
-chmod 600 config/traefik/acme.json
+make clean
 
 # 4. Restart the stack
-./start.sh
+make restart
 ```
 
 ### First Steps After Setup
@@ -468,14 +466,15 @@ A lightweight utility service that monitors the stack and sends Telegram alerts.
 
 | Action | Command |
 |--------|---------|
-| **Start/Update Stack** | `./start.sh` |
-| **Stop Stack** | `./stop.sh` |
+| **Start/Update Stack** | `make start` |
+| **Stop Stack** | `make stop` |
 | **View Live Logs** | `https://dozzle.<your-domain>` |
 | **Monitor Performance** | `docker compose -f docker-compose-tools.yaml run --rm ctop` |
+| **List Services** | `make services` |
 
 ### Security First Boot Sequence
 
-When you run `./start.sh`, the stack follows a strict "Defense First" order:
+When you run `make start`, the stack follows a strict "Defense First" order:
 
 1. **Environment Sync**: Validates your `.env` and ensures no critical settings are missing.
 2. **Security Layer**: Boots **CrowdSec** and **Redis** first.
@@ -488,7 +487,7 @@ When you run `./start.sh`, the stack follows a strict "Defense First" order:
 The stack manages security hashes for you. You don't need to manually generate `htpasswd` strings.
 
 1. **Manual Edit**: You can change any `_ADMIN_USER` or `_ADMIN_PASSWORD` directly in the `.env` file.
-2. **Auto-Detection**: When you run `./start.sh`, the script detects the change.
+2. **Auto-Detection**: When you run `make start`, the script detects the change.
 3. **Instant Sync**: It regenerates the secure hashes and updates your `.env` and running containers immediately.
 
 ### Monitoring Dashboards
@@ -695,7 +694,7 @@ This stack supports locally trusted certificates to prevent browser security war
 
 1. **Configure Environment**: Set `TRAEFIK_ACME_ENV_TYPE=local` in your `.env` file.
 
-2. **Generate Certificates**: When you run `./start.sh` with `TRAEFIK_ACME_ENV_TYPE=local`, the system will:
+2. **Generate Certificates**: When you run `make start` with `TRAEFIK_ACME_ENV_TYPE=local`, the system will:
     - Automatically scan your `/etc/hosts` for domains pointing to `127.0.0.1`.
     - Filter out defaults like `localhost` and `broadcasthost`.
     - Invoke `mkcert` to generate a single certificate covering all discovered domains.
@@ -703,11 +702,11 @@ This stack supports locally trusted certificates to prevent browser security war
     - Dynamically configure Traefik to use these certificates.
 
     > [!TIP]
-    > **Manual execution**: If you add new entries to `/etc/hosts` and want to refresh the certificate without a full restart, run `./create-local-certs.sh` manually.
+    > **Manual execution**: If you add new entries to `/etc/hosts` and want to refresh the certificate without a full restart, run `make certs`.
 
 3. **Start the Stack**:
     ```bash
-    ./start.sh
+    make start
     ```
     You will see: `🔐 Local Mode detected. Automating certificate generation...`
 
@@ -719,11 +718,13 @@ This stack supports locally trusted certificates to prevent browser security war
 .
 ├── .env.dist                              # Environment template
 ├── domains.csv.dist                       # Domain inventory template
-├── generate-config.py                     # Configuration generator
-├── initialize-env.sh                      # Interactive setup wizard
-├── create-local-certs.sh                  # Local SSL certificate generator (mkcert)
-├── start.sh                               # Deployment script
-├── stop.sh                                # Shutdown script
+├── Makefile                               # Project management commands
+├── scripts/                               # Core logic scripts
+│   ├── generate-config.py
+│   ├── initialize-env.sh
+│   ├── create-local-certs.sh
+│   ├── start.sh
+│   └── stop.sh
 │
 ├── certs/                                 # SSL certificates directory
 │
@@ -791,7 +792,7 @@ This stack supports locally trusted certificates to prevent browser security war
 
 ### Credentials sync failed
 
-- If your `.env` gets corrupted, delete the `_ADMIN_CREDS_SYNC` variables and the `_DASHBOARD_AUTH` hashes. Run `./start.sh` and the system will repair/regenerate them.
+- If your `.env` gets corrupted, delete the `_ADMIN_CREDS_SYNC` variables and the `_DASHBOARD_AUTH` hashes. Run `make start` and the system will repair/regenerate them.
 
 ### Anubis Cookie Issues
 

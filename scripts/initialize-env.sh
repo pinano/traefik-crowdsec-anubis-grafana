@@ -24,6 +24,34 @@ echo "========================================================"
 echo "      🤖 TRAEFIK + CROWDSEC + ANUBIS SETUP 🤖            "
 echo "========================================================"
 
+# ==============================================================================
+# PYTHON ENVIRONMENT SETUP
+# ==============================================================================
+echo "🐍 Checking Python environment..."
+
+# Check if python3 is installed
+if ! command -v python3 &> /dev/null; then
+    echo "❌ Error: python3 is not installed."
+    exit 1
+fi
+
+# Create virtual environment if it doesn't exist
+if [ ! -d ".venv" ]; then
+    echo "📦 Creating virtual environment (.venv)..."
+    python3 -m venv .venv
+fi
+
+# Install requirements
+if [ -f "requirements.txt" ]; then
+    echo "⬇️  Installing/Updating Python dependencies..."
+    ./.venv/bin/pip install -q -r requirements.txt || echo "⚠️  Warning: Failed to install dependencies. Check your internet connection."
+else
+    echo "⚠️  Warning: requirements.txt not found. Skipping dependency installation."
+fi
+
+echo "✅ Python environment ready."
+echo ""
+
 # 1. File Setup
 if [ ! -f "$DIST_FILE" ]; then
     echo "❌ Error: $DIST_FILE not found."

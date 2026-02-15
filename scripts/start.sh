@@ -46,9 +46,9 @@ ENV_FILE=".env"
 # 1. Check if .env exists, if not, initialize
 if [ ! -f "$ENV_FILE" ]; then
     echo "⚠️  $ENV_FILE not found. Running initialization..."
-    if [ -f "./initialize-env.sh" ]; then
-        chmod +x ./initialize-env.sh
-        ./initialize-env.sh
+    if [ -f "./scripts/initialize-env.sh" ]; then
+        chmod +x ./scripts/initialize-env.sh
+        ./scripts/initialize-env.sh
         exit 0
     else
         echo "❌ Error: initialize-env.sh not found. Please create $ENV_FILE manually."
@@ -417,8 +417,17 @@ if [ ! -f "domains.csv" ]; then
     echo "# domain, redirection, service, anubis_subdomain, rate, burst, concurrency" > domains.csv
 fi
 
+# Determine Python interpreter
+if [ -f ".venv/bin/python3" ]; then
+    PYTHON_CMD=".venv/bin/python3"
+elif [ -f "venv/bin/python3" ]; then
+    PYTHON_CMD="venv/bin/python3"
+else
+    PYTHON_CMD="python3"
+fi
+
 echo ""
-python3 generate-config.py | sed 's/^/   /'
+$PYTHON_CMD scripts/generate-config.py | sed 's/^/   /'
 echo ""
 
 echo "--------------------------------------------------------"
@@ -438,9 +447,9 @@ echo ""
 
 if [ "$TRAEFIK_ACME_ENV_TYPE" == "local" ]; then
     echo "🔐 Local Mode detected. Automating certificate generation..."
-    if [ -f "./create-local-certs.sh" ]; then
-        chmod +x ./create-local-certs.sh
-        ./create-local-certs.sh
+    if [ -f "./scripts/create-local-certs.sh" ]; then
+        chmod +x ./scripts/create-local-certs.sh
+        ./scripts/create-local-certs.sh
     else
         echo "   ⚠️ Warning: ./create-local-certs.sh not found. Skipping auto-generation."
     fi
