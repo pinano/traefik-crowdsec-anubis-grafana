@@ -53,9 +53,20 @@ DOCKER_COMPOSE := docker compose -p $(PROJECT_NAME) $(COMPOSE_FILES)
 # TARGETS
 # =============================================================================
 
+# Helper: Extract arguments for logs and shell commands
+# This allows using "make logs redis" instead of "make logs s=redis"
+SUPPORTED_COMMANDS := logs shell
+SUPPORTS_ARGS := $(filter $(firstword $(MAKECMDGOALS)),$(SUPPORTED_COMMANDS))
+ifneq "$(SUPPORTS_ARGS)" ""
+  # The remaining arguments are the service names
+  SERVICE_ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
+  # Turn them into do-nothing targets so make doesn't complain
+  $(eval $(SERVICE_ARGS):;@:)
+endif
+
 .PHONY: help
 help: ## Show this help message
-	@echo "Usage: make [target]"
+	@echo "Usage: make [target] [service]"
 	@echo ""
 	@echo "Targets:"
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -85,8 +96,12 @@ services: ## List available services
 	@$(DOCKER_COMPOSE) ps --services
 
 .PHONY: logs
-logs: ## Follow logs for all containers or a specific service (s=service_name)
-ifdef s
+logs: ## Follow logs for all containers or a specific service (usage: make logs [service])
+ifneq ($(strip $(SERVICE_ARGS)),)
+	@echo "Following logs for service: $(SERVICE_ARGS)..."
+	@sleep 2
+	@$(DOCKER_COMPOSE) logs -f $(SERVICE_ARGS)
+else ifdef s
 	@echo "Following logs for service: $(s)..."
 	@sleep 2
 	@$(DOCKER_COMPOSE) logs -f $(s)
@@ -97,11 +112,13 @@ else
 endif
 
 .PHONY: shell
-shell: ## Open a shell in a container (usage: make shell s=anubis)
-ifdef s
+shell: ## Open a shell in a container (usage: make shell [service])
+ifneq ($(strip $(SERVICE_ARGS)),)
+	@$(DOCKER_COMPOSE) exec -it $(SERVICE_ARGS) /bin/sh
+else ifdef s
 	@$(DOCKER_COMPOSE) exec -it $(s) /bin/sh
 else
-	@echo "Error: Please specify a service name using 's=service_name'."
+	@echo "Error: Please specify a service name (e.g., 'make shell anubis')."
 	@echo ""
 	@make services
 endif
