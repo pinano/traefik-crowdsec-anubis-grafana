@@ -12,6 +12,15 @@ SHELL := /bin/bash
 # Default target
 .DEFAULT_GOAL := help
 
+# Define Python interpreter (prioritizes virtual environment)
+ifneq (,$(wildcard .venv/bin/python3))
+    PYTHON := .venv/bin/python3
+else ifneq (,$(wildcard venv/bin/python3))
+    PYTHON := venv/bin/python3
+else
+    PYTHON := python3
+endif
+
 # Load environment variables from .env if it exists
 ifneq (,$(wildcard .env))
     include .env
@@ -112,11 +121,11 @@ services: ## List available services
 
 .PHONY: validate
 validate: ## Validate .env against .env.dist keys
-	@python3 scripts/validate-env.py
+	@$(PYTHON) scripts/validate-env.py
 
 .PHONY: sync
 sync: ## Synchronize .env with .env.dist (Add missing, remove extras)
-	@python3 scripts/validate-env.py --sync
+	@$(PYTHON) scripts/validate-env.py --sync
 
 .PHONY: logs
 logs: ## Follow logs for all containers or a specific service (usage: make logs [service])
@@ -202,11 +211,11 @@ certs-watch: ## Monitor ACME logs (Requires TRAEFIK_LOG_LEVEL=DEBUG in .env)
 
 .PHONY: certs-inspect
 certs-inspect: ## Analyze acme.json certificates against domains.csv
-	@python3 scripts/inspect-certs.py $(ARGS)
+	@$(PYTHON) scripts/inspect-certs.py $(ARGS)
 
 .PHONY: certs-inspect-v
 certs-inspect-v: ## Verbose certificate analysis (Lists all SANs)
-	@python3 scripts/inspect-certs.py -v
+	@$(PYTHON) scripts/inspect-certs.py -v
 
 
 
