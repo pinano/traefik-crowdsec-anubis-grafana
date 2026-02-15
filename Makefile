@@ -149,15 +149,19 @@ pull: ## Pull latest images
 	@$(DOCKER_COMPOSE) pull
 
 .PHONY: clean
-clean: ## Remove generated configuration files (Requires confirmation)
-	@echo "⚠️  WARNING: This will permanently delete the following files:"
-	@echo "   - config/traefik/dynamic-config/* (Generated Routers)"
-	@echo "   - config/traefik/acme.json        (SSL Certificates)"
+clean: ## Clean generated configs and backup certificates (Requires confirmation)
+	@echo "⚠️  WARNING: This action will:"
+	@echo "   - Permanently delete: config/traefik/dynamic-config/*"
+	@echo "   - Backup and remove:  config/traefik/acme.json"
 	@echo ""
 	@read -p "Are you sure you want to proceed? [y/N] " confirm; \
 	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
 		rm -rf config/traefik/dynamic-config/*; \
-		rm -f config/traefik/acme.json; \
+		if [ -f config/traefik/acme.json ]; then \
+			ts=$$(date +%Y%m%d%H%M%S); \
+			mv config/traefik/acme.json config/traefik/acme.json.$$ts; \
+			echo "📦 Backed up acme.json to acme.json.$$ts"; \
+		fi; \
 		echo "✅ Cleaned generated files."; \
 	else \
 		echo "Aborted."; \
