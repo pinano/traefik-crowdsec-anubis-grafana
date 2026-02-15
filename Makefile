@@ -99,11 +99,9 @@ services: ## List available services
 logs: ## Follow logs for all containers or a specific service (usage: make logs [service])
 ifneq ($(strip $(SERVICE_ARGS)),)
 	@echo "Following logs for service: $(SERVICE_ARGS)..."
-	@sleep 2
 	@$(DOCKER_COMPOSE) logs -f $(SERVICE_ARGS)
 else ifdef s
 	@echo "Following logs for service: $(s)..."
-	@sleep 2
 	@$(DOCKER_COMPOSE) logs -f $(s)
 else
 	@echo "Following logs for ALL services... (Use 'make services' to see list)"
@@ -118,7 +116,7 @@ ifneq ($(strip $(SERVICE_ARGS)),)
 else ifdef s
 	@$(DOCKER_COMPOSE) exec -it $(s) /bin/sh
 else
-	@echo "Error: Please specify a service name (e.g., 'make shell anubis')."
+	@echo "Error: Please specify a service name (e.g., 'make shell traefik')."
 	@echo ""
 	@make services
 endif

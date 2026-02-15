@@ -42,11 +42,12 @@ if [ ! -d ".venv" ]; then
 fi
 
 # Install requirements
-if [ -f "requirements.txt" ]; then
+# Install requirements
+if [ -f "scripts/requirements.txt" ]; then
     echo "⬇️  Installing/Updating Python dependencies..."
-    ./.venv/bin/pip install -q -r requirements.txt || echo "⚠️  Warning: Failed to install dependencies. Check your internet connection."
+    ./.venv/bin/pip install -q -r scripts/requirements.txt || echo "⚠️  Warning: Failed to install dependencies. Check your internet connection."
 else
-    echo "⚠️  Warning: requirements.txt not found. Skipping dependency installation."
+    echo "⚠️  Warning: scripts/requirements.txt not found. Skipping dependency installation."
 fi
 
 echo "✅ Python environment ready."
