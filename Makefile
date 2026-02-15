@@ -114,6 +114,10 @@ services: ## List available services
 validate: ## Validate .env against .env.dist keys
 	@python3 scripts/validate-env.py
 
+.PHONY: sync
+sync: ## Synchronize .env with .env.dist (Add missing, remove extras)
+	@python3 scripts/validate-env.py --sync
+
 .PHONY: logs
 logs: ## Follow logs for all containers or a specific service (usage: make logs [service])
 ifneq ($(strip $(SERVICE_ARGS)),)
