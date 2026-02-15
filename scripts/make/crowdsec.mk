@@ -2,7 +2,7 @@
 # Included conditionally in main Makefile
 
 .PHONY: crowdsec-metrics
-crowdsec-metrics: ## Show CrowdSec metrics (parsed logs, overflows)
+crowdsec-metrics: ## Show CrowdSec metrics (parsed logs, overflows)	
 	@$(call check_service,crowdsec,cscli metrics)
 
 .PHONY: crowdsec-decisions
