@@ -441,7 +441,33 @@ echo ""
 echo "--------------------------------------------------------"
 echo "✅ END: DYNAMIC CONFIGURATION GENERATION"
 echo "--------------------------------------------------------"
+echo "✅ END: DYNAMIC CONFIGURATION GENERATION"
+echo "--------------------------------------------------------"
 echo ""
+
+# Fix permissions if running internally (files created as root)
+if [[ "$DOMAIN_MANAGER_INTERNAL" == "true" ]]; then
+    echo "   🔧 Internal run detected. Fixing permissions for generated files..."
+    # We try to match the parent directory's ownership if possible, or just ensure readability
+    # Ideally we would know the host UID/GID, but making them world-readable (644) for config files is usually safe enough for Traefik to read.
+    # config/traefik/dynamic-config is mounted ro in Traefik, but Traefik needs to read it.
+    
+    chmod -R 644 ./config/traefik/dynamic-config/*.yaml
+    chmod -R 644 ./domains.csv
+    
+    # If we can, try to chown to the owner of the config dir (which is likely the host user)
+    # This might fail if the container doesn't see the host users, but we can try referencing the UID of the folder.
+    TARGET_UID=$(stat -c '%u' ./config/traefik)
+    TARGET_GID=$(stat -c '%g' ./config/traefik)
+    
+    if [ -n "$TARGET_UID" ] && [ -n "$TARGET_GID" ]; then
+         chown -R "$TARGET_UID:$TARGET_GID" ./config/traefik/dynamic-config
+         chown "$TARGET_UID:$TARGET_GID" ./domains.csv
+         echo "      ✅ Ownership fixed to $TARGET_UID:$TARGET_GID"
+    else
+         echo "      ⚠️  Could not determine target ownership. Left as root but readable."
+    fi
+fi
 
 # =============================================================================
 # PHASE 4B: Local SSL Trust (mkcert)
