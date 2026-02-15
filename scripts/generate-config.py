@@ -511,13 +511,17 @@ def generate_configs():
                 tls_configs.append(cert_def)
 
         print(f"   🔐 Processing certificate batches (Batch Size: {TLS_BATCH_SIZE})...")
-        for batch in tls_configs:
+        for idx, batch in enumerate(tls_configs, 1):
             domains_in_batch = [batch['main']] + batch.get('sans', [])
             san_count = len(batch.get('sans', []))
+            
+            # Get the root domain for this batch to show in logs
+            batch_root = get_root_domain(batch['main'])
+            
             if san_count > 0:
-                print(f"      🔐 Grouped Batch: {batch['main']} (+{san_count} SANs)")
+                print(f"      🔐 Batch #{idx} [{batch_root}]: {batch['main']} (+{san_count} SANs)")
             else:
-                print(f"      🔐 Grouped Batch: {batch['main']}")
+                print(f"      🔐 Batch #{idx} [{batch_root}]: {batch['main']}")
                 
             for d in domains_in_batch:
                 domain_to_cert_def[d] = batch
