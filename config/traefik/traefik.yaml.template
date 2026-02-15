@@ -1,6 +1,9 @@
 api:
   insecure: false
 
+# Enable ping for healthcheck
+ping: {}
+
 entryPoints:
 
   web:

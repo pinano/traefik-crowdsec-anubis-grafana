@@ -14,7 +14,7 @@ fi
 # Ensure output directory exists
 mkdir -p "$CERT_DIR"
 
-echo "🔍 Scanning /etc/hosts for 127.0.0.1 entries..."
+echo "   🔍 Scanning /etc/hosts for 127.0.0.1 entries..."
 
 # Extract all hostnames pointing to 127.0.0.1
 # 1. grep lines starting with 127.0.0.1
@@ -29,7 +29,7 @@ if [ -z "$DOMAINS" ]; then
     exit 1
 fi
 
-echo "✅ Found domains: $DOMAINS"
+echo "   ✅ Found domains: $DOMAINS"
 
 # Check if mkcert is installed
 if ! command -v mkcert &> /dev/null; then
@@ -37,16 +37,23 @@ if ! command -v mkcert &> /dev/null; then
     exit 1
 fi
 
-echo "🚀 Generating certificates with mkcert..."
+echo "   🚀 Generating certificates with mkcert..."
 
 # Generate certificate
 # We use the array of domains as separate arguments to mkcert
+# We use a subshell to capture output and indent it
+# But mkcert writes to stderr/stdout mixed.
+# Let's just indent the mkcert output itself or pipe it.
+# Piping might hide the interactive prompt if mkcert asks for password (sudo).
+# mkcert usually asks for sudo only on -install.
+# Let's just let mkcert output as is, it's hard to indent interactive commands.
+# But we can indent the success message.
 mkcert -cert-file "$CERT_DIR/local-cert.pem" -key-file "$CERT_DIR/local-key.pem" $DOMAINS
 
 if [ $? -eq 0 ]; then
-    echo "✨ Successfully generated local certificates:"
-    echo "   - Cert: $CERT_DIR/local-cert.pem"
-    echo "   - Key:  $CERT_DIR/local-key.pem"
+    echo "   ✨ Successfully generated local certificates:"
+    echo "      - Cert: $CERT_DIR/local-cert.pem"
+    echo "      - Key:  $CERT_DIR/local-key.pem"
 else
     echo "❌ Error: mkcert failed to generate certificates."
     exit 1

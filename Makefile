@@ -12,6 +12,12 @@ SHELL := /bin/bash
 # Default target
 .DEFAULT_GOAL := help
 
+# Load environment variables from .env if it exists
+ifneq (,$(wildcard .env))
+    include .env
+    export
+endif
+
 # =============================================================================
 # TARGETS
 # =============================================================================
@@ -99,14 +105,14 @@ services: ## List available services
 logs: ## Follow logs for all containers or a specific service (usage: make logs [service])
 ifneq ($(strip $(SERVICE_ARGS)),)
 	@echo "Following logs for service: $(SERVICE_ARGS)..."
-	@$(DOCKER_COMPOSE) logs -f $(SERVICE_ARGS)
+	@-$(DOCKER_COMPOSE) logs -f $(SERVICE_ARGS)
 else ifdef s
 	@echo "Following logs for service: $(s)..."
-	@$(DOCKER_COMPOSE) logs -f $(s)
+	@-$(DOCKER_COMPOSE) logs -f $(s)
 else
 	@echo "Following logs for ALL services... (Use 'make services' to see list)"
 	@sleep 2
-	@$(DOCKER_COMPOSE) logs -f
+	@-$(DOCKER_COMPOSE) logs -f
 endif
 
 .PHONY: shell
@@ -140,17 +146,35 @@ clean: ## Remove generated configuration files (Requires confirmation)
 		echo "Aborted."; \
 	fi
 
+# =============================================================================
+# OPTIONAL INCLUDES
+# =============================================================================
+
 # Only show 'certs' target if environment is local
 ifeq ($(TRAEFIK_ACME_ENV_TYPE),local)
-.PHONY: certs
-certs: ## Generate local certificates (calls create-local-certs.sh)
-	@./scripts/create-local-certs.sh
+    include scripts/make/certs.mk
 endif
 
-.PHONY: validate
-validate: ## Validate environment configuration
-	@if [ ! -f .env ]; then \
-		echo "Error: .env file missing. Run 'make init' first."; \
-		exit 1; \
-	fi
-	@python3 scripts/validate-env.py
+# Only show CrowdSec targets if enabled
+ifneq ($(CROWDSEC_DISABLE),true)
+    include scripts/make/crowdsec.mk
+endif
+
+.PHONY: redis-info
+redis-info: ## Show Redis server statistics
+	@$(DOCKER_COMPOSE) exec redis redis-cli -a "$${REDIS_PASSWORD}" INFO
+
+.PHONY: redis-monitor
+redis-monitor: ## Monitor Redis commands in real-time (Ctrl+C to stop)
+	@-$(DOCKER_COMPOSE) exec redis redis-cli -a "$${REDIS_PASSWORD}" MONITOR
+
+.PHONY: redis-ping
+redis-ping: ## Ping Redis server
+	@$(DOCKER_COMPOSE) exec redis redis-cli -a "$${REDIS_PASSWORD}" PING
+
+.PHONY: traefik-health
+traefik-health: ## Check Traefik health status
+	@echo "Checking Traefik health..."
+	@$(DOCKER_COMPOSE) exec traefik traefik healthcheck || echo "Traefik healthcheck command not available (using default image?)"
+	@echo "Checking process list:"
+	@$(DOCKER_COMPOSE) top traefik

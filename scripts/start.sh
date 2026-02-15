@@ -57,6 +57,7 @@ if [ ! -f "$ENV_FILE" ]; then
 fi
 
 # 1. Environment Preparation
+echo " --------------------------------------------------------"
 echo " [1/6] 📋 Preparing environment..."
 TEMP_ENV=$(mktemp)
 ADDED_VARS=0
@@ -167,7 +168,7 @@ validate_env() {
 validate_env | sed 's/^/   /'
 
 
-
+echo " --------------------------------------------------------"
 echo " [2/6] 🔐 Synchronizing credentials & paths..."
 echo "   🛡️ Checking admin credentials sync..."
 
@@ -275,7 +276,7 @@ else
 fi
 
 
-
+echo " --------------------------------------------------------"
 echo " [3/6] 🎨 Preparing application assets..."
 echo "   🛡️ Checking Anubis assets..."
 
@@ -379,10 +380,9 @@ fi
 
 # Generate dynamic configuration with Python script
 echo ""
-echo "--------------------------------------------------------"
-echo "⚙️  START: DYNAMIC CONFIGURATION GENERATION"
-echo "--------------------------------------------------------"
-
+echo "      --------------------------------------------------------"
+echo "      ⚙️  START: DYNAMIC CONFIGURATION GENERATION"
+echo "      --------------------------------------------------------"
 echo "      🧹 Cleaning up old generated configurations..."
 {
     mkdir -p ./config/traefik/dynamic-config
@@ -426,8 +426,6 @@ else
     PYTHON_CMD="python3"
 fi
 
-echo ""
-echo ""
 # Check dependencies before running
 if ! $PYTHON_CMD -c "import tldextract; import yaml" >/dev/null 2>&1; then
     echo "❌ Error: Python dependencies missing (tldextract, pyyaml)."
@@ -435,12 +433,12 @@ if ! $PYTHON_CMD -c "import tldextract; import yaml" >/dev/null 2>&1; then
     exit 1
 fi
 
+echo "      📄 Invoking generate-config.py for dynamic config generation..."
 $PYTHON_CMD scripts/generate-config.py | sed 's/^/   /'
-echo ""
 
-echo "--------------------------------------------------------"
-echo "✅ END: DYNAMIC CONFIGURATION GENERATION"
-echo "--------------------------------------------------------"
+echo "      --------------------------------------------------------"
+echo "      ✅ END: DYNAMIC CONFIGURATION GENERATION"
+echo "      --------------------------------------------------------"
 echo ""
 
 # Fix permissions if running internally (files created as root)
@@ -489,7 +487,7 @@ fi
 # If local certificates are found AND we are in local mode, configure Traefik to use them.
 
 if [ "$TRAEFIK_ACME_ENV_TYPE" == "local" ]; then
-    echo "🔐 Local Mode detected. Automating certificate generation..."
+    echo "   🔐 Local Mode detected. Automating certificate generation..."
     if [ -f "./scripts/create-local-certs.sh" ]; then
         chmod +x ./scripts/create-local-certs.sh
         ./scripts/create-local-certs.sh
@@ -497,7 +495,7 @@ if [ "$TRAEFIK_ACME_ENV_TYPE" == "local" ]; then
         echo "   ⚠️ Warning: ./create-local-certs.sh not found. Skipping auto-generation."
     fi
 
-    echo "🔐 Checking for local trusted certificates (Local Mode)..."
+    echo "   🔐 Checking for local trusted certificates (Local Mode)..."
     CERTS_DIR="./config/traefik/certs-local-dev"
     TRAEFIK_CERTS_CONF="./config/traefik/dynamic-config/local-certs.yaml"
 
@@ -525,7 +523,7 @@ else
 fi
 
 
-
+echo " --------------------------------------------------------"
 echo " [4/6] 🌐 Preparing network & security layer..."
 echo "   🛡️ Checking CrowdSec IP whitelist..."
 WHITELIST_FILE="./config/crowdsec/parsers/ip-whitelist.yaml"
@@ -667,7 +665,7 @@ if [ "$APACHE_HOST_AVAILABLE" == "true" ]; then
 fi
 
 
-
+echo " --------------------------------------------------------"
 echo " [5/6] 👮 Booting security layer..."
 
 if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
@@ -753,7 +751,7 @@ fi
 # --remove-orphans cleans up any old containers not in current config.
 
 
-
+echo " --------------------------------------------------------"
 echo " [6/6] 🚀 Deploying application services..."
 
 # If running inside domain-manager, exclude it from the 'up' command to avoid killing this script
@@ -771,9 +769,30 @@ echo "   🔍 Verifying Core DNS records..."
 CORE_SUBS=("traefik" "domains" "dozzle" "grafana")
 MISSING_DNS=()
 
+# Helper for DNS resolution (cross-platform)
+resolve_host() {
+    local host="$1"
+    if command -v getent >/dev/null 2>&1; then
+        getent ahosts "$host" >/dev/null 2>&1
+        return $?
+    elif command -v host >/dev/null 2>&1; then
+        host -t A "$host" >/dev/null 2>&1
+        return $?
+    elif command -v ping >/dev/null 2>&1; then
+        # Ping once, timeout 1s. Mac usage: -c 1 -t 1. Linux usage: -c 1 -W 1.
+        # We try a common subset or fallback.
+        ping -c 1 -t 1 "$host" >/dev/null 2>&1 || ping -c 1 -W 1 "$host" >/dev/null 2>&1
+        return $?
+    else
+        # Fallback: simple grep in /etc/hosts for local dev, though imperfect for real DNS
+        grep -q "[[:space:]]$host" /etc/hosts
+        return $?
+    fi
+}
+
 for sub in "${CORE_SUBS[@]}"; do
     TARGET_FQDN="$sub.$DOMAIN"
-    if ! getent ahosts "$TARGET_FQDN" >/dev/null 2>&1; then
+    if ! resolve_host "$TARGET_FQDN"; then
         MISSING_DNS+=("$TARGET_FQDN")
     fi
 done
