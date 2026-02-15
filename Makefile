@@ -195,7 +195,9 @@ traefik-health: ## Check Traefik health status
 .PHONY: watch-certs
 watch-certs: ## Monitor Let's Encrypt certificate generation (grep logs)
 	@echo "Monitoring ACME/Certificate logs... (Ctrl+C to stop)"
-	@$(DOCKER_COMPOSE) logs -f traefik | grep --line-buffered -iE 'challenge|obtained|Adding certificate|responded|validated|error|fail' | grep --line-buffered -vE 'Looking for|No ACME.*generation required|RequestHost'
+	@$(DOCKER_COMPOSE) logs -f traefik | \
+		grep --line-buffered -iE 'obtained|validated|solve.*challenge|acme.*error|fail' | \
+		grep --line-buffered -vE 'Trying to challenge|Adding certificate|Looking for|No ACME.*required|RequestHost|global-compress'
 
 
 
