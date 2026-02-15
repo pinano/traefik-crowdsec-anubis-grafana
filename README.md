@@ -510,78 +510,32 @@ The watchdog sends Telegram notifications for:
 
 ### CrowdSec Operations
 
-All CrowdSec commands use `cscli` inside the container. Since the stack uses multiple Compose files, the most direct way to run commands is using `docker exec`:
+The easiest way to interact with CrowdSec is using the `Makefile` shortcuts.
+
+#### Inspection & Lists
 
 ```bash
-docker exec -it stack-crowdsec-1 cscli <command>
-```
-
-> [!NOTE]
-> If you changed `PROJECT_NAME` in your `.env`, replace `stack` with your project name.
-
-#### Decision Management (Bans)
-
-```bash
-# Ban an IP
-docker exec -it stack-crowdsec-1 cscli decisions add --ip <IP> --duration 24h --reason "Manual Ban"
-
-# Ban an IP range (CIDR)
-docker exec -it stack-crowdsec-1 cscli decisions add --range 192.168.1.0/24 --duration 24h --reason "Subnet ban"
-
-# Unban an IP
-docker exec -it stack-crowdsec-1 cscli decisions delete --ip <IP>
-
-# List active bans
-docker exec -it stack-crowdsec-1 cscli decisions list
-```
-
-#### Metrics & Statistics
-
-```bash
-# View real-time metrics
-docker exec -it stack-crowdsec-1 cscli metrics
+# View active decisions (bans)
+make crowdsec-decisions
 
 # List recent alerts
-docker exec -it stack-crowdsec-1 cscli alerts list
+make crowdsec-alerts
 
-# View detailed alert information
-docker exec -it stack-crowdsec-1 cscli alerts inspect <ALERT_ID>
+# View real-time metrics
+make crowdsec-metrics
 ```
 
-#### Hub Management
+#### Advanced Management (Manual)
+
+For complex operations (like adding bans with specific reasons), execute `cscli` directly inside the container via `docker compose`:
 
 ```bash
-# Update the hub index
-docker exec -it stack-crowdsec-1 cscli hub update
+# Access the CrowdSec shell
+make shell crowdsec
+# Then run: cscli decisions add ...
 
-# Upgrade all installed components
-docker exec -it stack-crowdsec-1 cscli hub upgrade
-
-# Install a new collection (e.g., for WordPress)
-docker exec -it stack-crowdsec-1 cscli collections install crowdsecurity/wordpress
-```
-
-#### Bouncer Management
-
-```bash
-# Check bouncer status
-docker exec -it stack-crowdsec-1 cscli bouncers list
-
-# Delete a bouncer
-docker exec -it stack-crowdsec-1 cscli bouncers delete <bouncer_name>
-```
-
-#### Diagnostic Commands
-
-```bash
-# Check CrowdSec health
-docker exec -it stack-crowdsec-1 cscli lapi status
-
-# Validate configuration
-docker exec -it stack-crowdsec-1 cscli config show
-
-# Test log parsing (dry-run)
-docker exec -it stack-crowdsec-1 cscli explain --file /var/log/traefik/access.log --type traefik
+# Or run one-off commands
+docker compose -f docker-compose-traefik-crowdsec-redis.yaml exec crowdsec cscli decisions add --ip <IP> --duration 24h --reason "Manual Ban"
 ```
 
 > [!TIP]

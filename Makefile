@@ -59,6 +59,15 @@ DOCKER_COMPOSE := docker compose -p $(PROJECT_NAME) $(COMPOSE_FILES)
 # TARGETS
 # =============================================================================
 
+# Helper: Check if a service is running (or exists) before executing a command
+# Usage: $(call check_service,service_name,command)
+check_service = \
+	if [ -z "$$($(DOCKER_COMPOSE) ps -q $(1))" ]; then \
+		echo "Service '$(1)' is not running."; \
+	else \
+		$(DOCKER_COMPOSE) exec $(1) $(2); \
+	fi
+
 # Helper: Extract arguments for logs and shell commands
 # This allows using "make logs redis" instead of "make logs s=redis"
 SUPPORTED_COMMANDS := logs shell
@@ -150,15 +159,7 @@ clean: ## Remove generated configuration files (Requires confirmation)
 # OPTIONAL INCLUDES
 # =============================================================================
 
-# Only show 'certs' target if environment is local
-ifeq ($(TRAEFIK_ACME_ENV_TYPE),local)
-    include scripts/make/certs.mk
-endif
-
-# Only show CrowdSec targets if enabled
-ifneq ($(CROWDSEC_DISABLE),true)
-    include scripts/make/crowdsec.mk
-endif
+# (Moved Optional Includes to end of file)
 
 .PHONY: redis-info
 redis-info: ## Show Redis server statistics
@@ -178,3 +179,19 @@ traefik-health: ## Check Traefik health status
 	@$(DOCKER_COMPOSE) exec traefik traefik healthcheck || echo "Traefik healthcheck command not available (using default image?)"
 	@echo "Checking process list:"
 	@$(DOCKER_COMPOSE) top traefik
+
+
+
+# =============================================================================
+# OPTIONAL INCLUDES
+# =============================================================================
+
+# Local Certificates (only if environment is local)
+ifeq ($(TRAEFIK_ACME_ENV_TYPE),local)
+    include scripts/make/certs.mk
+endif
+
+# CrowdSec Targets (only if enabled)
+ifneq ($(CROWDSEC_DISABLE),true)
+    include scripts/make/crowdsec.mk
+endif
