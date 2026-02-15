@@ -427,6 +427,14 @@ else
 fi
 
 echo ""
+echo ""
+# Check dependencies before running
+if ! $PYTHON_CMD -c "import tldextract; import yaml" >/dev/null 2>&1; then
+    echo "❌ Error: Python dependencies missing (tldextract, pyyaml)."
+    echo "   👉 Please run 'make init' to set up the environment."
+    exit 1
+fi
+
 $PYTHON_CMD scripts/generate-config.py | sed 's/^/   /'
 echo ""
 

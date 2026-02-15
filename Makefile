@@ -39,6 +39,10 @@ endif
 # Extract PROJECT_NAME from .env (default to 'stack' if not found)
 PROJECT_NAME := $(shell grep '^PROJECT_NAME=' .env 2>/dev/null | cut -d= -f2 || echo stack)
 
+# Suppress warnings for variables set dynamically in start.sh
+export TRAEFIK_CONFIG_HASH ?= ""
+export TRAEFIK_CERT_RESOLVER ?= ""
+
 # Base Docker Compose command
 DOCKER_COMPOSE := docker compose -p $(PROJECT_NAME) $(COMPOSE_FILES)
 

@@ -29,13 +29,14 @@ Get the stack running in minutes. Choose the environment that matches your needs
 ### Prerequisites
 
 - **Docker Engine** & **Docker Compose** (v2.x+)
-- **Python 3** with required modules:
+- **Make** (usually pre-installed, or via `build-essential`)
+- **Python 3** (modules are auto-installed):
   ```bash
   # Debian/Ubuntu
-  sudo apt install python3-yaml python3-tldextract
+  sudo apt install make python3-venv python3-pip
   
-  # macOS
-  pip3 install pyyaml tldextract
+  # RHEL/Fedora
+  sudo dnf install make python3-pip
   ```
 - Ports `80` and `443` free on the host machine.
 
