@@ -34,7 +34,7 @@ ADMIN_PASS = os.environ.get('DOMAIN_MANAGER_ADMIN_PASSWORD', 'admin')
 # Mirror the host path inside the container
 BASE_DIR = os.environ.get('DOMAIN_MANAGER_APP_PATH_HOST', os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 CSV_PATH = os.path.join(BASE_DIR, 'domains.csv')
-START_SCRIPT = os.path.join(BASE_DIR, 'start.sh')
+START_SCRIPT = os.path.join(BASE_DIR, 'scripts/start.sh')
 
 print(f"DEBUG: BASE_DIR={BASE_DIR}")
 print(f"DEBUG: CSV_PATH={CSV_PATH}")

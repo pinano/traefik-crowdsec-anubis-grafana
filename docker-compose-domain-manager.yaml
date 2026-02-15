@@ -20,8 +20,7 @@ services:
       - ./domains.csv:${DOMAIN_MANAGER_APP_PATH_HOST}/domains.csv
       - ./.env:${DOMAIN_MANAGER_APP_PATH_HOST}/.env
       - ./.env.dist:${DOMAIN_MANAGER_APP_PATH_HOST}/.env.dist:ro
-      - ./start.sh:${DOMAIN_MANAGER_APP_PATH_HOST}/start.sh:ro
-      - ./generate-config.py:${DOMAIN_MANAGER_APP_PATH_HOST}/generate-config.py:ro
+      - ./scripts:${DOMAIN_MANAGER_APP_PATH_HOST}/scripts:ro
       - ./docker-compose-traefik-crowdsec-redis.yaml:${DOMAIN_MANAGER_APP_PATH_HOST}/docker-compose-traefik-crowdsec-redis.yaml:ro
       - ./docker-compose-tools.yaml:${DOMAIN_MANAGER_APP_PATH_HOST}/docker-compose-tools.yaml:ro
       - ./docker-compose-anubis-base.yaml:${DOMAIN_MANAGER_APP_PATH_HOST}/docker-compose-anubis-base.yaml:ro
