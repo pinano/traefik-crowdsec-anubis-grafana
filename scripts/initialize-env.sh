@@ -187,6 +187,7 @@ prompt_val "TRAEFIK_TIMEOUT_IDLE" "Traefik idle timeout in seconds"
 prompt_val "TRAEFIK_BLOCKED_PATHS" "Global Blocked Paths (e.g. /wp-admin/,/admin/)"
 prompt_val "TRAEFIK_BAD_USER_AGENTS" "Bad User Agents (regex, comma-separated)"
 prompt_val "TRAEFIK_ACCESS_LOG_BUFFER" "Access Log Buffer Size"
+prompt_val "TRAEFIK_LOG_LEVEL" "Traefik Log Level (DEBUG/INFO/WARN/ERROR)"
 prompt_val "TRAEFIK_HSTS_MAX_AGE" "HSTS max age (seconds)"
 prompt_val "TRAEFIK_FRAME_ANCESTORS" "Allowed Iframe Ancestors (e.g. https://my-other-web.com)"
 

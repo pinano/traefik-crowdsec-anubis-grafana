@@ -244,6 +244,11 @@ Access the management interface at `https://domains.<your-domain>`.
 - **Value `1000` (Production)**: Batches log writes to improve performance and reduce I/O under high traffic.
 - **Value `0` or `1` (Testing/Debugging)**: Disables buffering, making every request appear in the logs **instantly**. Use this while testing native blocking (User-Agent or Paths) to verify it's working.
 
+#### Debugging Log Level
+
+To see detailed ACME/Let's Encrypt generation logs, set `TRAEFIK_LOG_LEVEL=DEBUG` in your `.env` file and restart the stack. This will show validation challenges and certificate acquisition steps in the `make watch-certs` command.
+DEFAULT: `INFO`
+
 #### Traefik Timeouts
 
 Legacy applications or slow backends (e.g., heavy PHP/WordPress) may require adjusted timeouts.

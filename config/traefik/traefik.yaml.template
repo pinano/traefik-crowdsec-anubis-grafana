@@ -68,7 +68,7 @@ providers:
     watch: true
 
 log:
-  level: INFO
+  level: TRAEFIK_LOG_LEVEL_PLACEHOLDER
 
 accessLog:
   format: json
