@@ -110,6 +110,10 @@ services: ## List available services
 	@echo "Available services:"
 	@$(DOCKER_COMPOSE) ps --services
 
+.PHONY: validate
+validate: ## Validate .env against .env.dist keys
+	@python3 scripts/validate-env.py
+
 .PHONY: logs
 logs: ## Follow logs for all containers or a specific service (usage: make logs [service])
 ifneq ($(strip $(SERVICE_ARGS)),)

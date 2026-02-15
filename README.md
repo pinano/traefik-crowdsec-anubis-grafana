@@ -479,6 +479,7 @@ A lightweight utility service that monitors the stack and sends Telegram alerts.
 | **Service Status** | `make status` |
 | **Follow Logs** | `make logs` (or `make logs s=traefik`) |
 | **Open Container Shell** | `make shell traefik` |
+| **Validate Environment** | `make validate` |
 | **Show Help** | `make help` |
 
 ### Security First Boot Sequence
