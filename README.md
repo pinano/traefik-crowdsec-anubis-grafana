@@ -469,9 +469,12 @@ A lightweight utility service that monitors the stack and sends Telegram alerts.
 |--------|---------|
 | **Start/Update Stack** | `make start` |
 | **Stop Stack** | `make stop` |
-| **View Live Logs** | `https://dozzle.<your-domain>` |
-| **Monitor Performance** | `docker compose -f docker-compose-tools.yaml run --rm ctop` |
+| **Restart Stack** | `make restart` |
 | **List Services** | `make services` |
+| **Service Status** | `make status` |
+| **Follow Logs** | `make logs` (or `make logs s=traefik`) |
+| **Open Container Shell** | `make shell traefik` |
+| **Show Help** | `make help` |
 
 ### Security First Boot Sequence
 
