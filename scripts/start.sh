@@ -453,7 +453,8 @@ if [[ "$DOMAIN_MANAGER_INTERNAL" == "true" ]]; then
     # config/traefik/dynamic-config is mounted ro in Traefik, but Traefik needs to read it.
     
     chmod -R 644 ./config/traefik/dynamic-config/*.yaml
-    chmod -R 644 ./domains.csv
+    chmod 644 ./config/traefik/traefik-generated.yaml
+    chmod 644 ./domains.csv
     
     # If we can, try to chown to the owner of the config dir (which is likely the host user)
     # This might fail if the container doesn't see the host users, but we can try referencing the UID of the folder.
