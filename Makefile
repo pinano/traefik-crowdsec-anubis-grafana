@@ -201,8 +201,12 @@ certs-watch: ## Monitor ACME logs (Requires TRAEFIK_LOG_LEVEL=DEBUG in .env)
 		grep --line-buffered -vE 'Trying to challenge|Adding certificate|Looking for|No ACME.*required|RequestHost|global-compress|BasicAuth|Authentication failed'
 
 .PHONY: certs-inspect
-certs-inspect: ## Analyze acme.json certificates against domains.csv (Use ARGS="-v" for details)
+certs-inspect: ## Analyze acme.json certificates against domains.csv
 	@python3 scripts/inspect-certs.py $(ARGS)
+
+.PHONY: certs-inspect-v
+certs-inspect-v: ## Verbose certificate analysis (Lists all SANs)
+	@python3 scripts/inspect-certs.py -v
 
 
 

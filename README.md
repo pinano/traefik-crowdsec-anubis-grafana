@@ -483,6 +483,7 @@ A lightweight utility service that monitors the stack and sends Telegram alerts.
 | **Sync Environment** | `make sync` |
 | **Watch Certificates** | `make certs-watch` (Requires `DEBUG` traefik logs) |
 | **Inspect Certificates**| `make certs-inspect` |
+| **Inspect Detailed** | `make certs-inspect-v` |
 | **Show Help** | `make help` |
 
 ### Security First Boot Sequence

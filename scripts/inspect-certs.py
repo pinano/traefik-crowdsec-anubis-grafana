@@ -93,12 +93,8 @@ def inspect_certs(verbose=False):
                 san_str = f" (+{len(cert['sans'])} SANs)" if cert['sans'] else ""
                 print(f"   {i}. Main: {cert['main']}{san_str}")
                 if cert['sans']:
-                    # Limit SANs display if there are too many (avoid terminal flood)
-                    max_sans = 10
-                    for s in cert['sans'][:max_sans]:
+                    for s in cert['sans']:
                         print(f"      - {s}")
-                    if len(cert['sans']) > max_sans:
-                        print(f"      ... and {len(cert['sans']) - max_sans} more SANs")
 
     expected_domains = load_expected_domains()
     missing = expected_domains - covered_domains
