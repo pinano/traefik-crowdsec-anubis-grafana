@@ -374,7 +374,7 @@ fi
 if [ -f "./config/traefik/traefik-generated.yaml" ]; then
     TRAEFIK_CONFIG_HASH=$(cat ./config/traefik/traefik-generated.yaml | generate_hash)
     export TRAEFIK_CONFIG_HASH
-    echo "      #️⃣ Traefik Config Hash: $TRAEFIK_CONFIG_HASH"
+    echo "      #️⃣  Traefik Config Hash: $TRAEFIK_CONFIG_HASH"
 fi
 
 # Generate dynamic configuration with Python script

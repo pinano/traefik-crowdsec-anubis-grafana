@@ -648,7 +648,7 @@ def generate_policy_file():
         print(f"   ⚠️ WARN: {input_policy} not found, skipping policy generation.")
         return
 
-    print(f"   🛡 Anubis: Generating security policy...")
+    print(f"   🛡  Anubis: Generating security policy...")
 
     try:
         with open(input_policy, 'r') as f:

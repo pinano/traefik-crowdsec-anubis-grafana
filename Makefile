@@ -43,6 +43,9 @@ PROJECT_NAME := $(shell grep '^PROJECT_NAME=' .env 2>/dev/null | cut -d= -f2 || 
 export TRAEFIK_CONFIG_HASH ?= ""
 export TRAEFIK_CERT_RESOLVER ?= ""
 
+# Extract TRAEFIK_ACME_ENV_TYPE from .env
+TRAEFIK_ACME_ENV_TYPE := $(shell grep '^TRAEFIK_ACME_ENV_TYPE=' .env 2>/dev/null | cut -d= -f2)
+
 # Base Docker Compose command
 DOCKER_COMPOSE := docker compose -p $(PROJECT_NAME) $(COMPOSE_FILES)
 
@@ -84,9 +87,12 @@ services: ## List available services
 .PHONY: logs
 logs: ## Follow logs for all containers or a specific service (s=service_name)
 ifdef s
+	@echo "Following logs for service: $(s)..."
+	@sleep 2
 	@$(DOCKER_COMPOSE) logs -f $(s)
 else
 	@echo "Following logs for ALL services... (Use 'make services' to see list)"
+	@sleep 2
 	@$(DOCKER_COMPOSE) logs -f
 endif
 
@@ -106,26 +112,30 @@ pull: ## Pull latest images
 
 .PHONY: clean
 clean: ## Remove generated configuration files (Requires confirmation)
-	@read -p "Are you sure you want to remove generated configs/certs? [y/N] " confirm; \
+	@echo "⚠️  WARNING: This will permanently delete the following files:"
+	@echo "   - config/traefik/dynamic-config/* (Generated Routers)"
+	@echo "   - config/traefik/acme.json        (SSL Certificates)"
+	@echo ""
+	@read -p "Are you sure you want to proceed? [y/N] " confirm; \
 	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
 		rm -rf config/traefik/dynamic-config/*; \
 		rm -f config/traefik/acme.json; \
-		echo "Cleaned generated files."; \
+		echo "✅ Cleaned generated files."; \
 	else \
 		echo "Aborted."; \
 	fi
 
+# Only show 'certs' target if environment is local
+ifeq ($(TRAEFIK_ACME_ENV_TYPE),local)
 .PHONY: certs
 certs: ## Generate local certificates (calls create-local-certs.sh)
 	@./scripts/create-local-certs.sh
+endif
 
 .PHONY: validate
 validate: ## Validate environment configuration
-	@# Extract validation logic if possible, or just run start.sh with a dry-run flag if we implement one.
-	@# For now, we can just check if .env exists
 	@if [ ! -f .env ]; then \
 		echo "Error: .env file missing. Run 'make init' first."; \
 		exit 1; \
-	else \
-		echo "Environment file exists. Run 'make start' to perform full validation."; \
 	fi
+	@python3 scripts/validate-env.py
