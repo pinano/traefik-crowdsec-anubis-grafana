@@ -441,8 +441,6 @@ echo ""
 echo "--------------------------------------------------------"
 echo "✅ END: DYNAMIC CONFIGURATION GENERATION"
 echo "--------------------------------------------------------"
-echo "✅ END: DYNAMIC CONFIGURATION GENERATION"
-echo "--------------------------------------------------------"
 echo ""
 
 # Fix permissions if running internally (files created as root)
@@ -452,9 +450,19 @@ if [[ "$DOMAIN_MANAGER_INTERNAL" == "true" ]]; then
     # Ideally we would know the host UID/GID, but making them world-readable (644) for config files is usually safe enough for Traefik to read.
     # config/traefik/dynamic-config is mounted ro in Traefik, but Traefik needs to read it.
     
-    chmod -R 644 ./config/traefik/dynamic-config/*.yaml
-    chmod 644 ./config/traefik/traefik-generated.yaml
+    # Robust permission fix: Directories 755, Files 644
+    find ./config/traefik -type d -exec chmod 755 {} \;
+    find ./config/traefik -type f -name "*.yaml" -exec chmod 644 {} \;
+    find ./config/traefik -type f -name "*.json" -exec chmod 600 {} \; # acme.json needs 600
     chmod 644 ./domains.csv
+    
+    # Ensure acme.json is strictly 600 (override the find above if needed, though find catches json)
+    # But acme.json should NOT be world readable? Traefik generally wants 600.
+    # If find set it to 644 (if ended in yaml?), no. acme.json ends in json.
+    # We explicitly force acme.json to 600 just in case.
+    if [ -f "./config/traefik/acme.json" ]; then
+        chmod 600 ./config/traefik/acme.json
+    fi
     
     # If we can, try to chown to the owner of the config dir (which is likely the host user)
     # This might fail if the container doesn't see the host users, but we can try referencing the UID of the folder.
