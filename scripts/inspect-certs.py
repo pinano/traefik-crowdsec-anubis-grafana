@@ -68,13 +68,15 @@ def inspect_certs(verbose=False):
                     
                     if main:
                         covered_domains.add(main)
-                        for san in sans:
+                        # Deduplicate main from SANs for display purposes
+                        sans_cleaned = [s for s in sans if s != main]
+                        for san in sans_cleaned:
                             covered_domains.add(san)
                         
                         certificates_details.append({
                             'resolver': resolver_name,
                             'main': main,
-                            'sans': sans,
+                            'sans': sans_cleaned,
                             'root': get_root_domain(main)
                         })
 
