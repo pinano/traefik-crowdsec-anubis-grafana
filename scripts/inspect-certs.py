@@ -2,6 +2,7 @@ import json
 import csv
 import os
 import tldextract
+import argparse
 from collections import defaultdict
 
 ACME_FILE = 'config/traefik/acme.json'
@@ -39,7 +40,7 @@ def load_expected_domains():
     
     return expected
 
-def inspect_certs():
+def inspect_certs(verbose=False):
     print(f"🔍 Inspecting Certificates in {ACME_FILE}...")
     
     if not os.path.exists(ACME_FILE) or os.path.getsize(ACME_FILE) == 0:
@@ -54,29 +55,52 @@ def inspect_certs():
             return
 
     covered_domains = set()
-    cert_count = 0
+    certificates_details = []
     
     # Traefik acme.json structure: { "resolverName": { "Certificates": [...] } }
     for resolver_name, resolver_data in acme_data.items():
         if isinstance(resolver_data, dict) and 'Certificates' in resolver_data:
             certs = resolver_data['Certificates']
-            cert_count += len(certs)
             for cert in certs:
                 if 'domain' in cert:
-                    main = cert['domain'].get('main')
+                    main = cert['domain'].get('main', '').lower()
+                    sans = [s.lower() for s in cert['domain'].get('sans', [])]
+                    
                     if main:
-                        covered_domains.add(main.lower())
-                    sans = cert['domain'].get('sans', [])
-                    for san in sans:
-                        covered_domains.add(san.lower())
+                        covered_domains.add(main)
+                        for san in sans:
+                            covered_domains.add(san)
+                        
+                        certificates_details.append({
+                            'resolver': resolver_name,
+                            'main': main,
+                            'sans': sans,
+                            'root': get_root_domain(main)
+                        })
 
-    print(f"✅ Found {cert_count} certificates covering {len(covered_domains)} unique domains.")
+    print(f"✅ Found {len(certificates_details)} certificates covering {len(covered_domains)} unique domains.")
     
-    expected_domains = load_expected_domains()
-    if not expected_domains:
-        print("ℹ️  No domains found in domains.csv to compare.")
-        return
+    if verbose and certificates_details:
+        print("\n📜 DETAILED CERTIFICATE LIST:")
+        # Group by root for better readability in verbose mode
+        by_root = defaultdict(list)
+        for cert in certificates_details:
+            by_root[cert['root']].append(cert)
+            
+        for root, certs in sorted(by_root.items()):
+            print(f"\n📂 Root Domain: {root}")
+            for i, cert in enumerate(certs, 1):
+                san_str = f" (+{len(cert['sans'])} SANs)" if cert['sans'] else ""
+                print(f"   {i}. Main: {cert['main']}{san_str}")
+                if cert['sans']:
+                    # Limit SANs display if there are too many (avoid terminal flood)
+                    max_sans = 10
+                    for s in cert['sans'][:max_sans]:
+                        print(f"      - {s}")
+                    if len(cert['sans']) > max_sans:
+                        print(f"      ... and {len(cert['sans']) - max_sans} more SANs")
 
+    expected_domains = load_expected_domains()
     missing = expected_domains - covered_domains
     
     print(f"\n📊 Summary vs {DOMAINS_FILE}:")
@@ -88,8 +112,12 @@ def inspect_certs():
         print("\n❌ MISSING DOMAINS (No certificate found):")
         for d in sorted(missing):
             print(f"   ➜ {d}")
-    else:
+    elif expected_domains:
         print("\n✨ All domains from domains.csv are covered by current certificates.")
 
 if __name__ == "__main__":
-    inspect_certs()
+    parser = argparse.ArgumentParser(description="Inspect Traefik acme.json certificates.")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Show detailed certificate information")
+    args = parser.parse_args()
+    
+    inspect_certs(verbose=args.verbose)

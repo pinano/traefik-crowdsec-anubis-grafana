@@ -246,7 +246,7 @@ Access the management interface at `https://domains.<your-domain>`.
 
 #### Debugging Log Level
 
-To see detailed ACME/Let's Encrypt generation logs, set `TRAEFIK_LOG_LEVEL=DEBUG` in your `.env` file and restart the stack. This will show validation challenges and certificate acquisition steps in the `make watch-certs` command.
+To see detailed ACME/Let's Encrypt generation logs, set `TRAEFIK_LOG_LEVEL=DEBUG` in your `.env` file and restart the stack. This will show validation challenges and certificate acquisition steps in the `make certs-watch` command.
 DEFAULT: `INFO`
 
 #### Traefik Timeouts
@@ -481,6 +481,8 @@ A lightweight utility service that monitors the stack and sends Telegram alerts.
 | **Open Container Shell** | `make shell traefik` |
 | **Validate Environment** | `make validate` |
 | **Sync Environment** | `make sync` |
+| **Watch Certificates** | `make certs-watch` (Requires `DEBUG` traefik logs) |
+| **Inspect Certificates**| `make certs-inspect` |
 | **Show Help** | `make help` |
 
 ### Security First Boot Sequence

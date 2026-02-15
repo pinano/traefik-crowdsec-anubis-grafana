@@ -193,15 +193,16 @@ traefik-health: ## Check Traefik health status
 	@$(DOCKER_COMPOSE) top traefik
 
 .PHONY: watch-certs
-watch-certs: ## Monitor Let's Encrypt certificate generation (grep logs)
+.PHONY: certs-watch
+certs-watch: ## Monitor ACME logs (Requires TRAEFIK_LOG_LEVEL=DEBUG in .env)
 	@echo "Monitoring ACME/Certificate logs... (Ctrl+C to stop)"
 	@$(DOCKER_COMPOSE) logs -f traefik | \
 		grep --line-buffered -iE 'obtained|validated|solve.*challenge|acme.*error|fail' | \
 		grep --line-buffered -vE 'Trying to challenge|Adding certificate|Looking for|No ACME.*required|RequestHost|global-compress|BasicAuth|Authentication failed'
 
-.PHONY: inspect-certs
-inspect-certs: ## Analyze acme.json certificates against domains.csv
-	@python3 scripts/inspect-certs.py
+.PHONY: certs-inspect
+certs-inspect: ## Analyze acme.json certificates against domains.csv (Use ARGS="-v" for details)
+	@python3 scripts/inspect-certs.py $(ARGS)
 
 
 
