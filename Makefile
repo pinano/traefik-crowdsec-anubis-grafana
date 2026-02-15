@@ -180,6 +180,11 @@ traefik-health: ## Check Traefik health status
 	@echo "Checking process list:"
 	@$(DOCKER_COMPOSE) top traefik
 
+.PHONY: watch-certs
+watch-certs: ## Monitor Let's Encrypt certificate generation (grep logs)
+	@echo "Monitoring ACME/Certificate logs... (Ctrl+C to stop)"
+	@$(DOCKER_COMPOSE) logs -f traefik | grep --line-buffered -iE 'legit|acme|certificate|resolver' | grep -v 'RequestHost'
+
 
 
 # =============================================================================
