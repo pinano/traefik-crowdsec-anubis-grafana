@@ -34,13 +34,19 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"
-      - "traefik.http.routers.domain-manager.rule=Host(`domains.${DOMAIN}`)"
+      - "traefik.http.routers.domain-manager.rule=Host(`dashboard.${DOMAIN}`)"
+      - "traefik.http.routers.domain-manager.priority=1"
       - "traefik.http.routers.domain-manager.entrypoints=websecure"
       - "traefik.http.routers.domain-manager.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-}"
       - "traefik.http.services.domain-manager.loadbalancer.server.port=5000"
-      # Basic Auth can be added here or handled in-app as requested
-      # - "traefik.http.routers.domain-manager.middlewares=domain-manager-auth"
-      # - "traefik.http.middlewares.domain-manager-auth.basicauth.users=${DOMAIN_MANAGER_DASHBOARD_AUTH}"
+      # --- SSO Middlewares Definition (to be used by other services) ---
+      # 1. Forward Auth: checks /auth-check
+      - "traefik.http.middlewares.dashboard-auth.forwardauth.address=http://domain-manager:5000/auth-check"
+      - "traefik.http.middlewares.dashboard-auth.forwardauth.trustForwardHeader=true"
+      # 2. Error Page: Redirects 401 to /login
+      - "traefik.http.middlewares.dashboard-error.errors.status=401"
+      - "traefik.http.middlewares.dashboard-error.errors.service=domain-manager@docker"
+      - "traefik.http.middlewares.dashboard-error.errors.query=/login"
 
 networks:
   traefik:

@@ -345,7 +345,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadDomains() {
         try {
-            const response = await fetch('/api/domains');
+            const response = await fetch('/dm-api/domains');
             const data = await response.json();
             // Assign unique IDs for reactive tracking and calculate root domain
             allDomains = data.map(d => {
@@ -369,7 +369,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadServices() {
         try {
-            const response = await fetch('/api/services');
+            const response = await fetch('/dm-api/services');
             allServices = await response.json();
         } catch (error) {
             console.error('Error loading services:', error);
@@ -701,7 +701,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const task = async () => {
                     try {
-                        const response = await fetch('/api/check-domain', {
+                        const response = await fetch('/dm-api/check-domain', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -806,7 +806,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .map(getCleanPayload);
 
         try {
-            const response = await fetch('/api/domains', {
+            const response = await fetch('/dm-api/domains', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -970,7 +970,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.classList.remove('has-notification');
         restartBtn.classList.remove('btn-restart-needed');
 
-        const eventSource = new EventSource(`/api/restart-stream?csrf_token=${csrfToken}`);
+        const eventSource = new EventSource(`/dm-api/restart-stream?csrf_token=${csrfToken}`);
 
         eventSource.onmessage = (event) => {
             if (event.data.trim() === "[Process finished with code 0]") {

@@ -767,7 +767,7 @@ fi
 sleep 1
 
 echo "   🔍 Verifying Core DNS records..."
-CORE_SUBS=("traefik" "domains" "dozzle" "grafana")
+CORE_SUBS=("dashboard")
 MISSING_DNS=()
 
 # Helper for DNS resolution (cross-platform)
@@ -822,9 +822,10 @@ echo "✅ DEPLOYMENT COMPLETE! (Total time: ${DURATION}s)"
 echo "========================================================"
 echo ""
 echo "🌐 Core Services:"
-echo "   ➜ Traefik Dashboard: https://traefik.$DOMAIN"
-echo "   ➜ Domain Manager:    https://domains.$DOMAIN"
-echo "   ➜ Dozzle (Logs):     https://dozzle.$DOMAIN"
-echo "   ➜ Grafana (Metrics): https://grafana.$DOMAIN"
-echo "========================================================"
+    echo -e "   ➜ Dashboard Home:  https://dashboard.${DOMAIN}/"
+    echo -e "   ➜ Domain Manager:  https://dashboard.${DOMAIN}/domains"
+    echo -e "   ➜ Traefik:         https://dashboard.${DOMAIN}/traefik/"
+    echo -e "   ➜ Dozzle (Logs):   https://dashboard.${DOMAIN}/dozzle/"
+    echo -e "   ➜ Grafana:         https://dashboard.${DOMAIN}/grafana/"
+    echo -e "========================================================"
 echo ""

@@ -191,44 +191,15 @@ prompt_val "TRAEFIK_LOG_LEVEL" "Traefik Log Level (DEBUG/INFO/WARN/ERROR)"
 prompt_val "TRAEFIK_HSTS_MAX_AGE" "HSTS max age (seconds)"
 prompt_val "TRAEFIK_FRAME_ANCESTORS" "Allowed Iframe Ancestors (e.g. https://my-other-web.com)"
 
-prompt_val "TRAEFIK_ADMIN_USER" "Traefik Admin User"
-prompt_val "TRAEFIK_ADMIN_PASSWORD" "Traefik Admin Password"
-
-# Smart defaults for other services
-TR_USER=$(grep "^TRAEFIK_ADMIN_USER=" "$ENV_FILE" | cut -d'=' -f2-)
-TR_PASS=$(grep "^TRAEFIK_ADMIN_PASSWORD=" "$ENV_FILE" | cut -d'=' -f2-)
-
-# --- DOZZLE CREDENTIALS ---
+# --- DASHBOARD CREDENTIALS (SSO) ---
 echo ""
-echo "👉 Dozzle Admin Credentials (leave empty to use Traefik's)"
-read -p "   User [${TR_USER}]: " dz_user
-[ -z "$dz_user" ] && dz_user="$TR_USER"
-replace_val "DOZZLE_ADMIN_USER" "$dz_user"
-
-read -p "   Password [${TR_PASS}]: " dz_pass
-[ -z "$dz_pass" ] && dz_pass="$TR_PASS"
-replace_val "DOZZLE_ADMIN_PASSWORD" "$dz_pass"
-
-# --- GRAFANA CREDENTIALS ---
-echo ""
-echo "👉 Grafana Admin Credentials (leave empty to use Traefik's)"
-read -p "   User [${TR_USER}]: " gr_user
-[ -z "$gr_user" ] && gr_user="$TR_USER"
-replace_val "GRAFANA_ADMIN_USER" "$gr_user"
-
-read -p "   Password [${TR_PASS}]: " gr_pass
-[ -z "$gr_pass" ] && gr_pass="$TR_PASS"
-replace_val "GRAFANA_ADMIN_PASSWORD" "$gr_pass"
-
-# --- DOMAIN MANAGER CREDENTIALS ---
-echo ""
-echo "👉 Domain Manager Admin Credentials (leave empty to use Traefik's)"
-read -p "   User [${TR_USER}]: " dm_user
-[ -z "$dm_user" ] && dm_user="$TR_USER"
+echo "👉 Dashboard Admin Credentials (SSO for all services)"
+read -p "   User [admin]: " dm_user
+[ -z "$dm_user" ] && dm_user="admin"
 replace_val "DOMAIN_MANAGER_ADMIN_USER" "$dm_user"
 
-read -p "   Password [${TR_PASS}]: " dm_pass
-[ -z "$dm_pass" ] && dm_pass="$TR_PASS"
+read -p "   Password [password]: " dm_pass
+[ -z "$dm_pass" ] && dm_pass="password"
 replace_val "DOMAIN_MANAGER_ADMIN_PASSWORD" "$dm_pass"
 
 prompt_val "WATCHDOG_TELEGRAM_BOT_TOKEN" "Telegram Bot Token (for Let's Encrypt renewal alerts)"
@@ -268,32 +239,10 @@ else
     fi
 fi
 
-# 2. TRAEFIK & DOZZLE DASHBOARD AUTH (Auto-generated)
-echo ""
-echo "🔐 Generating Authentication Hashes..."
-# Traefik
-T_USER=$(grep "^TRAEFIK_ADMIN_USER=" "$ENV_FILE" | cut -d'=' -f2-)
-T_PASS=$(grep "^TRAEFIK_ADMIN_PASSWORD=" "$ENV_FILE" | cut -d'=' -f2-)
-if [ -n "$T_USER" ] && [ -n "$T_PASS" ]; then
-    echo "   ⏳ Hashing Traefik credentials..."
-    T_HASH=$(docker run --rm httpd:alpine htpasswd -Bbn "$T_USER" "$T_PASS")
-    replace_val "TRAEFIK_DASHBOARD_AUTH" "'$T_HASH'"
-    T_SYNC=$(echo -n "${T_USER}:${T_PASS}" | sha1sum | cut -d' ' -f1)
-    replace_val "TRAEFIK_ADMIN_CREDS_SYNC" "$T_SYNC"
-    echo "   ✅ Updated TRAEFIK_DASHBOARD_AUTH and sync check"
-fi
-
-# Dozzle
-D_USER=$(grep "^DOZZLE_ADMIN_USER=" "$ENV_FILE" | cut -d'=' -f2-)
-D_PASS=$(grep "^DOZZLE_ADMIN_PASSWORD=" "$ENV_FILE" | cut -d'=' -f2-)
-if [ -n "$D_USER" ] && [ -n "$D_PASS" ]; then
-    echo "   ⏳ Hashing Dozzle credentials..."
-    D_HASH=$(docker run --rm httpd:alpine htpasswd -Bbn "$D_USER" "$D_PASS")
-    replace_val "DOZZLE_DASHBOARD_AUTH" "'$D_HASH'"
-    D_SYNC=$(echo -n "${D_USER}:${D_PASS}" | sha1sum | cut -d' ' -f1)
-    replace_val "DOZZLE_ADMIN_CREDS_SYNC" "$D_SYNC"
-    echo "   ✅ Updated DOZZLE_DASHBOARD_AUTH and sync check"
-fi
+# 2. TRAEFIK & DOZZLE DASHBOARD AUTH (REMOVED - Managed by Domain Manager SSO)
+# echo ""
+# echo "🔐  Authentication is managed by Domain Manager (SSO)."
+# echo "    Legacy basic auth generation skipped."
 
 # 3. CROWDSEC_API_KEY
 DISABLE_CS=$(grep "^CROWDSEC_DISABLE=" "$ENV_FILE" | cut -d'=' -f2-)

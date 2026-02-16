@@ -117,9 +117,14 @@
                 </div>
             </div>
             <div class="actions">
-                <a href="{{ url_for('index') }}" class="btn btn-secondary">
-                    <i data-lucide="arrow-left"></i> Back to Dashboard
-                </a>
+                <div class="actions">
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                        <i data-lucide="layout-grid"></i> Dashboard
+                    </a>
+                    <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                        <i data-lucide="arrow-left"></i> Back to Domains
+                    </a>
+                </div>
             </div>
         </header>
 

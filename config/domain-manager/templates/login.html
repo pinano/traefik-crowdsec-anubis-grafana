@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - {{ domain }} - Domain Manager</title>
+    <title>Login - dashboard.{{ domain }}</title>
     <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}" type="image/png">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link
@@ -15,13 +15,16 @@
 <body class="login-page">
     <div class="login-container">
         <div class="login-box">
-            <h1>domains.{{ domain }}</h1>
+            <h1>dashboard.{{ domain }}</h1>
 
             {% if error %}
             <div class="alert alert-danger">{{ error }}</div>
             {% endif %}
 
-            <form method="POST">
+            <form method="POST" action="{{ url_for('login') }}">
+                {% if next %}
+                <input type="hidden" name="next" value="{{ next }}">
+                {% endif %}
                 <div class="form-group">
                     <label for="username">Username</label>
                     <input type="text" id="username" name="username" required autofocus>

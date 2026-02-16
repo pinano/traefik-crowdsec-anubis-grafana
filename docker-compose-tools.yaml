@@ -9,6 +9,7 @@ services:
     networks:
       - traefik
     environment:
+      - DOZZLE_BASE=/dozzle
       - TZ=${TZ}
     volumes:
       - /etc/localtime:/etc/localtime:ro
@@ -22,14 +23,14 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"
       # Dashboard
-      - "traefik.http.routers.dozzle.rule=Host(`dozzle.${DOMAIN}`)"
+      - "traefik.http.routers.dozzle.rule=Host(`dashboard.${DOMAIN}`) && PathPrefix(`/dozzle`)"
+      - "traefik.http.routers.dozzle.priority=100"
       - "traefik.http.routers.dozzle.entrypoints=websecure"
       - "traefik.http.routers.dozzle.tls.certresolver=${TRAEFIK_CERT_RESOLVER}"
       # Service: Tell Traefik that Dozzle listens on internal port 8080
       - "traefik.http.services.dozzle.loadbalancer.server.port=8080"
-      # Basic Auth for Dozzle
-      - "traefik.http.routers.dozzle.middlewares=dozzle-auth-middleware"
-      - "traefik.http.middlewares.dozzle-auth-middleware.basicauth.users=${DOZZLE_DASHBOARD_AUTH}"
+      # SSO Middleware (Error middleware must be first)
+      - "traefik.http.routers.dozzle.middlewares=dashboard-error@docker,dashboard-auth@docker"
 
   # ===========================
   #  CTOP: Explicitly invoked with: docker compose run --rm ctop
