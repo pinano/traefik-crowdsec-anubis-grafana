@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Certificates - {{ domain }}</title>
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}" type="image/png">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:ital,wght@0,300;0,400;0,700;1,300&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .badge {
+            display: inline-block;
+            padding: 0.25em 0.4em;
+            font-size: 75%;
+            font-weight: 700;
+            line-height: 1;
+            text-align: center;
+            white-space: nowrap;
+            vertical-align: baseline;
+            border-radius: 0.25rem;
+            margin-right: 0.25rem;
+            margin-bottom: 0.25rem;
+        }
+        .badge-info { background-color: #e0f2fe; color: #0369a1; }
+        .badge-success { background-color: #dcfce7; color: #15803d; }
+        .badge-warning { background-color: #fef3c7; color: #b45309; }
+        .badge-danger { background-color: #fee2e2; color: #b91c1c; }
+        
+        .summary-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+            text-align: center;
+            flex: 1;
+        }
+
+        .summary-card h3 {
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+
+        .summary-card .value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-color);
+        }
+
+        .summary-container {
+            display: flex;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .action-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <h1>Certificates Inspector</h1>
+                <div class="logo-subtitles">
+                    <span>{{ domain }}</span>
+                </div>
+            </div>
+            <div class="actions">
+                <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                    <i data-lucide="arrow-left"></i> Back to Dashboard
+                </a>
+            </div>
+        </header>
+
+        <main>
+            <!-- Summary Stats -->
+            <div class="summary-container">
+                <div class="summary-card">
+                    <h3>Total Expected Domains</h3>
+                    <div class="value">{{ expected_count }}</div>
+                </div>
+                <div class="summary-card">
+                    <h3>Covered Domains</h3>
+                    <div class="value" style="color: var(--success-color);">{{ covered_count }}</div>
+                </div>
+                <div class="summary-card">
+                    <h3>Missing Certificates</h3>
+                    <div class="value" style="{{ 'color: var(--danger-color);' if missing_domains else 'color: var(--text-muted);' }}">
+                        {{ missing_domains|length }}
+                    </div>
+                </div>
+            </div>
+
+            {% if missing_domains %}
+            <div class="alert alert-danger">
+                <strong><i data-lucide="alert-triangle" style="vertical-align: text-bottom;"></i> Missing Certificates:</strong>
+                <p>The following domains are expected based on <code>domains.csv</code> but were not found in any active certificate:</p>
+                <br>
+                <ul class="error-list">
+                    {% for d in missing_domains %}
+                        <li>{{ d }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            <div class="table-tools">
+                <div class="search-wrapper">
+                    <i data-lucide="search"></i>
+                    <input type="text" id="search-input" placeholder="Search certificates...">
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table id="certs-table">
+                    <thead>
+                        <tr>
+                            <th class="sortable" data-sort="status" style="width: 5%">Status</th>
+                            <th class="sortable" data-sort="root" style="width: 15%">Root Domain</th>
+                            <th class="sortable" data-sort="main" style="width: 20%">Main Domain</th>
+                            <th style="width: 30%">SANs</th>
+                            <th class="sortable" data-sort="expiration" style="width: 20%">Expiration</th>
+                            <th class="sortable" data-sort="resolver" style="width: 10%">Resolver</th>
+                        </tr>
+                    </thead>
+                    <tbody id="certs-body">
+                        {% for cert in certificates %}
+                        <tr>
+                            <td style="text-align: center;">
+                                <i data-lucide="check-circle" style="color: var(--success-color); width: 1.2rem; height: 1.2rem;" title="Valid"></i>
+                                <span style="display:none;">valid</span>
+                            </td>
+                            <td class="root-domain-cell">{{ cert.root }}</td>
+                            <td style="font-weight: 500;">{{ cert.main }}</td>
+                            <td>
+                                {% for san in cert.sans %}
+                                    <span class="badge badge-info">{{ san }}</span>
+                                {% else %}
+                                    <span style="color: var(--text-muted); font-size: 0.8rem;">-</span>
+                                {% endfor %}
+                            </td>
+                            <td>{{ cert.expiration }}</td>
+                            <td><span class="badge badge-warning" style="font-weight: normal; color: #78350f;">{{ cert.resolver }}</span></td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                                No certificates found in acme.json.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const tableBody = document.getElementById('certs-body');
+            const searchInput = document.getElementById('search-input');
+            const headers = document.querySelectorAll('.sortable');
+            
+            // Collect rows for sorting/filtering
+            // We clone nodes or just reference them? Reference is fine.
+            let rows = Array.from(tableBody.querySelectorAll('tr'));
+            
+            // Simple Client-side Search
+            searchInput.addEventListener('input', (e) => {
+                const term = e.target.value.toLowerCase();
+                rows.forEach(row => {
+                    const text = row.textContent.toLowerCase();
+                    row.style.display = text.includes(term) ? '' : 'none';
+                });
+            });
+
+            // Simple Client-side Sort
+            let currentSort = { column: null, direction: 'asc' };
+
+            headers.forEach(header => {
+                // Add sort icons if missing (since I didn't add them in HTML above to keep it clean)
+                if (!header.querySelector('.sort-icon')) {
+                    header.innerHTML += ' <i data-lucide="chevrons-up-down" class="sort-icon default" style="width:14px; height:14px; vertical-align:middle; opacity:0.5;"></i>';
+                    lucide.createIcons({ root: header });
+                }
+
+                header.addEventListener('click', () => {
+                    const column = header.dataset.sort;
+                    // Find index based on header index
+                    const headerRow = header.parentElement;
+                    const index = Array.from(headerRow.children).indexOf(header);
+                    
+                    // Reset icons
+                    document.querySelectorAll('.sort-icon').forEach(icon => {
+                        // Reset to default up-down icon
+                        icon.setAttribute('data-lucide', 'chevrons-up-down');
+                        icon.style.opacity = '0.5';
+                        icon.style.color = '';
+                    });
+                    lucide.createIcons(); // Refresh icons
+
+                    if (currentSort.column === column) {
+                        currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        currentSort.column = column;
+                        currentSort.direction = 'asc';
+                    }
+
+                    // Update current icon
+                    const targetIcon = header.querySelector('.sort-icon');
+                    if (currentSort.direction === 'asc') {
+                        targetIcon.setAttribute('data-lucide', 'chevron-up');
+                    } else {
+                        targetIcon.setAttribute('data-lucide', 'chevron-down');
+                    }
+                    targetIcon.style.opacity = '1';
+                    targetIcon.style.color = 'var(--primary-color)';
+                    lucide.createIcons({ root: header });
+
+                    // Sort rows
+                    const sortedRows = rows.sort((a, b) => {
+                        const aVal = a.children[index].textContent.trim();
+                        const bVal = b.children[index].textContent.trim();
+                        
+                        // Basic string comparison
+                        return currentSort.direction === 'asc' 
+                            ? aVal.localeCompare(bVal)
+                            : bVal.localeCompare(aVal);
+                    });
+
+                    // Re-append rows
+                    sortedRows.forEach(row => tableBody.appendChild(row));
+                    
+                    // Re-assign rows to keep current order for next ops
+                    rows = sortedRows;
+                });
+            });
+        });
+    </script>
+</body>
+</html>

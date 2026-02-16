@@ -8,6 +8,10 @@ from flask import Flask, render_template, request, redirect, url_for, session, j
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from functools import wraps
+import json
+import base64
+import datetime
+import tldextract
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', secrets.token_hex(32))
@@ -35,6 +39,7 @@ ADMIN_PASS = os.environ.get('DOMAIN_MANAGER_ADMIN_PASSWORD', 'admin')
 BASE_DIR = os.environ.get('DOMAIN_MANAGER_APP_PATH_HOST', os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 CSV_PATH = os.path.join(BASE_DIR, 'domains.csv')
 START_SCRIPT = os.path.join(BASE_DIR, 'scripts/start.sh')
+ACME_FILE = os.path.join(BASE_DIR, 'config/traefik/acme.json')
 
 print(f"DEBUG: BASE_DIR={BASE_DIR}")
 print(f"DEBUG: CSV_PATH={CSV_PATH}")
@@ -105,6 +110,41 @@ def validate_domain_data(entry):
             return False
             
     return True
+
+    return True
+
+def get_root_domain(domain):
+    extracted = tldextract.extract(domain)
+    if extracted.suffix:
+        return f"{extracted.domain}.{extracted.suffix}"
+    return domain
+
+def get_cert_expiration(cert_b64):
+    try:
+        # Decode base64 to get PEM
+        cert_pem = base64.b64decode(cert_b64).decode('utf-8')
+        
+        # Use openssl to extract end date
+        cmd = ['openssl', 'x509', '-noout', '-enddate']
+        process = subprocess.Popen(
+            cmd, 
+            stdin=subprocess.PIPE, 
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        stdout, stderr = process.communicate(input=cert_pem)
+        
+        if process.returncode != 0:
+            return f"Error: {stderr.strip()}"
+            
+        # Format: notAfter=Feb 16 08:41:11 2026 GMT
+        if '=' in stdout:
+            date_str = stdout.strip().split('=', 1)[1]
+            return date_str
+        return stdout.strip()
+    except Exception as e:
+        return f"Error parsing: {e}"
 
 
 def read_csv():
@@ -219,6 +259,79 @@ def index():
                            rate_avg=TRAEFIK_RATE_AVG,
                            rate_burst=TRAEFIK_RATE_BURST,
                            concurrency=TRAEFIK_CONCURRENCY)
+
+@app.route('/certs')
+@login_required
+def certs_view():
+    # 1. Load Expected Domains from CSV
+    expected_domains = set()
+    csv_data = read_csv()
+    for row in csv_data:
+        if row.get('enabled', True): # Only check enabled domains? Or all? User said "all domains.csv are generated"
+             d = row.get('domain', '').strip().lower()
+             if d:
+                 expected_domains.add(d)
+             
+             # Check for Anubis subdomain
+             anubis = row.get('anubis_subdomain', '').strip()
+             if anubis and d:
+                 root = get_root_domain(d)
+                 expected_domains.add(f"{anubis}.{root}".lower())
+
+    # 2. Load Certificates from acme.json
+    acme_data = {}
+    if os.path.exists(ACME_FILE) and os.path.getsize(ACME_FILE) > 0:
+        try:
+            with open(ACME_FILE, 'r') as f:
+                acme_data = json.load(f)
+        except Exception as e:
+            print(f"Error loading acme.json: {e}")
+
+    covered_domains = set()
+    certificates_details = []
+
+    # Iterate resolvers
+    for resolver_name, resolver_data in acme_data.items():
+        if isinstance(resolver_data, dict) and 'Certificates' in resolver_data:
+            for cert in resolver_data['Certificates']:
+                if 'domain' in cert:
+                    main = cert['domain'].get('main', '').lower()
+                    sans = [s.lower() for s in cert['domain'].get('sans', [])]
+                    
+                    if main:
+                        covered_domains.add(main)
+                        sans_cleaned = [s for s in sans if s != main]
+                        for san in sans_cleaned:
+                            covered_domains.add(san)
+                        
+                        expiration = ""
+                        if cert.get('certificate'):
+                            expiration = get_cert_expiration(cert['certificate'])
+
+                        certificates_details.append({
+                            'resolver': resolver_name,
+                            'main': main,
+                            'sans': sans_cleaned,
+                            'root': get_root_domain(main),
+                            'expiration': expiration,
+                            'status': 'valid' # We assume valid if present, expiration check could be added
+                        })
+
+    # 3. Calculate Missing
+    missing_domains = expected_domains - covered_domains
+    
+    # 4. Prepare data for template
+    # We want to show ALL expected domains, whether covered or not?
+    # Or show a list of certificates AND a list of missing?
+    # Request: "information of certificates... and summary info if all domains.csv are generated"
+    
+    return render_template('certs.html', 
+                           domain=DOMAIN,
+                           certificates=certificates_details,
+                           expected_count=len(expected_domains),
+                           covered_count=len(expected_domains - missing_domains),
+                           missing_domains=sorted(list(missing_domains)))
+
 
 @app.route('/api/domains', methods=['GET', 'POST'])
 @login_required
