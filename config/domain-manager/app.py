@@ -333,27 +333,16 @@ def check_host_file(domain):
 
 def get_external_services():
     try:
-        # Get list of services from docker ps or docker compose
-        # We want services that are part of our stack. 
-        # Using docker compose ps --services might be best if we can run it.
-        # Alternatively, list all containers on the same network?
-        # Let's stick to a simple docker format command that lists names.
-        # But wait, the original logic probably used docker compose or docker ps.
-        # Let's try to query docker API via curl if available or subprocess docker.
-        
-        # We will use the docker socket if mapped, or just subprocess 'docker'
-        # Requires 'docker' CLI to be installed in image. It is (we use it for restart).
-        # Use docker ps to get the 'com.docker.compose.service' label.
-        # This returns the service name defined in docker-compose.yaml (e.g. 'traefik', 'dozzle')
-        # regardless of the folder name/project prefix.
-        cmd = ["docker", "ps", "--format", '{{.Label "com.docker.compose.service"}}']
+        # Per user request: strictly use container names.
+        # This allows selecting specific containers like 'ib1-api' vs 'ib2-api'.
+        # NOTE: This means for stack services you must use the full container name (e.g. stack-traefik-1)
+        cmd = ["docker", "ps", "--format", "{{.Names}}"]
         result = subprocess.run(cmd, capture_output=True, text=True)
         
         if result.returncode == 0:
             services = result.stdout.strip().split('\n')
-            # Filter empty strings (in case some containers don't have the label) and duplicates
             unique_services = sorted(list(set([s.strip() for s in services if s.strip()])))
-            # print(f"DEBUG: Found services: {unique_services}")
+            print(f"DEBUG: Found containers: {unique_services}")
             return unique_services
         
         print(f"DEBUG: Error running docker ps: {result.stderr}")
