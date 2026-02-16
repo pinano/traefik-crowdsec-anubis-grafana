@@ -547,6 +547,7 @@ def check_domain():
     # (e.g. dev.local defined in host /etc/hosts but not in container DNS).
     # If we are in local mode, we relax this check but verify against /etc/hosts via mount
     if not expected_ip:
+        TRAEFIK_ACME_ENV_TYPE = os.environ.get('TRAEFIK_ACME_ENV_TYPE', 'local')
         if TRAEFIK_ACME_ENV_TYPE == 'local':
              if check_host_file(host_domain):
                  expected_ip = '127.0.0.1' # Dummy fallback for comparison logic

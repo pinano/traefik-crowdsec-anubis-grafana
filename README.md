@@ -472,20 +472,25 @@ A lightweight utility service that monitors the stack and sends Telegram alerts.
 
 | Action | Command |
 |--------|---------|
+| **Initialize Env** | `make init` |
 | **Start/Update Stack** | `make start` |
 | **Stop Stack** | `make stop` |
 | **Restart Stack** | `make restart` |
 | **Rebuild Services** | `make rebuild` (rebuilds custom images) |
+| **Pull Images** | `make pull` |
 | **List Services** | `make services` |
 | **Service Status** | `make status` |
 | **Monitor Containers** | `make ctop` |
-| **Follow Logs** | `make logs` (or `make logs s=traefik`) |
-| **Open Container Shell** | `make shell traefik` |
+| **Follow Logs** | `make logs [service]` |
+| **Open Shell** | `make shell [service]` |
 | **Validate Environment** | `make validate` |
 | **Sync Environment** | `make sync` |
-| **Watch Certificates** | `make certs-watch` (Requires `DEBUG` traefik logs) |
+| **Clean Artifacts** | `make clean` (Interactive) |
+| **Watch Certificates** | `make certs-watch` (Requires `DEBUG` logs) |
 | **Certificates Info**| `make certs-info` (Summary) |
 | **Inspect Certificates** | `make certs-inspect` (Detailed) |
+| **Traefik Health** | `make traefik-health` |
+| **Redis Stats** | `make redis-info` / `make redis-monitor` |
 | **Show Help** | `make help` |
 
 ### Security First Boot Sequence
