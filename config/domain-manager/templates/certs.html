@@ -180,23 +180,20 @@
                     <tbody id="certs-body">
                         {% for cert in certificates %}
                         <tr class="{{ 'superseded-row' if cert.superseded else '' }}"
-                            style="{{ 'opacity: 0.6; background-color: #f9fafb;' if cert.superseded else '' }}">
+                            style="{{ 'opacity: 0.7; background-color: #ededed;' if cert.superseded else '' }}">
                             <td data-label="Status" style="text-align: center;">
                                 {% if cert.status == 'valid' %}
                                 <i data-lucide="check-circle"
                                     style="color: var(--success-color); width: 1.2rem; height: 1.2rem;"
                                     title="Valid"></i>
-                                <span style="display:none;">valid</span>
                                 {% elif cert.status == 'warning' %}
                                 <i data-lucide="alert-triangle"
                                     style="color: var(--warning-color); width: 1.2rem; height: 1.2rem;"
                                     title="Expiring Soon"></i>
-                                <span style="display:none;">warning</span>
                                 {% else %}
                                 <i data-lucide="x-octagon"
                                     style="color: var(--danger-color); width: 1.2rem; height: 1.2rem;"
                                     title="Expired/Invalid"></i>
-                                <span style="display:none;">expired</span>
                                 {% endif %}
                                 {% if cert.superseded %}
                                 <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;">SUPERSEDED
@@ -227,8 +224,8 @@
                                     {{ cert.expiration }}
                                 </span>
                                 {% if cert.superseded %}
-                                <br><span class="badge badge-superseded"
-                                    style="font-size: 0.65rem; margin-top: 2px;">NOT IN USE</span>
+                                <br><span class="badge badge-danger"
+                                    style="font-size: 0.85rem; margin-top: 4px; padding: 4px 6px;">NOT IN USE</span>
                                 {% endif %}
                             </td>
                         </tr>
