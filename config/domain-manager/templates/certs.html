@@ -16,7 +16,7 @@
         .badge {
             display: inline-block;
             padding: 0.25em 0.4em;
-            font-size: 75%;
+            font-size: 85%;
             font-weight: 700;
             line-height: 1;
             text-align: center;
@@ -45,6 +45,11 @@
         .badge-danger {
             background-color: #fee2e2;
             color: #b91c1c;
+        }
+
+        .badge-superseded {
+            background-color: #f3f4f6;
+            color: #4b5563;
         }
 
         .summary-card {
@@ -131,8 +136,7 @@
                 </div>
                 <div class="summary-card">
                     <h3>Missing Domains</h3>
-                    <div class="value"
-                        style="{{ 'color: var(--danger-color);' if missing_count > 0 else 'color: var(--text-color);' }}">
+                    <div class="value" style="color: var(--danger-color);">
                         {{ missing_count }}
                     </div>
                 </div>
@@ -175,7 +179,8 @@
                     </thead>
                     <tbody id="certs-body">
                         {% for cert in certificates %}
-                        <tr>
+                        <tr class="{{ 'superseded-row' if cert.superseded else '' }}"
+                            style="{{ 'opacity: 0.6; background-color: #f9fafb;' if cert.superseded else '' }}">
                             <td data-label="Status" style="text-align: center;">
                                 {% if cert.status == 'valid' %}
                                 <i data-lucide="check-circle"
@@ -192,6 +197,10 @@
                                     style="color: var(--danger-color); width: 1.2rem; height: 1.2rem;"
                                     title="Expired/Invalid"></i>
                                 <span style="display:none;">expired</span>
+                                {% endif %}
+                                {% if cert.superseded %}
+                                <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;">SUPERSEDED
+                                </div>
                                 {% endif %}
                             </td>
                             <td data-label="Root Domain" class="root-domain-cell">{{ cert.root }}</td>
@@ -217,6 +226,10 @@
                                     style="{{ 'color: var(--warning-color); font-weight: bold;' if cert.status == 'warning' else ('color: var(--danger-color); font-weight: bold;' if cert.status == 'expired' else '') }}">
                                     {{ cert.expiration }}
                                 </span>
+                                {% if cert.superseded %}
+                                <br><span class="badge badge-superseded"
+                                    style="font-size: 0.65rem; margin-top: 2px;">NOT IN USE</span>
+                                {% endif %}
                             </td>
                         </tr>
                         {% else %}

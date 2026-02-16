@@ -13,6 +13,7 @@ import json
 import base64
 import datetime
 import tldextract
+from collections import defaultdict
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', secrets.token_hex(32))
