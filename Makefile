@@ -110,6 +110,19 @@ stop: ## Stop the stack (calls stop.sh)
 .PHONY: restart
 restart: stop start ## Restart the stack
 
+.PHONY: rebuild
+rebuild: ## Rebuild services from Dockerfile (default: domain-manager watchdog)
+ifneq ($(strip $(SERVICE_ARGS)),)
+	@echo "Rebuilding service(s): $(SERVICE_ARGS)..."
+	@$(DOCKER_COMPOSE) up -d --build --force-recreate $(SERVICE_ARGS)
+else ifdef s
+	@echo "Rebuilding service: $(s)..."
+	@$(DOCKER_COMPOSE) up -d --build --force-recreate $(s)
+else
+	@echo "Rebuilding custom image services (domain-manager, watchdog)..."
+	@$(DOCKER_COMPOSE) up -d --build --force-recreate domain-manager watchdog
+endif
+
 .PHONY: status
 status: ## Show stack status (docker compose ps)
 	@$(DOCKER_COMPOSE) ps

@@ -475,6 +475,7 @@ A lightweight utility service that monitors the stack and sends Telegram alerts.
 | **Start/Update Stack** | `make start` |
 | **Stop Stack** | `make stop` |
 | **Restart Stack** | `make restart` |
+| **Rebuild Services** | `make rebuild` (rebuilds custom images) |
 | **List Services** | `make services` |
 | **Service Status** | `make status` |
 | **Monitor Containers** | `make ctop` |
