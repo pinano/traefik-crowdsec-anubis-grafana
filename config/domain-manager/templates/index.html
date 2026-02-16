@@ -41,16 +41,16 @@
                 </div>
             </div>
             <div class="actions">
-                <button id="check-btn" class="btn btn-info" style="color: white; background-color: #0ea5e9;">
-                    <i data-lucide="network"></i> Validate Records
-                </button>
-                <a href="{{ url_for('certs_view') }}" target="_blank" class="btn btn-secondary">
-                    <i data-lucide="file-check"></i> Certificates
+                <a href="{{ url_for('certs_view') }}" target="_blank" class="btn btn-primary">
+                    <i data-lucide="shield-check"></i> Certificates
                 </a>
-                <button id="export-btn" class="btn btn-success">
+                <button id="export-btn" class="btn btn-secondary">
                     <i data-lucide="download"></i> Export CSV
                 </button>
-                <button id="save-btn" class="btn btn-primary" disabled>
+                <button id="validate-btn" class="btn btn-secondary">
+                    <i data-lucide="check-circle-2"></i> Validate Records
+                </button>
+                <button id="save-btn" class="btn btn-success" disabled>
                     <i data-lucide="save"></i> Save Changes
                 </button>
                 <button id="restart-btn" class="btn btn-danger">

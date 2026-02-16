@@ -28,10 +28,6 @@ ifneq (,$(wildcard .env))
 endif
 
 # =============================================================================
-# TARGETS
-# =============================================================================
-
-# =============================================================================
 # DOCKER COMPOSE CONFIGURATION
 # =============================================================================
 
@@ -189,12 +185,6 @@ clean: ## Clean generated configs and backup certificates (Requires confirmation
 		echo "Aborted."; \
 	fi
 
-# =============================================================================
-# OPTIONAL INCLUDES
-# =============================================================================
-
-# (Moved Optional Includes to end of file)
-
 .PHONY: redis-info
 redis-info: ## Show Redis server statistics
 	@$(DOCKER_COMPOSE) exec redis redis-cli -a "$${REDIS_PASSWORD}" INFO
@@ -226,15 +216,13 @@ certs-watch: ## Monitor ACME logs (Requires TRAEFIK_LOG_LEVEL=DEBUG in .env)
 ctop: ## Monitor containers using ctop
 	@docker run --rm -ti --name=ctop --volume /var/run/docker.sock:/var/run/docker.sock:ro quay.io/vektorlab/ctop:latest
 
-.PHONY: certs-inspect
-certs-inspect: ## Analyze acme.json certificates against domains.csv
+.PHONY: certs-info
+certs-info: ## Analyze acme.json certificates against domains.csv (Summary)
 	@$(PYTHON) scripts/inspect-certs.py $(ARGS)
 
-.PHONY: certs-inspect-v
-certs-inspect-v: ## Verbose certificate analysis (Lists all SANs)
-	@$(PYTHON) scripts/inspect-certs.py -v
-
-
+.PHONY: certs-inspect
+certs-inspect: ## Analyze acme.json certificates against domains.csv (Detailed)
+	@$(PYTHON) scripts/inspect-certs.py --verbose $(ARGS)
 
 # =============================================================================
 # OPTIONAL INCLUDES

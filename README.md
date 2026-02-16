@@ -484,8 +484,8 @@ A lightweight utility service that monitors the stack and sends Telegram alerts.
 | **Validate Environment** | `make validate` |
 | **Sync Environment** | `make sync` |
 | **Watch Certificates** | `make certs-watch` (Requires `DEBUG` traefik logs) |
-| **Inspect Certificates**| `make certs-inspect` |
-| **Inspect Detailed** | `make certs-inspect-v` |
+| **Certificates Info**| `make certs-info` (Summary) |
+| **Inspect Certificates** | `make certs-inspect` (Detailed) |
 | **Show Help** | `make help` |
 
 ### Security First Boot Sequence

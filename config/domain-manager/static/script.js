@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     const domainsBody = document.getElementById('domains-body');
     const saveBtn = document.getElementById('save-btn');
-    const checkBtn = document.getElementById('check-btn');
+    const checkBtn = document.getElementById('validate-btn');
     const exportBtn = document.getElementById('export-btn');
     const restartBtn = document.getElementById('restart-btn');
     const searchInput = document.getElementById('search-input');
