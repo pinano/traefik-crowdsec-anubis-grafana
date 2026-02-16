@@ -185,6 +185,10 @@ clean: ## Clean generated configs and backup certificates (Requires confirmation
 		echo "Aborted."; \
 	fi
 
+.PHONY: ctop
+ctop: ## Monitor containers using ctop
+	@docker run --rm -ti --name=ctop --volume /var/run/docker.sock:/var/run/docker.sock:ro quay.io/vektorlab/ctop:latest
+
 .PHONY: redis-info
 redis-info: ## Show Redis server statistics
 	@$(DOCKER_COMPOSE) exec redis redis-cli -a "$${REDIS_PASSWORD}" INFO
@@ -219,10 +223,6 @@ certs-info: ## Analyze acme.json certificates against domains.csv (Summary)
 .PHONY: certs-inspect
 certs-inspect: ## Analyze acme.json certificates against domains.csv (Detailed)
 	@$(PYTHON) scripts/inspect-certs.py --verbose $(ARGS)
-
-.PHONY: ctop
-ctop: ## Monitor containers using ctop
-	@docker run --rm -ti --name=ctop --volume /var/run/docker.sock:/var/run/docker.sock:ro quay.io/vektorlab/ctop:latest
 
 # =============================================================================
 # OPTIONAL INCLUDES
