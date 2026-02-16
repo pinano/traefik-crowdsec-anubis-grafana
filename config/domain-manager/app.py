@@ -123,13 +123,17 @@ def get_root_domain(domain):
         return f"{extracted.domain}.{extracted.suffix}"
     return domain
 
-def get_cert_expiration(cert_b64):
+# Parse certificate details (CN, SANs, Expiration) using OpenSSL
+def parse_certificate_data(cert_b64):
     try:
         # Decode base64 to get PEM
         cert_pem = base64.b64decode(cert_b64).decode('utf-8')
         
-        # Use openssl to extract end date
-        cmd = ['openssl', 'x509', '-noout', '-enddate']
+        # Use openssl to extract info
+        # -subject: extracts Subject (Owner)
+        # -enddate: extracts Expiration
+        # -ext subjectAltName: extracts SANs
+        cmd = ['openssl', 'x509', '-noout', '-subject', '-enddate', '-ext', 'subjectAltName']
         process = subprocess.Popen(
             cmd, 
             stdin=subprocess.PIPE, 
@@ -140,26 +144,80 @@ def get_cert_expiration(cert_b64):
         stdout, stderr = process.communicate(input=cert_pem)
         
         if process.returncode != 0:
-            return f"Error: {stderr.strip()}", -1
+            return {
+                'error': f"Error: {stderr.strip()}",
+                'valid_days': -1,
+                'expiration_text': "Error",
+                'cn': "Unknown",
+                'sans': []
+            }
+
+        # Defaults
+        data = {
+            'error': None,
+            'valid_days': -1,
+            'expiration_text': "",
+            'cn': "",
+            'sans': []
+        }
+
+        # Parse Line by Line
+        for line in stdout.splitlines():
+            line = line.strip()
+            # 1. Subject/CN
+            # format: subject=CN = softest2023.sailti.com
+            if line.startswith('subject='):
+                # Extract CN
+                match = re.search(r'CN\s*=\s*([^,]+)', line)
+                if match:
+                    data['cn'] = match.group(1).strip()
             
-        # Format: notAfter=Feb 16 08:41:11 2026 GMT
-        if '=' in stdout:
-            date_str = stdout.strip().split('=', 1)[1]
-            try:
-                # Parse date: Feb 16 08:41:11 2026 GMT
-                dt = datetime.datetime.strptime(date_str, '%b %d %H:%M:%S %Y GMT')
-                formatted = dt.strftime('%Y-%m-%d %H:%M:%S')
-                
-                now = datetime.datetime.utcnow()
-                delta = dt - now
-                days = delta.days
-                
-                return f"{formatted} ({days} days left)", days
-            except Exception:
-                return date_str, -1
-        return stdout.strip(), -1
+            # 2. Expiration
+            # format: notAfter=May 17 12:14:44 2026 GMT
+            if line.startswith('notAfter='):
+                date_str = line.split('=', 1)[1]
+                try:
+                    dt = datetime.datetime.strptime(date_str, '%b %d %H:%M:%S %Y GMT')
+                    formatted = dt.strftime('%Y-%m-%d %H:%M:%S')
+                    now = datetime.datetime.utcnow()
+                    delta = dt - now
+                    data['valid_days'] = delta.days
+                    data['expiration_text'] = f"{formatted} ({delta.days} days left)"
+                except:
+                    data['expiration_text'] = date_str
+            
+            # 3. SANs
+            # format: DNS:domain1.com, DNS:domain2.com, ...
+            # it might be on the line following "X509v3 Subject Alternative Name:" or inline depending on openssl version/format
+            # But with -ext subjectAltName, typically output starts with the header then the content
+            if line.startswith('DNS:'):
+                 # Splitting by comma
+                 parts = [p.strip().replace('DNS:', '') for p in line.split(',')]
+                 data['sans'].extend(parts)
+
+        # Fallback if SANs were on a new line (common in some openssl versions)
+        # output of -ext is usually:
+        # X509v3 Subject Alternative Name: 
+        #    DNS:a.com, DNS:b.com
+        if not data['sans'] and 'Subject Alternative Name' in stdout:
+             # Find the block
+             # Check distinct lines again or regex the whole blob
+             sans_match = re.search(r'Subject Alternative Name:\s*\n\s*(.*)', stdout, re.MULTILINE)
+             if sans_match:
+                 san_line = sans_match.group(1).strip()
+                 parts = [p.strip().replace('DNS:', '') for p in san_line.split(',')]
+                 data['sans'].extend(parts)
+        
+        return data
+
     except Exception as e:
-        return f"Error parsing: {e}", -1
+         return {
+                'error': f"Exception: {e}",
+                'valid_days': -1,
+                'expiration_text': str(e),
+                'cn': "Error",
+                'sans': []
+            }
 
 
 def read_csv():
@@ -310,49 +368,80 @@ def certs_view():
         if isinstance(resolver_data, dict) and 'Certificates' in resolver_data:
             for cert in resolver_data['Certificates']:
                 if 'domain' in cert:
-                    main = cert['domain'].get('main', '').lower()
-                    sans = [s.lower() for s in cert['domain'].get('sans', [])]
-                    
-                    if main:
-                        covered_domains.add(main)
-                        sans_cleaned = [s for s in sans if s != main]
-                        for san in sans_cleaned:
-                            covered_domains.add(san)
+                    # Ignore the 'main' and 'sans' from JSON keys as they might be stale
+                    # Parse REAL data from the certificate
+                    if cert.get('certificate'):
+                        cert_info = parse_certificate_data(cert['certificate'])
                         
-                        expiration_text = ""
-                        days_left = -1
-                        status = 'expired' # Default if error or missing
+                        real_main = cert_info['cn'].lower() if cert_info['cn'] else "unknown"
+                        real_sans = [s.lower() for s in cert_info['sans']]
+                        
+                        # Filter out main from SANs for display
+                        real_sans_cleaned = [s for s in real_sans if s != real_main]
+                        
+                        # Update stats coverage
+                        if real_main != 'unknown':
+                            covered_domains.add(real_main)
+                            for s in real_sans_cleaned:
+                                covered_domains.add(s)
 
-                        if cert.get('certificate'):
-                            expiration_text, days_left = get_cert_expiration(cert['certificate'])
-                        
-                        if days_left > 30:
+                        status = 'expired'
+                        if cert_info['valid_days'] > 30:
                             status = 'valid'
-                        elif days_left > 0:
+                        elif cert_info['valid_days'] > 0:
                             status = 'warning'
-                        else:
-                            status = 'expired'
-
+                        
                         certificates_details.append({
-                            # 'resolver': resolver_name, # Removed as per user request
-                            'main': main,
-                            'sans': sans_cleaned,
-                            'root': get_root_domain(main),
-                            'expiration': expiration_text,
-                            'status': status
+                            'main': real_main,
+                            'sans': real_sans_cleaned,
+                            'root': get_root_domain(real_main) if real_main != 'unknown' else 'Unknown',
+                            'expiration': cert_info['expiration_text'],
+                            'valid_days': cert_info['valid_days'], # Needed for sorting
+                            'status': status,
+                            'superseded': False # Default
                         })
+                    else:
+                        # Fallback if no certificate data (shouldn't happen for valid entries)
+                        continue
 
-    # 3. Calculate Stats
-    total_certs = len(certificates_details)
-    total_sans = sum(len(c['sans']) for c in certificates_details)
+    # 3. Post-process to identify superseded certificates
+    # Group by Main Domain (CN)
+    certs_by_main = defaultdict(list)
+    for cert in certificates_details:
+        certs_by_main[cert['main']].append(cert)
+    
+    final_certificates = []
+    
+    for main_domain, certs in certs_by_main.items():
+        # If multiple certs for same CN, sort by validity (more days = newer/better)
+        if len(certs) > 1:
+            # Sort descending by valid_days
+            certs.sort(key=lambda x: x['valid_days'], reverse=True)
+            
+            # The first one is active, rest are superseded
+            for i in range(1, len(certs)):
+                certs[i]['superseded'] = True
+                certs[i]['status'] = 'superseded' # Override status for display logic if needed
+        
+        final_certificates.extend(certs)
+    
+    # Sort final list by root domain then main domain for display
+    final_certificates.sort(key=lambda x: (x['root'], x['main']))
+
+    # 4. Calculate Stats (using final list)
+    total_certs = len(final_certificates)
+    # Count unique active SANs only? Or all? Let's count all to be safe, or just active.
+    # User asked for visual indication, not necessarily removing them from stats.
+    # But let's keep stats based on what's visible.
+    total_sans = sum(len(c['sans']) for c in final_certificates)
     
     missing_domains = expected_domains - covered_domains
     missing_count = len(missing_domains)
     
-    # 4. Prepare data for template
+    # 5. Prepare data for template
     return render_template('certs.html', 
                            domain=DOMAIN,
-                           certificates=certificates_details,
+                           certificates=final_certificates,
                            total_certs=total_certs,
                            total_sans=total_sans,
                            missing_count=missing_count,

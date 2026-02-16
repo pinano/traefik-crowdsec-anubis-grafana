@@ -166,9 +166,11 @@
                         <tr>
                             <th class="sortable" data-sort="status" style="width: 5%">Status</th>
                             <th class="sortable" data-sort="root" style="width: 15%">Root Domain</th>
-                            <th class="sortable" data-sort="main" style="width: 25%">Main Domain</th>
+                            <th class="sortable" data-sort="main" style="width: 25%; text-align: center;">Main Domain
+                            </th>
                             <th style="width: 35%">SANs</th>
-                            <th class="sortable" data-sort="expiration" style="width: 20%">Expiration</th>
+                            <th class="sortable" data-sort="expiration" style="width: 20%; text-align: center;">
+                                Expiration</th>
                         </tr>
                     </thead>
                     <tbody id="certs-body">
@@ -193,7 +195,16 @@
                                 {% endif %}
                             </td>
                             <td data-label="Root Domain" class="root-domain-cell">{{ cert.root }}</td>
-                            <td data-label="Main Domain" style="font-weight: 500;">{{ cert.main }}</td>
+                            <td data-label="Main Domain" style="font-weight: 500; text-align: center;">
+                                {{ cert.main }}
+                                {% if cert.sans %}
+                                <span class="badge badge-info"
+                                    title="Total Domains: {{ cert.sans|length + 1 }} (Main + SANs)"
+                                    style="margin-left: 0.5rem; cursor: help; vertical-align: middle;">
+                                    {{ cert.sans|length + 1 }}
+                                </span>
+                                {% endif %}
+                            </td>
                             <td data-label="SANs">
                                 {% for san in cert.sans %}
                                 <span class="badge badge-info">{{ san }}</span>
@@ -201,7 +212,7 @@
                                 <span style="color: var(--text-muted); font-size: 0.8rem;">-</span>
                                 {% endfor %}
                             </td>
-                            <td data-label="Expiration">
+                            <td data-label="Expiration" style="text-align: center;">
                                 <span
                                     style="{{ 'color: var(--warning-color); font-weight: bold;' if cert.status == 'warning' else ('color: var(--danger-color); font-weight: bold;' if cert.status == 'expired' else '') }}">
                                     {{ cert.expiration }}
