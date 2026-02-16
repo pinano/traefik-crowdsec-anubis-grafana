@@ -83,6 +83,22 @@
             align-items: center;
             margin-bottom: 1.5rem;
         }
+
+        @media (max-width: 768px) {
+            #certs-table td:last-child {
+                background: var(--card-bg);
+                justify-content: flex-start;
+                padding-left: 45%;
+                padding-right: 0.35rem;
+                /* Reset to default td padding if needed */
+                border-bottom: 1px solid var(--border-color);
+                /* Restore border */
+            }
+
+            #certs-table td:last-child:before {
+                content: attr(data-label);
+            }
+        }
     </style>
 </head>
 
@@ -158,22 +174,22 @@
                     <tbody id="certs-body">
                         {% for cert in certificates %}
                         <tr>
-                            <td style="text-align: center;">
+                            <td data-label="Status" style="text-align: center;">
                                 <i data-lucide="check-circle"
                                     style="color: var(--success-color); width: 1.2rem; height: 1.2rem;"
                                     title="Valid"></i>
                                 <span style="display:none;">valid</span>
                             </td>
-                            <td class="root-domain-cell">{{ cert.root }}</td>
-                            <td style="font-weight: 500;">{{ cert.main }}</td>
-                            <td>
+                            <td data-label="Root Domain" class="root-domain-cell">{{ cert.root }}</td>
+                            <td data-label="Main Domain" style="font-weight: 500;">{{ cert.main }}</td>
+                            <td data-label="SANs">
                                 {% for san in cert.sans %}
                                 <span class="badge badge-info">{{ san }}</span>
                                 {% else %}
                                 <span style="color: var(--text-muted); font-size: 0.8rem;">-</span>
                                 {% endfor %}
                             </td>
-                            <td>{{ cert.expiration }}</td>
+                            <td data-label="Expiration">{{ cert.expiration }}</td>
                         </tr>
                         {% else %}
                         <tr>

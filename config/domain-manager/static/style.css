@@ -876,6 +876,8 @@ input:focus {
         min-height: 40px;
         display: flex;
         align-items: center;
+        flex-wrap: wrap;
+        gap: 0.5rem;
         border-bottom: 1px solid var(--border-color);
     }
 

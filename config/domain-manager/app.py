@@ -147,7 +147,18 @@ def get_cert_expiration(cert_b64):
         # Format: notAfter=Feb 16 08:41:11 2026 GMT
         if '=' in stdout:
             date_str = stdout.strip().split('=', 1)[1]
-            return date_str
+            try:
+                # Parse date: Feb 16 08:41:11 2026 GMT
+                dt = datetime.datetime.strptime(date_str, '%b %d %H:%M:%S %Y GMT')
+                formatted = dt.strftime('%Y-%m-%d %H:%M:%S')
+                
+                now = datetime.datetime.utcnow()
+                delta = dt - now
+                days = delta.days
+                
+                return f"{formatted} ({days} days left)"
+            except Exception:
+                return date_str
         return stdout.strip()
     except Exception as e:
         return f"Error parsing: {e}"
