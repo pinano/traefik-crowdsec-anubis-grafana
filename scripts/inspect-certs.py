@@ -92,6 +92,8 @@ def inspect_certs(verbose=False):
     for resolver_name, resolver_data in acme_data.items():
         if isinstance(resolver_data, dict) and 'Certificates' in resolver_data:
             certs = resolver_data['Certificates']
+            if not certs:
+                continue
             for cert in certs:
                 if 'domain' in cert:
                     main = cert['domain'].get('main', '').lower()

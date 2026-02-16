@@ -75,7 +75,7 @@ def login_required(f):
         if not session.get('logged_in'):
             if request.path.startswith('/dm-api/') or request.path == '/dm-api/restart-stream':
                 return jsonify({'error': 'Unauthorized', 'message': 'Authentication required'}), 401
-            return redirect(url_for('login'))
+            return redirect(url_for('login', next=request.path))
         return f(*args, **kwargs)
     return decorated_function
 
