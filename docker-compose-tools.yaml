@@ -23,7 +23,7 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"
       # Dashboard
-      - "traefik.http.routers.dozzle.rule=Host(`dashboard.${DOMAIN}`) && PathPrefix(`/dozzle`)"
+      - "traefik.http.routers.dozzle.rule=Host(`${DASHBOARD_SUBDOMAIN}.${DOMAIN}`) && PathPrefix(`/dozzle`)"
       - "traefik.http.routers.dozzle.priority=100"
       - "traefik.http.routers.dozzle.entrypoints=websecure"
       - "traefik.http.routers.dozzle.tls.certresolver=${TRAEFIK_CERT_RESOLVER}"

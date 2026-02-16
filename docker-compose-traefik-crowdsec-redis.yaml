@@ -34,7 +34,7 @@ services:
       # Restart on config change
       #- "traefik.config.hash=${TRAEFIK_CONFIG_HASH}"
       # Dashboard
-      - "traefik.http.routers.traefik.rule=Host(`dashboard.${DOMAIN}`) && (PathPrefix(`/traefik`) || PathPrefix(`/api`) || PathPrefix(`/dashboard`))"
+      - "traefik.http.routers.traefik.rule=Host(`${DASHBOARD_SUBDOMAIN}.${DOMAIN}`) && (PathPrefix(`/traefik`) || PathPrefix(`/api`) || PathPrefix(`/dashboard`))"
       - "traefik.http.routers.traefik.priority=100"
       - "traefik.http.routers.traefik.entrypoints=websecure"
       - "traefik.http.routers.traefik.service=api@internal"

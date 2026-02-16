@@ -143,6 +143,10 @@ else
     prompt_val "REDIS_PASSWORD" "Redis Password (manual input)"
 fi
 
+prompt_val "DASHBOARD_SUBDOMAIN" "Dashboard Subdomain (e.g. 'dashboard' for dashboard.example.com)"
+
+prompt_val "CROWDSEC_UPDATE_INTERVAL" "CrowdSec update interval (seconds)"
+
 prompt_val "CROWDSEC_UPDATE_INTERVAL" "CrowdSec update interval (seconds)"
 
 echo ""

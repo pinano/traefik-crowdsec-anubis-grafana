@@ -34,7 +34,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"
-      - "traefik.http.routers.domain-manager.rule=Host(`dashboard.${DOMAIN}`)"
+      - "traefik.http.routers.domain-manager.rule=Host(`${DASHBOARD_SUBDOMAIN}.${DOMAIN}`)"
       - "traefik.http.routers.domain-manager.priority=1"
       - "traefik.http.routers.domain-manager.entrypoints=websecure"
       - "traefik.http.routers.domain-manager.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-}"

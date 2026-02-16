@@ -58,6 +58,7 @@ TRAEFIK_RATE_AVG = os.environ.get('TRAEFIK_GLOBAL_RATE_AVG', '60')
 TRAEFIK_RATE_BURST = os.environ.get('TRAEFIK_GLOBAL_RATE_BURST', '120')
 TRAEFIK_CONCURRENCY = os.environ.get('TRAEFIK_GLOBAL_CONCURRENCY', '25')
 TRAEFIK_ACME_ENV_TYPE = os.environ.get('TRAEFIK_ACME_ENV_TYPE', 'production')
+DASHBOARD_SUBDOMAIN = os.environ.get('DASHBOARD_SUBDOMAIN', 'dashboard')
 ENV = os.environ.copy()
 ENV['TERM'] = 'xterm'
 
@@ -342,22 +343,20 @@ def get_external_services():
         
         # We will use the docker socket if mapped, or just subprocess 'docker'
         # Requires 'docker' CLI to be installed in image. It is (we use it for restart).
-        
-        cmd = ["docker", "ps", "--format", "{{.Names}}"]
+        # Use docker ps to get the 'com.docker.compose.service' label.
+        # This returns the service name defined in docker-compose.yaml (e.g. 'traefik', 'dozzle')
+        # regardless of the folder name/project prefix.
+        cmd = ["docker", "ps", "--format", '{{.Label "com.docker.compose.service"}}']
         result = subprocess.run(cmd, capture_output=True, text=True)
-        
-        # This returns container names like 'traefik-domain-manager-1'.
-        # We might want service names. 
-        # 'docker compose ps --services' is better if we are in the compose root.
-        
-        cmd_compose = ["docker", "compose", "ps", "--services"]
-        # We need to run this in BASE_DIR
-        result = subprocess.run(cmd_compose, cwd=BASE_DIR, capture_output=True, text=True, env=ENV)
         
         if result.returncode == 0:
             services = result.stdout.strip().split('\n')
-            return [s.strip() for s in services if s.strip()]
+            # Filter empty strings (in case some containers don't have the label) and duplicates
+            unique_services = sorted(list(set([s.strip() for s in services if s.strip()])))
+            # print(f"DEBUG: Found services: {unique_services}")
+            return unique_services
         
+        print(f"DEBUG: Error running docker ps: {result.stderr}")
         return []
     except Exception as e:
         print(f"Error getting services: {e}")
@@ -670,7 +669,8 @@ def check_domain():
     }
     
     # 0. Global Host IP
-    host_domain = os.environ.get('DOMAIN')
+    # We resolve the full dashboard domain using the configurable subdomain
+    host_domain = f"{DASHBOARD_SUBDOMAIN}.{os.environ.get('DOMAIN')}"
     expected_ip = resolve_domain(host_domain)
     
     # In local development, the container might not be able to resolve the host domain
