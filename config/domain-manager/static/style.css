@@ -12,6 +12,14 @@
     --warning-color: #f59e0b;
     /* Amber */
 
+    /* New Button Colors */
+    --info-color: #0ea5e9;
+    /* Sky 500 */
+    --info-hover: #38bdf8;
+    --validate-color: #8b5cf6;
+    /* Violet 500 */
+    --validate-hover: #a78bfa;
+
     --bg-color: #f8fafc;
     /* Slate 50 */
     --card-bg: #ffffff;
@@ -203,6 +211,24 @@ body.has-notification .header-scrolled {
 
 .btn-secondary:hover {
     background-color: var(--header-bg);
+}
+
+.btn-info {
+    background-color: var(--info-color);
+    color: white;
+}
+
+.btn-info:hover {
+    background-color: var(--info-hover);
+}
+
+.btn-validate {
+    background-color: var(--validate-color);
+    color: white;
+}
+
+.btn-validate:hover {
+    background-color: var(--validate-hover);
 }
 
 .btn-sm {
