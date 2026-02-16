@@ -4,6 +4,9 @@ import os
 import tldextract
 import argparse
 from collections import defaultdict
+import subprocess
+import datetime
+import base64
 
 ACME_FILE = 'config/traefik/acme.json'
 DOMAINS_FILE = 'domains.csv'
@@ -39,6 +42,34 @@ def load_expected_domains():
         print(f"❌ Error reading {DOMAINS_FILE}: {e}")
     
     return expected
+
+def get_cert_expiration(cert_b64):
+    try:
+        # Decode base64 to get PEM
+        cert_pem = base64.b64decode(cert_b64).decode('utf-8')
+        
+        # Use openssl to extract end date
+        cmd = ['openssl', 'x509', '-noout', '-enddate']
+        process = subprocess.Popen(
+            cmd, 
+            stdin=subprocess.PIPE, 
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        stdout, stderr = process.communicate(input=cert_pem)
+        
+        if process.returncode != 0:
+            return f"Error: {stderr.strip()}"
+            
+        # Format: notAfter=Feb 16 08:41:11 2026 GMT
+        # Output example: notAfter=May 17 08:41:11 2026 GMT
+        if '=' in stdout:
+            date_str = stdout.strip().split('=', 1)[1]
+            return date_str
+        return stdout.strip()
+    except Exception as e:
+        return f"Error parsing: {e}"
 
 def inspect_certs(verbose=False):
     print(f"🔍 Inspecting Certificates in {ACME_FILE}...")
@@ -77,7 +108,8 @@ def inspect_certs(verbose=False):
                             'resolver': resolver_name,
                             'main': main,
                             'sans': sans_cleaned,
-                            'root': get_root_domain(main)
+                            'root': get_root_domain(main),
+                            'certificate': cert.get('certificate', '')
                         })
 
     print(f"✅ Found {len(certificates_details)} certificates covering {len(covered_domains)} unique domains.")
@@ -93,7 +125,13 @@ def inspect_certs(verbose=False):
             print(f"\n📂 Root Domain: {root}")
             for i, cert in enumerate(certs, 1):
                 san_str = f" (+{len(cert['sans'])} SANs)" if cert['sans'] else ""
-                print(f"   {i}. Main: {cert['main']}{san_str}")
+                
+                expiration = ""
+                if cert['certificate']:
+                     expiry_date = get_cert_expiration(cert['certificate'])
+                     expiration = f" [Expires: {expiry_date}]"
+
+                print(f"   {i}. Main: {cert['main']}{san_str}{expiration}")
                 if cert['sans']:
                     for s in cert['sans']:
                         print(f"      - {s}")
