@@ -1,3 +1,6 @@
+from gevent import monkey
+monkey.patch_all()
+
 import os
 import csv
 import subprocess
@@ -72,6 +75,9 @@ def login_required(f):
 
 @app.before_request
 def check_csrf():
+    if request.path == '/':
+         print(f"DEBUG: app.view_functions keys: {list(app.view_functions.keys())}")
+
     if request.endpoint == 'login':
         return
     
@@ -309,7 +315,7 @@ def certs_view():
                             expiration = get_cert_expiration(cert['certificate'])
 
                         certificates_details.append({
-                            'resolver': resolver_name,
+                            # 'resolver': resolver_name, # Removed as per user request
                             'main': main,
                             'sans': sans_cleaned,
                             'root': get_root_domain(main),
@@ -317,19 +323,20 @@ def certs_view():
                             'status': 'valid' # We assume valid if present, expiration check could be added
                         })
 
-    # 3. Calculate Missing
+    # 3. Calculate Stats
+    total_certs = len(certificates_details)
+    total_sans = sum(len(c['sans']) for c in certificates_details)
+    
     missing_domains = expected_domains - covered_domains
+    missing_count = len(missing_domains)
     
     # 4. Prepare data for template
-    # We want to show ALL expected domains, whether covered or not?
-    # Or show a list of certificates AND a list of missing?
-    # Request: "information of certificates... and summary info if all domains.csv are generated"
-    
     return render_template('certs.html', 
                            domain=DOMAIN,
                            certificates=certificates_details,
-                           expected_count=len(expected_domains),
-                           covered_count=len(expected_domains - missing_domains),
+                           total_certs=total_certs,
+                           total_sans=total_sans,
+                           missing_count=missing_count,
                            missing_domains=sorted(list(missing_domains)))
 
 
@@ -660,3 +667,5 @@ def restart_stream():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
+
+print(f"DEBUG: Startup - URL Map: {app.url_map}", flush=True)
