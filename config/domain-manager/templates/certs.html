@@ -175,10 +175,22 @@
                         {% for cert in certificates %}
                         <tr>
                             <td data-label="Status" style="text-align: center;">
+                                {% if cert.status == 'valid' %}
                                 <i data-lucide="check-circle"
                                     style="color: var(--success-color); width: 1.2rem; height: 1.2rem;"
                                     title="Valid"></i>
                                 <span style="display:none;">valid</span>
+                                {% elif cert.status == 'warning' %}
+                                <i data-lucide="alert-triangle"
+                                    style="color: var(--warning-color); width: 1.2rem; height: 1.2rem;"
+                                    title="Expiring Soon"></i>
+                                <span style="display:none;">warning</span>
+                                {% else %}
+                                <i data-lucide="x-octagon"
+                                    style="color: var(--danger-color); width: 1.2rem; height: 1.2rem;"
+                                    title="Expired/Invalid"></i>
+                                <span style="display:none;">expired</span>
+                                {% endif %}
                             </td>
                             <td data-label="Root Domain" class="root-domain-cell">{{ cert.root }}</td>
                             <td data-label="Main Domain" style="font-weight: 500;">{{ cert.main }}</td>
@@ -189,7 +201,12 @@
                                 <span style="color: var(--text-muted); font-size: 0.8rem;">-</span>
                                 {% endfor %}
                             </td>
-                            <td data-label="Expiration">{{ cert.expiration }}</td>
+                            <td data-label="Expiration">
+                                <span
+                                    style="{{ 'color: var(--warning-color); font-weight: bold;' if cert.status == 'warning' else ('color: var(--danger-color); font-weight: bold;' if cert.status == 'expired' else '') }}">
+                                    {{ cert.expiration }}
+                                </span>
+                            </td>
                         </tr>
                         {% else %}
                         <tr>

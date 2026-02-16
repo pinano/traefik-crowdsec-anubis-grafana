@@ -209,6 +209,10 @@ certs-watch: ## Monitor ACME logs (Requires TRAEFIK_LOG_LEVEL=DEBUG in .env)
 		grep --line-buffered -iE 'obtained|validated|solve.*challenge|acme.*error|fail' | \
 		grep --line-buffered -vE 'Trying to challenge|Adding certificate|Looking for|No ACME.*required|RequestHost|global-compress|BasicAuth|Authentication failed'
 
+.PHONY: ctop
+ctop: ## Monitor containers using ctop
+	@docker run --rm -ti --name=ctop --volume /var/run/docker.sock:/var/run/docker.sock:ro quay.io/vektorlab/ctop:latest
+
 .PHONY: certs-inspect
 certs-inspect: ## Analyze acme.json certificates against domains.csv
 	@$(PYTHON) scripts/inspect-certs.py $(ARGS)

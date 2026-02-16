@@ -461,7 +461,7 @@ A lightweight utility service that monitors the stack and sends Telegram alerts.
 ### Auxiliary Tools
 
 - **Dozzle**: Real-time log viewer for all containers (`https://dozzle.<domain>`).
-- **ctop**: Interactive container monitoring (run manually with `docker compose -f docker-compose-tools.yaml run --rm ctop`).
+- **ctop**: Interactive container monitoring (run `make ctop`).
 - **Anubis-Assets**: Nginx server for local Anubis static assets.
 
 ---
@@ -477,6 +477,7 @@ A lightweight utility service that monitors the stack and sends Telegram alerts.
 | **Restart Stack** | `make restart` |
 | **List Services** | `make services` |
 | **Service Status** | `make status` |
+| **Monitor Containers** | `make ctop` |
 | **Follow Logs** | `make logs` (or `make logs s=traefik`) |
 | **Open Container Shell** | `make shell traefik` |
 | **Validate Environment** | `make validate` |

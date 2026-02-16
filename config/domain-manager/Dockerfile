@@ -13,4 +13,4 @@ RUN apk add --no-cache docker-cli docker-compose bash ncurses openssl
 
 EXPOSE 5000
 
-CMD ["gunicorn", "--worker-class", "gevent", "--bind", "0.0.0.0:5000", "--workers", "1", "--timeout", "600", "app:app"]
+CMD ["gunicorn", "--config", "gunicorn_config.py", "app:app"]

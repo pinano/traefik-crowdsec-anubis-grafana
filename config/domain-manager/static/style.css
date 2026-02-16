@@ -9,6 +9,8 @@
     --success-color: #34d399;
     /* Soft Emerald */
     --success-hover: #6ee7b7;
+    --warning-color: #f59e0b;
+    /* Amber */
 
     --bg-color: #f8fafc;
     /* Slate 50 */
@@ -875,7 +877,8 @@ input:focus {
         padding-bottom: 0.6rem;
         min-height: 40px;
         display: flex;
-        align-items: center;
+        align-items: flex-start;
+        /* Align content to top */
         flex-wrap: wrap;
         gap: 0.5rem;
         border-bottom: 1px solid var(--border-color);
@@ -891,8 +894,8 @@ input:focus {
 
     td:before {
         position: absolute;
-        top: 50%;
-        transform: translateY(-50%);
+        top: 0.6rem;
+        /* Align with top padding */
         left: 0.75rem;
         width: 40%;
         padding-right: 10px;

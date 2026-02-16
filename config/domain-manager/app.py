@@ -142,7 +142,7 @@ def get_cert_expiration(cert_b64):
         stdout, stderr = process.communicate(input=cert_pem)
         
         if process.returncode != 0:
-            return f"Error: {stderr.strip()}"
+            return f"Error: {stderr.strip()}", -1
             
         # Format: notAfter=Feb 16 08:41:11 2026 GMT
         if '=' in stdout:
@@ -156,12 +156,12 @@ def get_cert_expiration(cert_b64):
                 delta = dt - now
                 days = delta.days
                 
-                return f"{formatted} ({days} days left)"
+                return f"{formatted} ({days} days left)", days
             except Exception:
-                return date_str
-        return stdout.strip()
+                return date_str, -1
+        return stdout.strip(), -1
     except Exception as e:
-        return f"Error parsing: {e}"
+        return f"Error parsing: {e}", -1
 
 
 def read_csv():
@@ -321,17 +321,27 @@ def certs_view():
                         for san in sans_cleaned:
                             covered_domains.add(san)
                         
-                        expiration = ""
+                        expiration_text = ""
+                        days_left = -1
+                        status = 'expired' # Default if error or missing
+
                         if cert.get('certificate'):
-                            expiration = get_cert_expiration(cert['certificate'])
+                            expiration_text, days_left = get_cert_expiration(cert['certificate'])
+                        
+                        if days_left > 30:
+                            status = 'valid'
+                        elif days_left > 0:
+                            status = 'warning'
+                        else:
+                            status = 'expired'
 
                         certificates_details.append({
                             # 'resolver': resolver_name, # Removed as per user request
                             'main': main,
                             'sans': sans_cleaned,
                             'root': get_root_domain(main),
-                            'expiration': expiration,
-                            'status': 'valid' # We assume valid if present, expiration check could be added
+                            'expiration': expiration_text,
+                            'status': status
                         })
 
     # 3. Calculate Stats
