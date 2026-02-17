@@ -14,6 +14,7 @@ services:
       - TZ=${TZ}
       - DOMAIN_MANAGER_INTERNAL=true
       - TRAEFIK_ACME_ENV_TYPE=${TRAEFIK_ACME_ENV_TYPE}
+      - DASHBOARD_SUBDOMAIN=${DASHBOARD_SUBDOMAIN}
       - APACHE_HOST_AVAILABLE=${APACHE_HOST_AVAILABLE:-false}
     working_dir: ${DOMAIN_MANAGER_APP_PATH_HOST}/config/domain-manager
     volumes:
