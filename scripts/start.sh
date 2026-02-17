@@ -170,7 +170,6 @@ validate_env | sed 's/^/   /'
 
 echo " --------------------------------------------------------"
 echo " [2/6] 🔐 Synchronizing credentials & paths..."
-echo "   🛡️ Checking admin credentials sync..."
 
 SYNC_NEEDED=0
 
@@ -229,12 +228,12 @@ if [ -z "$DOMAIN_MANAGER_SECRET_KEY" ] || [ "$DOMAIN_MANAGER_SECRET_KEY" == "REP
 fi
 
 if [ $SYNC_NEEDED -gt 0 ]; then
-    echo "   ✅ Authentication hashes synchronized in .env. Re-loading environment..."
+    echo "   ✅ Credentials synchronized."
     set -a
     source .env
     set +a
 else
-    echo "   ✅ Admin credentials are in sync."
+    echo "   ✅ Credentials in sync."
 fi
 
 # =============================================================================
@@ -243,7 +242,6 @@ fi
 # Calculate the absolute path of the project on the host and ensure it is set 
 # in .env. This is critical for Docker's working_dir and volume mirroring.
 
-echo "   📍 Configuring project absolute path..."
 # Use realpath if available, otherwise fallback to readlink -f or pwd -P
 if command -v realpath >/dev/null 2>&1; then
     DETECTED_PATH=$(realpath .)
@@ -256,7 +254,7 @@ fi
 # Update .env to ensure Docker Compose picks it up correctly even from the file
 update_env_var "DOMAIN_MANAGER_APP_PATH_HOST" "$DETECTED_PATH"
 export DOMAIN_MANAGER_APP_PATH_HOST="$DETECTED_PATH"
-echo "   ✅ DOMAIN_MANAGER_APP_PATH_HOST set to: $DOMAIN_MANAGER_APP_PATH_HOST"
+echo "   ✅ Project path: $DETECTED_PATH"
 
 # Normalize CROWDSEC_DISABLE to lowercase
 CROWDSEC_DISABLE=$(echo "${CROWDSEC_DISABLE:-false}" | tr '[:upper:]' '[:lower:]')
@@ -278,40 +276,47 @@ fi
 
 echo " --------------------------------------------------------"
 echo " [3/6] 🎨 Preparing application assets..."
-echo "   🛡️ Checking Anubis assets..."
 
 ANUBIS_ASSETS_DIR="./config/anubis/assets"
 ANUBIS_ASSETS_IMG_DIR="$ANUBIS_ASSETS_DIR/static/img"
 
-# Copy default CSS if custom doesn't exist
+CUSTOM_COUNT=0
+DEFAULT_COUNT=0
+
+# CSS asset
 if [ ! -f "$ANUBIS_ASSETS_DIR/custom.css" ]; then
     if [ -f "$ANUBIS_ASSETS_DIR/custom.css.dist" ]; then
         cp "$ANUBIS_ASSETS_DIR/custom.css.dist" "$ANUBIS_ASSETS_DIR/custom.css"
-        echo "   ✅ Copied default custom.css"
     fi
+    DEFAULT_COUNT=$((DEFAULT_COUNT + 1))
 else
-    echo "   ℹ️ Using custom custom.css"
+    CUSTOM_COUNT=$((CUSTOM_COUNT + 1))
 fi
 
-# Copy default images if custom versions don't exist
+# Image assets
 for img in happy.webp pensive.webp reject.webp; do
     if [ ! -f "$ANUBIS_ASSETS_IMG_DIR/$img" ]; then
         if [ -f "$ANUBIS_ASSETS_IMG_DIR/$img.dist" ]; then
             cp "$ANUBIS_ASSETS_IMG_DIR/$img.dist" "$ANUBIS_ASSETS_IMG_DIR/$img"
-            echo "   ✅ Copied default $img"
         fi
+        DEFAULT_COUNT=$((DEFAULT_COUNT + 1))
     else
-        echo "   ℹ️ Using custom $img"
+        CUSTOM_COUNT=$((CUSTOM_COUNT + 1))
     fi
 done
 
-echo "   🔒 Checking Traefik cert storage & ACME..."
+if [ $DEFAULT_COUNT -eq 0 ]; then
+    echo "   ✅ Anubis assets ready ($CUSTOM_COUNT custom)."
+elif [ $CUSTOM_COUNT -eq 0 ]; then
+    echo "   ✅ Anubis assets ready ($DEFAULT_COUNT default)."
+else
+    echo "   ✅ Anubis assets ready ($CUSTOM_COUNT custom, $DEFAULT_COUNT default)."
+fi
+
 if [ ! -f ./config/traefik/acme.json ]; then
     touch ./config/traefik/acme.json
     chmod 600 ./config/traefik/acme.json
     echo "   ✅ Created acme.json with secure permissions."
-else
-    echo "   ✅ acme.json already exists."
 fi
 
 # echo "🔒 Configuring ACME environment..."
@@ -349,14 +354,9 @@ fi
 
 # Export the resolver choice so Docker Compose can use it
 export TRAEFIK_CERT_RESOLVER
-if [ -z "$TRAEFIK_CERT_RESOLVER" ]; then
-     echo "   ℹ️ TRAEFIK_CERT_RESOLVER is disabled (Local Mode)."
-else
-     echo "   ℹ️ TRAEFIK_CERT_RESOLVER set to: '$TRAEFIK_CERT_RESOLVER'"
-fi
 
 # Generate traefik-generated.yaml from template
-echo "   ⚙️ Generating static & dynamic configurations..."
+echo "   ⚙️ Generating Traefik static config..."
 if [ -f "./config/traefik/traefik.yaml.template" ]; then
     sed -e "s#TRAEFIK_ACME_EMAIL_PLACEHOLDER#${TRAEFIK_ACME_EMAIL}#g" \
         -e "s#TRAEFIK_ACME_CASERVER_PLACEHOLDER#${TRAEFIK_ACME_CA_SERVER}#g" \
@@ -365,26 +365,18 @@ if [ -f "./config/traefik/traefik.yaml.template" ]; then
         -e "s#TRAEFIK_ACCESS_LOG_BUFFER_PLACEHOLDER#${TRAEFIK_ACCESS_LOG_BUFFER:-1000}#g" \
         -e "s#TRAEFIK_LOG_LEVEL_PLACEHOLDER#${TRAEFIK_LOG_LEVEL:-INFO}#g" \
         ./config/traefik/traefik.yaml.template > ./config/traefik/traefik-generated.yaml
-    echo "      ✅ traefik-generated.yaml produced."
 else
     echo "❌ Error: config/traefik/traefik.yaml.template not found!"
     exit 1
 fi
 
 # Calculate hash of the generated config to force restart on changes
-# relying on Docker Compose to detect env var changes
 if [ -f "./config/traefik/traefik-generated.yaml" ]; then
     TRAEFIK_CONFIG_HASH=$(cat ./config/traefik/traefik-generated.yaml | generate_hash)
     export TRAEFIK_CONFIG_HASH
-    echo "      #️⃣  Traefik Config Hash: $TRAEFIK_CONFIG_HASH"
 fi
 
 # Generate dynamic configuration with Python script
-echo ""
-echo "      --------------------------------------------------------"
-echo "      ⚙️  START: DYNAMIC CONFIGURATION GENERATION"
-echo "      --------------------------------------------------------"
-echo "      🧹 Cleaning up old generated configurations..."
 {
     mkdir -p ./config/traefik/dynamic-config
     mkdir -p ./config/anubis
@@ -414,7 +406,7 @@ fi
 
 # Ensure domains.csv exists with correct header
 if [ ! -f "domains.csv" ]; then
-    echo "📄 Creating default domains.csv..."
+    echo "   📄 Creating default domains.csv..."
     echo "# domain, redirection, service, anubis_subdomain, rate, burst, concurrency" > domains.csv
 fi
 
@@ -434,13 +426,7 @@ if ! $PYTHON_CMD -c "import tldextract; import yaml" >/dev/null 2>&1; then
     exit 1
 fi
 
-echo "      📄 Invoking generate-config.py for dynamic config generation..."
 $PYTHON_CMD scripts/generate-config.py | sed 's/^/   /'
-
-echo "      --------------------------------------------------------"
-echo "      ✅ END: DYNAMIC CONFIGURATION GENERATION"
-echo "      --------------------------------------------------------"
-echo ""
 
 # Fix permissions if running internally (files created as root)
 if [[ "$DOMAIN_MANAGER_INTERNAL" == "true" ]]; then
@@ -519,36 +505,32 @@ EOF
             echo "   🗑️  Removed stale local-certs.yaml."
         fi
     fi
-else
-    echo "   ⏭️ Skipping local certificate check (TRAEFIK_ACME_ENV_TYPE != 'local')."
 fi
 
 
 echo " --------------------------------------------------------"
 echo " [4/6] 🌐 Preparing network & security layer..."
-echo "   🛡️ Checking CrowdSec IP whitelist..."
 WHITELIST_FILE="./config/crowdsec/parsers/ip-whitelist.yaml"
 
 if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
-    echo "   📋 Generating whitelist (including internal network ranges)..."
     
     # Initialize lists with default internal ranges
     declare -a IPS_LIST=("127.0.0.1")
     declare -a CIDRS_LIST=("172.16.0.0/12" "10.0.0.0/8" "192.168.0.0/16")
     
     # Add custom entries from .env if present
+    CUSTOM_ENTRY_COUNT=0
     if [ -n "$CROWDSEC_WHITELIST_IPS" ]; then
-        echo "      ➕ Processing custom IPs from CROWDSEC_WHITELIST_IPS..."
         IFS=',' read -ra ENTRIES <<< "$CROWDSEC_WHITELIST_IPS"
         for entry in "${ENTRIES[@]}"; do
             entry=$(echo "$entry" | xargs) # Trim
             if [ -n "$entry" ]; then
                 if [[ "$entry" == *"/"* ]]; then
                     CIDRS_LIST+=("$entry")
-                    echo "         ➜ Added CIDR: $entry"
+                    CUSTOM_ENTRY_COUNT=$((CUSTOM_ENTRY_COUNT + 1))
                 else
                     IPS_LIST+=("$entry")
-                    echo "         ➜ Added IP: $entry"
+                    CUSTOM_ENTRY_COUNT=$((CUSTOM_ENTRY_COUNT + 1))
                 fi
             fi
         done
@@ -584,7 +566,12 @@ EOF
         done
     fi
     
-    echo "      ✅ Whitelist generated successfully with $((${#IPS_LIST[@]} + ${#CIDRS_LIST[@]})) entries."
+    TOTAL_ENTRIES=$((${#IPS_LIST[@]} + ${#CIDRS_LIST[@]}))
+    if [ $CUSTOM_ENTRY_COUNT -gt 0 ]; then
+        echo "   ✅ CrowdSec whitelist: $TOTAL_ENTRIES entries ($CUSTOM_ENTRY_COUNT custom)."
+    else
+        echo "   ✅ CrowdSec whitelist: $TOTAL_ENTRIES entries."
+    fi
 else
     echo "   ℹ️ CrowdSec is disabled, skipping whitelist generation."
     # Remove old whitelist if it exists to avoid stale entries
@@ -599,26 +586,20 @@ fi
 # =============================================================================
 # This variable is used by generate-config.py to create native Traefik blocking rules.
 if [ -n "$TRAEFIK_BAD_USER_AGENTS" ]; then
-    echo "🛡️ User-Agent blacklist configured in Traefik side."
+    UA_COUNT=$(echo "$TRAEFIK_BAD_USER_AGENTS" | tr ',' '\n' | grep -c .)
+    echo "   🛡️ UA blacklist: $UA_COUNT patterns configured."
     export TRAEFIK_BAD_USER_AGENTS
-else
-    echo "   ℹ️ TRAEFIK_BAD_USER_AGENTS is empty. No native UA blocking applied."
 fi
 
 
-   echo "   🛡 Checking Docker networks..."
 if ! docker network inspect anubis-backend >/dev/null 2>&1; then
     docker network create --internal anubis-backend
     echo "   ✅ Created anubis-backend network (internal)."
-else
-    echo "   ✅ anubis-backend network already exists."
 fi
 
 if ! docker network inspect traefik >/dev/null 2>&1; then
     docker network create traefik
     echo "   ✅ Created traefik network."
-else
-    echo "   ✅ traefik network already exists."
 fi
 
 # =============================================================================
@@ -647,14 +628,8 @@ fi
 # --- Build compose file list (shared with stop.sh and Makefile) ---
 source scripts/compose-files.sh
 
-if [ -f "docker-compose-anubis-generated.yaml" ]; then
-    echo "   ✅ Included docker-compose-anubis-generated.yaml"
-else
-    echo "   ℹ️ docker-compose-anubis-generated.yaml not found (skipping)."
-fi
-
 if [ "$APACHE_HOST_AVAILABLE" == "true" ]; then
-    echo "   📋 Apache legacy installation detected, including logs extension."
+    echo "   📋 Apache legacy detected, including logs extension."
 fi
 
 
@@ -700,12 +675,11 @@ if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
     # Re-register the Traefik Bouncer key on each start to ensure consistency.
     # Delete first (silently) in case it already exists, then add fresh.
 
-    echo "   🔄 Synchronizing Traefik Bouncer..."
     docker exec "$CROWDSEC_ID" cscli bouncers delete traefik-bouncer > /dev/null 2>&1 || true
     docker exec "$CROWDSEC_ID" cscli bouncers add traefik-bouncer --key "${CROWDSEC_API_KEY}" > /dev/null
 
     if [ $? -eq 0 ]; then
-        echo "   🔑 Bouncer key registered successfully."
+        echo "   🔑 Bouncer key registered."
     else
         echo "⚠️ Error registering bouncer key. Check CrowdSec logs."
         exit 1
@@ -814,10 +788,10 @@ echo "✅ DEPLOYMENT COMPLETE! (Total time: ${DURATION}s)"
 echo "========================================================"
 echo ""
 echo "🌐 Core Services:"
-    echo -e "   ➜ Dashboard Home:  https://dashboard.${DOMAIN}/"
-    echo -e "   ➜ Domain Manager:  https://dashboard.${DOMAIN}/domains"
-    echo -e "   ➜ Traefik:         https://dashboard.${DOMAIN}/traefik/"
-    echo -e "   ➜ Dozzle (Logs):   https://dashboard.${DOMAIN}/dozzle/"
-    echo -e "   ➜ Grafana:         https://dashboard.${DOMAIN}/grafana/"
+    echo -e "   ➜ Dashboard Home:  https://${DASHBOARD_SUBDOMAIN:-dashboard}.${DOMAIN}/"
+    echo -e "   ➜ Domain Manager:  https://${DASHBOARD_SUBDOMAIN:-dashboard}.${DOMAIN}/domains"
+    echo -e "   ➜ Traefik:         https://${DASHBOARD_SUBDOMAIN:-dashboard}.${DOMAIN}/traefik/"
+    echo -e "   ➜ Dozzle (Logs):   https://${DASHBOARD_SUBDOMAIN:-dashboard}.${DOMAIN}/dozzle/"
+    echo -e "   ➜ Grafana:         https://${DASHBOARD_SUBDOMAIN:-dashboard}.${DOMAIN}/grafana/"
     echo -e "========================================================"
 echo ""
