@@ -48,7 +48,7 @@ trap cleanup EXIT INT TERM
 # =============================================================================
 # PHASE 2: Build Compose File List
 # =============================================================================
-# Must match the same files used in start.sh to ensure all containers are stopped.
+# Uses shared script to ensure consistency with start.sh and Makefile.
 
 # Safety check: if docker-compose-anubis-generated.yaml is a directory (Docker artifact), remove it
 if [ -d "docker-compose-anubis-generated.yaml" ]; then
@@ -62,22 +62,7 @@ if [ -d "domains.csv" ]; then
     rm -rf domains.csv
 fi
 
-com_files="-f docker-compose-traefik-crowdsec-redis.yaml \
-               -f docker-compose-tools.yaml \
-               -f docker-compose-grafana-loki-alloy.yaml \
-               -f docker-compose-domain-manager.yaml"
-
-if [ -f "docker-compose-anubis-generated.yaml" ]; then
-    com_files="$com_files -f docker-compose-anubis-generated.yaml"
-    echo "   ✅ Included docker-compose-anubis-generated.yaml"
-fi
-
-COMPOSE_FILES="$com_files"
-
-# Include Apache host logs for legacy installations (same condition as start.sh)
-if [ -d "/var/log/apache2" ]; then
-    COMPOSE_FILES="$COMPOSE_FILES -f docker-compose-apache-logs.yaml"
-fi
+source scripts/compose-files.sh
 
 # =============================================================================
 # PHASE 3: Stop All Services

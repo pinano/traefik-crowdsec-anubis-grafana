@@ -625,22 +625,7 @@ fi
 # PHASE 6: Build Compose File List
 # =============================================================================
 
-com_files="-f docker-compose-traefik-crowdsec-redis.yaml \
-               -f docker-compose-tools.yaml \
-               -f docker-compose-grafana-loki-alloy.yaml \
-               -f docker-compose-domain-manager.yaml"
-
-if [ -f "docker-compose-anubis-generated.yaml" ]; then
-    com_files="$com_files -f docker-compose-anubis-generated.yaml"
-    echo "   ✅ Included docker-compose-anubis-generated.yaml"
-else
-    echo "   ℹ️ docker-compose-anubis-generated.yaml not found (skipping)."
-fi
-
-COMPOSE_FILES="$com_files"
-
-# Include Apache host logs for legacy installations
-# Debian/Ubuntu only: check if apache2 is properly installed via dpkg-query
+# --- Apache Detection (sets flag file for compose-files.sh) ---
 APACHE_FLAG_FILE=".apache_host_available"
 
 # If we are in the host (dpkg-query exists), do the real check
@@ -659,9 +644,16 @@ else
     export APACHE_HOST_AVAILABLE="false"
 fi
 
-# Enable logs extension if Apache is available
+# --- Build compose file list (shared with stop.sh and Makefile) ---
+source scripts/compose-files.sh
+
+if [ -f "docker-compose-anubis-generated.yaml" ]; then
+    echo "   ✅ Included docker-compose-anubis-generated.yaml"
+else
+    echo "   ℹ️ docker-compose-anubis-generated.yaml not found (skipping)."
+fi
+
 if [ "$APACHE_HOST_AVAILABLE" == "true" ]; then
-    COMPOSE_FILES="$COMPOSE_FILES -f docker-compose-apache-logs.yaml"
     echo "   📋 Apache legacy installation detected, including logs extension."
 fi
 

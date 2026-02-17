@@ -136,7 +136,7 @@ loki.process "pipelines" {
                 host     = "host",
                 method   = "method",
                 msg      = "msg",
-                log_type = "error",
+                log_type = "level",
             }
         }
 

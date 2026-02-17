@@ -1,6 +1,7 @@
 import tldextract
 import yaml
 import os
+import sys
 import csv
 import re
 from collections import defaultdict
@@ -33,6 +34,9 @@ BLOCKED_USER_AGENTS_STR = os.getenv('TRAEFIK_BAD_USER_AGENTS', '').strip()
 
 # Frame Ancestors (for iframes)
 FRAME_ANCESTORS = os.getenv('TRAEFIK_FRAME_ANCESTORS', '').strip()
+
+# Apache Host IP (docker0 bridge on Linux = 172.17.0.1)
+APACHE_HOST_IP = os.getenv('APACHE_HOST_IP', '172.17.0.1').strip()
 
 # Robust stripping of surrounding quotes
 if (BLOCKED_PATHS_STR.startswith('"') and BLOCKED_PATHS_STR.endswith('"')) or \
@@ -243,7 +247,7 @@ def process_router(entry, http_section, domain_to_cert_def):
 def generate_configs():
     if not os.path.exists(INPUT_FILE):
         print(f"    ❌ FATAL ERROR: {INPUT_FILE} not found.")
-        return
+        sys.exit(1)
 
     raw_entries = []
     error_count = 0
@@ -312,7 +316,7 @@ def generate_configs():
 
                     # Stats tracking
                     if service == 'apache-host': stats['apache'] += 1
-                    if anubis_sub: stats['anubis'] += 1
+                    elif anubis_sub: stats['anubis'] += 1
                     else: stats['standard'] += 1
 
     except Exception as e:
@@ -369,7 +373,7 @@ def generate_configs():
                         'stsPreload': True,
                         'stsSeconds': HSTS_SECONDS,
                         'customFrameOptionsValue': 'SAMEORIGIN' if not FRAME_ANCESTORS else '',
-                        'contentSecurityPolicy': f"frame-ancestors 'self' {FRAME_ANCESTORS.replace(',', ' ')}" if FRAME_ANCESTORS else None
+                        **(({'contentSecurityPolicy': f"frame-ancestors 'self' {FRAME_ANCESTORS.replace(',', ' ')}"}) if FRAME_ANCESTORS else {})
                     }
                 },
                 # 4. Traefik Rate Limit
@@ -417,8 +421,8 @@ def generate_configs():
                 'apache-host-8080': {
                     'loadBalancer': {
                         'serversTransport': 'legacy-transport',
-                        # Fixed IP for Linux environments where host.docker.internal may vary
-                        'servers': [{'url': 'http://172.17.0.1:8080'}],
+                        # Configurable via APACHE_HOST_IP env var (default: 172.17.0.1 for Linux docker0 bridge)
+                        'servers': [{'url': f'http://{APACHE_HOST_IP}:8080'}],
                         'passHostHeader': True
                     }
                 }

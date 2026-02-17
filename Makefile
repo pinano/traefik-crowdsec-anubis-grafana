@@ -31,21 +31,8 @@ endif
 # DOCKER COMPOSE CONFIGURATION
 # =============================================================================
 
-# Base Compose files
-COMPOSE_FILES := -f docker-compose-traefik-crowdsec-redis.yaml \
-                 -f docker-compose-tools.yaml \
-                 -f docker-compose-grafana-loki-alloy.yaml \
-                 -f docker-compose-domain-manager.yaml
-
-# Add Anubis if generated
-ifneq ("$(wildcard docker-compose-anubis-generated.yaml)","")
-    COMPOSE_FILES += -f docker-compose-anubis-generated.yaml
-endif
-
-# Add Apache logs if flagged (relying on .apache_host_available created by start.sh)
-ifneq ("$(wildcard .apache_host_available)","")
-    COMPOSE_FILES += -f docker-compose-apache-logs.yaml
-endif
+# Build compose file list from shared script (single source of truth)
+COMPOSE_FILES := $(shell . scripts/compose-files.sh && echo $$COMPOSE_FILES)
 
 # Extract PROJECT_NAME from .env (default to 'stack' if not found)
 PROJECT_NAME := $(shell grep '^PROJECT_NAME=' .env 2>/dev/null | cut -d= -f2 || echo stack)

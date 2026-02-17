@@ -101,9 +101,15 @@ make restart
 
 ### First Steps After Setup
 
-1. **Access Domain Manager**: `https://domains.<your-domain>` — Add your sites here.
-2. **View Live Logs**: `https://dozzle.<your-domain>` — Real-time container logs.
-3. **Monitor Metrics**: `https://grafana.<your-domain>` — Traffic dashboards.
+All internal tools are accessible via your dashboard subdomain (default: `dashboard.<your-domain>`):
+
+1. **Access Domain Manager**: `https://dashboard.<your-domain>` — Add your sites here.
+2. **View Traefik Dashboard**: `https://dashboard.<your-domain>/traefik` — Routing overview.
+3. **View Live Logs**: `https://dashboard.<your-domain>/dozzle` — Real-time container logs.
+4. **Monitor Metrics**: `https://dashboard.<your-domain>/grafana` — Traffic dashboards.
+
+> [!NOTE]
+> The dashboard subdomain is configurable via `DASHBOARD_SUBDOMAIN` in `.env`.
 
 ---
 
@@ -230,6 +236,7 @@ Access the management interface at `https://domains.<your-domain>`.
 | `TRAEFIK_LISTEN_IP` | Host IP to bind ports 80/443. Use `0.0.0.0` for all interfaces. | `0.0.0.0` |
 | `TRAEFIK_ACME_EMAIL` | Email for Let's Encrypt certificate notices (required for SSL). | - |
 | `TRAEFIK_ACME_ENV_TYPE` | `production`, `staging` (testing), or `local` (mkcert). | `staging` |
+| `TRAEFIK_ACME_CA_SERVER` | Custom ACME server URL. Only used if `TRAEFIK_ACME_ENV_TYPE` is empty. | - |
 | `TRAEFIK_GLOBAL_RATE_AVG` | Default requests per second allowed per IP. | `60` |
 | `TRAEFIK_GLOBAL_RATE_BURST` | Peak requests allowed before blocking. | `120` |
 | `TRAEFIK_GLOBAL_CONCURRENCY` | Max simultaneous connections per IP. | `25` |
@@ -238,6 +245,7 @@ Access the management interface at `https://domains.<your-domain>`.
 | `TRAEFIK_BAD_USER_AGENTS` | Comma-separated list of User-Agent regex patterns to block natively (e.g., `(?i).*curl.*`). | - |
 | `TRAEFIK_ACCESS_LOG_BUFFER` | Number of log lines to buffer before writing to disk/stdout. | `1000` |
 | `TRAEFIK_FRAME_ANCESTORS` | External domains allowed to embed your sites in iframes. | - |
+| `APACHE_HOST_IP` | IP of the host machine as seen from Docker (docker0 bridge). | `172.17.0.1` |
 
 #### When to adjust Log Buffering (`TRAEFIK_ACCESS_LOG_BUFFER`)
 
@@ -261,20 +269,27 @@ Legacy applications or slow backends (e.g., heavy PHP/WordPress) may require adj
 > [!IMPORTANT]
 > These variables update the configuration at **both ends** of the proxy. If your application takes 70 seconds to respond, you must increase `TRAEFIK_TIMEOUT_ACTIVE` to at least 75s.
 
+#### Dashboard & SSO
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DASHBOARD_SUBDOMAIN` | Subdomain where all internal tools are served. | `dashboard` |
+
+All tools (Domain Manager, Traefik, Dozzle, Grafana) are served under `<DASHBOARD_SUBDOMAIN>.<DOMAIN>` with path-based routing. The Domain Manager acts as an SSO (Single Sign-On) provider for all internal services using Traefik's forward-auth middleware.
+
 #### Dashboard Credentials
 
 The stack uses independent credentials for each dashboard. These are synchronized automatically by `start.sh`.
 
 | Variable | Service | Default |
 |----------|---------|---------|
-| `TRAEFIK_ADMIN_USER` | Traefik Dashboard | `admin` |
-| `TRAEFIK_ADMIN_PASSWORD` | Traefik Dashboard | - |
-| `DOMAIN_MANAGER_ADMIN_USER` | Domain Manager UI | `admin` |
-| `DOMAIN_MANAGER_ADMIN_PASSWORD` | Domain Manager UI | - |
-| `DOZZLE_ADMIN_USER` | Dozzle Log Viewer | `admin` |
-| `DOZZLE_ADMIN_PASSWORD` | Dozzle Log Viewer | - |
-| `GRAFANA_ADMIN_USER` | Grafana Dashboards | `admin` |
-| `GRAFANA_ADMIN_PASSWORD` | Grafana Dashboards | - |
+| `DOMAIN_MANAGER_ADMIN_USER` | Domain Manager / SSO Login | `admin` |
+| `DOMAIN_MANAGER_ADMIN_PASSWORD` | Domain Manager / SSO Login | - |
+| `GRAFANA_ADMIN_USER` | Grafana Admin (full admin access) | `admin` |
+| `GRAFANA_ADMIN_PASSWORD` | Grafana Admin (full admin access) | - |
+
+> [!NOTE]
+> **Grafana Access Levels**: Users authenticated via SSO get **Viewer** access (read-only dashboards). Use the Grafana admin credentials above to log in with full admin privileges for configuration.
 
 > [!NOTE]
 > **Internal Variables**: Variables like `TRAEFIK_DASHBOARD_AUTH`, `DOZZLE_DASHBOARD_AUTH`, `DOMAIN_MANAGER_SECRET_KEY`, and `DOMAIN_MANAGER_APP_PATH_HOST` are managed automatically. You don't need to edit them manually.
@@ -307,14 +322,16 @@ Every request passes through a sequential chain of middlewares designed to filte
 
 | Order | Middleware | Purpose | Security Benefit |
 |:---:|:---|:---|:---|
-| 1 | **UA Blacklist** | Matches requests against a list of bad User-Agent regex patterns. | **Native Blocking**: Rejects known bots/scrapers instantly via Traefik. |
-| 2 | **CrowdSec Check** | Consults the local CrowdSec database for the client IP. | **Instant Mitigation**: Blocks known malicious IPs at the entry point. |
-| 3 | **Global Buffering** | Reads the entire request into memory before passing it to the backend. | **Slowloris Defense**: Prevents attackers from exhausting server sockets. |
-| 4 | **Security Headers** | Injects recommended browser security headers (HSTS, XSS, Frame-Options). | **Client Hardening**: Protects users from clickjacking and protocol downgrade attacks. |
-| 5 | **Rate Limiting** | Throttles requests based on average and burst thresholds. | **Flood Protection**: Mitigates automated scraping and brute-force attempts. |
-| 6 | **Concurrency** | Limits the number of simultaneous active connections per client. | **Resource Preservation**: Ensures one heavy/malicious user cannot consume all backend threads. |
-| 7 | **ForwardAuth (Anubis)** | (Optional) Intercepts requests to verify or challenge the session. | **Bot Defense**: Forces suspicious traffic to solve a Proof-of-Work challenge. |
-| 8 | **Compression** | Dynamically compresses response bodies (Gzip) for supported clients. | **Performance**: Reduces bandwidth usage and improves load times. |
+| 1 | **CrowdSec Check** | Consults the local CrowdSec database for the client IP. | **Instant Mitigation**: Blocks known malicious IPs at the entry point. |
+| 2 | **Global Buffering** | Reads the entire request into memory before passing it to the backend. | **Slowloris Defense**: Prevents attackers from exhausting server sockets. |
+| 3 | **Security Headers** | Injects recommended browser security headers (HSTS, XSS, Frame-Options). | **Client Hardening**: Protects users from clickjacking and protocol downgrade attacks. |
+| 4 | **Rate Limiting** | Throttles requests based on average and burst thresholds. | **Flood Protection**: Mitigates automated scraping and brute-force attempts. |
+| 5 | **Concurrency** | Limits the number of simultaneous active connections per client. | **Resource Preservation**: Ensures one heavy/malicious user cannot consume all backend threads. |
+| 6 | **ForwardAuth (Anubis)** | (Optional) Intercepts requests to verify or challenge the session. | **Bot Defense**: Forces suspicious traffic to solve a Proof-of-Work challenge. |
+| 7 | **Compression** | Dynamically compresses response bodies (Gzip) for supported clients. | **Performance**: Reduces bandwidth usage and improves load times. |
+
+> [!NOTE]
+> **UA Blacklist** operates separately via a dedicated path-blocking router with higher priority, not as part of this chain.
 
 #### Specialized Middlewares
 
@@ -489,6 +506,7 @@ A lightweight utility service that monitors the stack and sends Telegram alerts.
 | **Watch Certificates** | `make certs-watch` (Requires `DEBUG` logs) |
 | **Certificates Info**| `make certs-info` (Summary) |
 | **Inspect Certificates** | `make certs-inspect` (Detailed) |
+| **Generate Local Certs** | `make certs-create-local` (Local mode only) |
 | **Traefik Health** | `make traefik-health` |
 | **Redis Stats** | `make redis-info` / `make redis-monitor` |
 | **Show Help** | `make help` |
@@ -513,12 +531,15 @@ The stack manages security hashes for you. You don't need to manually generate `
 
 ### Monitoring Dashboards
 
-| Dashboard | URL | Auth |
-|-----------|-----|------|
-| Traefik | `https://traefik.<domain>` | Basic Auth |
-| Domain Manager | `https://domains.<domain>` | Login form |
-| Grafana | `https://grafana.<domain>` | Login form |
-| Dozzle | `https://dozzle.<domain>` | Basic Auth |
+All dashboards are served under `https://<DASHBOARD_SUBDOMAIN>.<DOMAIN>` (default: `dashboard`).
+
+| Dashboard | Path | Auth |
+|-----------|------|------|
+| Domain Manager | `/` (root) | SSO Login |
+| Traefik | `/traefik` | SSO Login |
+| Grafana | `/grafana` | SSO (Viewer) / Admin login |
+| Dozzle | `/dozzle` | SSO Login |
+| Certificates | `/certs` | SSO Login |
 
 ### Watchdog Alerts
 
@@ -547,25 +568,28 @@ make crowdsec-metrics
 
 #### Advanced Management (Manual)
 
-For complex operations (like adding bans with specific reasons), execute `cscli` directly inside the container via `docker compose`:
+For complex operations (like adding bans with specific reasons), execute `cscli` directly inside the container:
 
 ```bash
 # Access the CrowdSec shell
 make shell crowdsec
 # Then run: cscli decisions add ...
 
-# Or run one-off commands
-docker compose -f docker-compose-traefik-crowdsec-redis.yaml exec crowdsec cscli decisions add --ip <IP> --duration 24h --reason "Manual Ban"
+# Or run one-off commands directly
+make shell crowdsec -- cscli decisions add --ip <IP> --duration 24h --reason "Manual Ban"
 ```
 
 > [!TIP]
-> Use `docker exec -it stack-crowdsec-1 cscli <command> --help` for detailed options on any command.
+> Use `make shell crowdsec -- cscli <command> --help` for detailed options on any command.
 
 ---
 
 ## Apache Legacy Configuration
 
-This section covers the configuration required for legacy Apache installations running directly on the host (not in Docker containers). When using the `apache-host` service type in `domains.csv`, Traefik proxies requests to Apache on `host.docker.internal:8080`.
+This section covers the configuration required for legacy Apache installations running directly on the host (not in Docker containers). When using the `apache-host` service type in `domains.csv`, Traefik proxies requests to Apache on `<APACHE_HOST_IP>:8080` (default: `172.17.0.1`, the docker0 bridge on Linux).
+
+> [!TIP]
+> If you're running Docker Desktop (macOS/Windows), set `APACHE_HOST_IP=host.docker.internal` in your `.env`.
 
 ### Real Client IP Forwarding
 
@@ -677,7 +701,7 @@ This stack supports locally trusted certificates to prevent browser security war
     - Dynamically configure Traefik to use these certificates.
 
     > [!TIP]
-    > **Manual execution**: If you add new entries to `/etc/hosts` and want to refresh the certificate without a full restart, run `make certs`.
+    > **Manual execution**: If you add new entries to `/etc/hosts` and want to refresh the certificate without a full restart, run `make certs-create-local`.
 
 3. **Start the Stack**:
     ```bash
@@ -695,18 +719,24 @@ This stack supports locally trusted certificates to prevent browser security war
 ├── domains.csv.dist                       # Domain inventory template
 ├── Makefile                               # Project management commands
 ├── scripts/                               # Core logic scripts
-│   ├── generate-config.py
-│   ├── initialize-env.sh
-│   ├── create-local-certs.sh
-│   ├── start.sh
-│   └── stop.sh
-│
-├── certs/                                 # SSL certificates directory
+│   ├── compose-files.sh                   # Shared compose file list builder
+│   ├── generate-config.py                 # Dynamic Traefik config generator
+│   ├── initialize-env.sh                  # Interactive .env setup wizard
+│   ├── validate-env.py                    # .env validation & sync tool
+│   ├── inspect-certs.py                   # Certificate inspection utility
+│   ├── create-local-certs.sh              # Local mkcert certificate generator
+│   ├── start.sh                           # Full stack startup orchestrator
+│   ├── stop.sh                            # Graceful stack shutdown
+│   ├── requirements.txt                   # Python dependencies
+│   └── make/                              # Conditional Makefile includes
+│       ├── certs.mk                       # Local cert targets
+│       └── crowdsec.mk                    # CrowdSec management targets
 │
 ├── config/
 │   ├── alloy/                             # Alloy log collector config
 │   │   └── config.alloy
 │   ├── anubis/                            # Anubis bot defense
+│   │   ├── botPolicy.yaml                 # Bot policy template
 │   │   └── assets/                        # Static assets (images, CSS)
 │   ├── crowdsec/                          # CrowdSec IPS
 │   │   ├── acquis.yaml
@@ -714,6 +744,7 @@ This stack supports locally trusted certificates to prevent browser security war
 │   │   └── parsers/                       # Custom parsers (IP whitelist)
 │   ├── domain-manager/                    # Admin UI backend (Python/Flask)
 │   │   ├── app.py
+│   │   ├── Dockerfile
 │   │   ├── static/
 │   │   └── templates/
 │   ├── grafana/                           # Grafana datasources
@@ -738,7 +769,8 @@ This stack supports locally trusted certificates to prevent browser security war
     ├── docker-compose-grafana-loki-alloy.yaml       # Observability stack
     ├── docker-compose-domain-manager.yaml           # Admin UI service
     ├── docker-compose-anubis-base.yaml              # Anubis template
-    └── docker-compose-anubis-generated.yaml         # Auto-generated Anubis instances
+    ├── docker-compose-anubis-generated.yaml         # Auto-generated Anubis instances
+    └── docker-compose-apache-logs.yaml              # Apache log aggregation (optional)
 ```
 
 ---

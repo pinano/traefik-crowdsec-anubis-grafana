@@ -5,6 +5,7 @@ import subprocess
 import secrets
 import re
 import socket
+import logging
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, Response
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -15,6 +16,8 @@ import datetime
 import tldextract
 from collections import defaultdict
 from werkzeug.middleware.proxy_fix import ProxyFix
+
+log = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('DOMAIN_MANAGER_SECRET_KEY', secrets.token_hex(32))
@@ -43,15 +46,23 @@ limiter = Limiter(
 ADMIN_USER = os.environ.get('DOMAIN_MANAGER_ADMIN_USER', 'admin')
 ADMIN_PASS = os.environ.get('DOMAIN_MANAGER_ADMIN_PASSWORD', 'admin')
 
+# Security check: warn if using default credentials
+if ADMIN_PASS in ('password', 'admin', ''):
+    print("=" * 60)
+    print("⚠️  WARNING: Dashboard is using a DEFAULT PASSWORD!")
+    print("   Run 'make init' or update DOMAIN_MANAGER_ADMIN_PASSWORD")
+    print("   in your .env file to set a secure password.")
+    print("=" * 60)
+
 # Mirror the host path inside the container
 BASE_DIR = os.environ.get('DOMAIN_MANAGER_APP_PATH_HOST', os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 CSV_PATH = os.path.join(BASE_DIR, 'domains.csv')
 START_SCRIPT = os.path.join(BASE_DIR, 'scripts/start.sh')
 ACME_FILE = os.path.join(BASE_DIR, 'config/traefik/acme.json')
 
-print(f"DEBUG: BASE_DIR={BASE_DIR}")
-print(f"DEBUG: CSV_PATH={CSV_PATH}")
-print(f"DEBUG: START_SCRIPT={START_SCRIPT}")
+log.debug(f"BASE_DIR={BASE_DIR}")
+log.debug(f"CSV_PATH={CSV_PATH}")
+log.debug(f"START_SCRIPT={START_SCRIPT}")
 
 DOMAIN = os.environ.get('DOMAIN', 'localhost')
 TRAEFIK_RATE_AVG = os.environ.get('TRAEFIK_GLOBAL_RATE_AVG', '60')
@@ -82,7 +93,7 @@ def login_required(f):
 @app.before_request
 def check_csrf():
     if request.path == '/':
-         print(f"DEBUG: app.view_functions keys: {list(app.view_functions.keys())}")
+         log.debug(f"app.view_functions keys: {list(app.view_functions.keys())}")
 
     if request.endpoint == 'login':
         return
@@ -186,12 +197,12 @@ def parse_certificate_data(cert_b64):
                 try:
                     dt = datetime.datetime.strptime(date_str, '%b %d %H:%M:%S %Y GMT')
                     formatted = dt.strftime('%Y-%m-%d %H:%M:%S')
-                    now = datetime.datetime.utcnow()
+                    now = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
                     delta = dt - now
                     data['valid_days'] = delta.days
                     data['expiration_timestamp'] = dt.timestamp()
                     data['expiration_text'] = f"{formatted} ({delta.days} days left)"
-                except:
+                except Exception:
                     data['expiration_text'] = date_str
             
             # 3. SANs
@@ -325,9 +336,11 @@ def check_host_file(domain):
     try:
         with open('/etc/hosts', 'r') as f:
             for line in f:
-                if domain in line and not line.strip().startswith('#'):
-                    return True
-    except:
+                if not line.strip().startswith('#'):
+                    parts = line.split()
+                    if len(parts) >= 2 and domain in parts[1:]:
+                        return True
+    except Exception:
         pass
     return False
 
@@ -342,13 +355,13 @@ def get_external_services():
         if result.returncode == 0:
             services = result.stdout.strip().split('\n')
             unique_services = sorted(list(set([s.strip() for s in services if s.strip()])))
-            print(f"DEBUG: Found containers: {unique_services}")
+            log.debug(f"Found containers: {unique_services}")
             return unique_services
         
-        print(f"DEBUG: Error running docker ps: {result.stderr}")
+        log.debug(f"Error running docker ps: {result.stderr}")
         return []
     except Exception as e:
-        print(f"Error getting services: {e}")
+        log.error(f"Error getting services: {e}")
         return []
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -377,10 +390,10 @@ def login():
                     parsed = urlparse(referrer)
                     if parsed.path and parsed.path != '/login':
                         next_url = parsed.path
-                except:
+                except Exception:
                     pass
         
-        print(f"DEBUG LOGIN POST: User={user}, Next={next_url}")
+        log.debug(f"LOGIN POST: User={user}, Next={next_url}")
 
         if user == ADMIN_USER and pw == ADMIN_PASS:
             session.clear() # Clear any existing session to prevent fixation
@@ -389,14 +402,14 @@ def login():
             
             # Helper to validate next_url (prevent open redirects)
             if next_url and next_url.startswith('/'):
-                 print(f"DEBUG: Redirecting to {next_url}")
+                 log.debug(f"Redirecting to {next_url}")
                  return redirect(next_url)
             
-            print("DEBUG: Redirecting to dashboard")
+            log.debug("Redirecting to dashboard")
             return redirect(url_for('dashboard'))
         
         # Log failure (useful for external monitoring or security logs)
-        print(f"SECURITY: Failed login attempt for user '{user}' from {request.remote_addr}")
+        log.warning(f"SECURITY: Failed login attempt for user '{user}' from {request.remote_addr}")
         return render_template('login.html', error='Invalid credentials', domain=DOMAIN, next=next_url)
     
     # GET: Capture 'next' from query or Referer or X-Replaced-Path
@@ -406,7 +419,7 @@ def login():
     if next_url and '/login' in next_url:
         next_url = None
     
-    print(f"DEBUG LOGIN GET: Next={next_url}")
+    log.debug(f"LOGIN GET: Next={next_url}")
     return render_template('login.html', domain=DOMAIN, next=next_url)
 
 @app.route('/logout')
@@ -666,7 +679,7 @@ def check_domain():
     # (e.g. dev.local defined in host /etc/hosts but not in container DNS).
     # If we are in local mode, we relax this check but verify against /etc/hosts via mount
     if not expected_ip:
-        TRAEFIK_ACME_ENV_TYPE = os.environ.get('TRAEFIK_ACME_ENV_TYPE', 'local')
+        # Use module-level TRAEFIK_ACME_ENV_TYPE (consistent default)
         if TRAEFIK_ACME_ENV_TYPE == 'local':
              if check_host_file(host_domain):
                  expected_ip = '127.0.0.1' # Dummy fallback for comparison logic
@@ -722,10 +735,9 @@ def check_domain():
     
     # 2.5. Anubis Check
     if anubis_subdomain and domain_to_check:
-        # Get root domain from domain_to_check
-        parts = domain_to_check.split('.')
-        if len(parts) >= 2:
-            root_domain = ".".join(parts[-2:])
+        # Get root domain from domain_to_check using tldextract
+        root_domain = get_root_domain(domain_to_check)
+        if root_domain:
             anubis_full_domain = f"{anubis_subdomain}.{root_domain}"
             anubis_ip = resolve_domain(anubis_full_domain)
             
@@ -761,7 +773,7 @@ def check_domain():
                  status_response['status'] = 'mismatch'
              else:
                  status_response['service']['status'] = 'found'
-        except Exception:
+        except Exception:  # noqa: broad exception for service check
              status_response['service'] = {'status': 'error'}
              # Don't fail the whole row just for internal error if possible? 
              # But request asks to check existence.
@@ -807,4 +819,4 @@ def restart_stream():
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
 
-print(f"DEBUG: Startup - URL Map: {app.url_map}", flush=True)
+log.debug(f"Startup - URL Map: {app.url_map}")

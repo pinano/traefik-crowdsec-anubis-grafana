@@ -78,8 +78,31 @@
 
         .summary-container {
             display: flex;
-            gap: 1.5rem;
+            gap: 1rem;
             margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .summary-card {
+            min-width: 0;
+        }
+
+        @media (max-width: 480px) {
+            .summary-container {
+                gap: 0.5rem;
+            }
+
+            .summary-card {
+                padding: 1rem 0.5rem;
+            }
+
+            .summary-card h3 {
+                font-size: 0.7rem;
+            }
+
+            .summary-card .value {
+                font-size: 1.5rem;
+            }
         }
 
         .action-header {
