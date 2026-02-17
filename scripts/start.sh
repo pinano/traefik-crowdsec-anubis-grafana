@@ -171,8 +171,6 @@ validate_env | sed 's/^/   /'
 echo " --------------------------------------------------------"
 echo " [2/6] 🔐 Synchronizing credentials & paths..."
 
-SYNC_NEEDED=0
-
 # Helper to perform common hashing (portability between Linux/macOS)
 # Usage: echo -n "string" | generate_hash  OR  cat file | generate_hash
 generate_hash() {
@@ -184,7 +182,6 @@ generate_hash() {
 }
 
 # Helper to update variables in .env efficiently
-# Use a temporary file to batch updates if needed
 update_env_var() {
     local var_name=$1
     local new_val=$2
@@ -196,44 +193,15 @@ update_env_var() {
     rm "$TMP_ENV"
 }
 
-# 1. Traefik Credentials Sync
-CURRENT_TRAEFIK_SYNC=$(echo -n "${TRAEFIK_ADMIN_USER}:${TRAEFIK_ADMIN_PASSWORD}" | generate_hash)
-if [ "$CURRENT_TRAEFIK_SYNC" != "$TRAEFIK_ADMIN_CREDS_SYNC" ]; then
-    echo "   🔄 Traefik credentials changed. Regenerating hash..."
-    T_HASH=$(docker run --rm httpd:alpine htpasswd -Bbn "$TRAEFIK_ADMIN_USER" "$TRAEFIK_ADMIN_PASSWORD")
-    update_env_var "TRAEFIK_DASHBOARD_AUTH" "'$T_HASH'"
-    update_env_var "TRAEFIK_ADMIN_CREDS_SYNC" "$CURRENT_TRAEFIK_SYNC"
-    export TRAEFIK_DASHBOARD_AUTH="$T_HASH"
-    SYNC_NEEDED=$((SYNC_NEEDED + 1))
-fi
-
-# 2. Dozzle Credentials Sync
-CURRENT_DOZZLE_SYNC=$(echo -n "${DOZZLE_ADMIN_USER}:${DOZZLE_ADMIN_PASSWORD}" | generate_hash)
-if [ "$CURRENT_DOZZLE_SYNC" != "$DOZZLE_ADMIN_CREDS_SYNC" ]; then
-    echo "   🔄 Dozzle credentials changed. Regenerating hash..."
-    D_HASH=$(docker run --rm httpd:alpine htpasswd -Bbn "$DOZZLE_ADMIN_USER" "$DOZZLE_ADMIN_PASSWORD")
-    update_env_var "DOZZLE_DASHBOARD_AUTH" "'$D_HASH'"
-    update_env_var "DOZZLE_ADMIN_CREDS_SYNC" "$CURRENT_DOZZLE_SYNC"
-    export DOZZLE_DASHBOARD_AUTH="$D_HASH"
-    SYNC_NEEDED=$((SYNC_NEEDED + 1))
-fi
-
-# 3. Domain Manager Secret Key
+# Domain Manager Secret Key (auto-generate on first run)
 if [ -z "$DOMAIN_MANAGER_SECRET_KEY" ] || [ "$DOMAIN_MANAGER_SECRET_KEY" == "REPLACE_ME" ]; then
-    echo "   🔄 Domain Manager Secret Key is missing or default. Generating secure key..."
+    echo "   🔄 Generating Domain Manager secret key..."
     NEW_DM_KEY=$(openssl rand -hex 32)
     update_env_var "DOMAIN_MANAGER_SECRET_KEY" "$NEW_DM_KEY"
     export DOMAIN_MANAGER_SECRET_KEY="$NEW_DM_KEY"
-    SYNC_NEEDED=$((SYNC_NEEDED + 1))
-fi
-
-if [ $SYNC_NEEDED -gt 0 ]; then
-    echo "   ✅ Credentials synchronized."
     set -a
     source .env
     set +a
-else
-    echo "   ✅ Credentials in sync."
 fi
 
 # =============================================================================
@@ -463,13 +431,10 @@ if [[ "$DOMAIN_MANAGER_INTERNAL" == "true" ]]; then
     fi
 fi
 
-# =============================================================================
-# PHASE 4B: Local SSL Trust (mkcert)
-# =============================================================================
-# If local certificates are found, configure Traefik to use them as default.
+
 
 # =============================================================================
-# PHASE 4B: Local SSL Trust (mkcert)
+# PHASE 3: Local SSL Trust (mkcert)
 # =============================================================================
 # If local certificates are found AND we are in local mode, configure Traefik to use them.
 
@@ -582,7 +547,7 @@ else
 fi
 
 # =============================================================================
-# PHASE 4D: User-Agent Blacklist Configuration
+# PHASE 4: User-Agent Blacklist Configuration
 # =============================================================================
 # This variable is used by generate-config.py to create native Traefik blocking rules.
 if [ -n "$TRAEFIK_BAD_USER_AGENTS" ]; then
@@ -603,7 +568,7 @@ if ! docker network inspect traefik >/dev/null 2>&1; then
 fi
 
 # =============================================================================
-# PHASE 6: Build Compose File List
+# PHASE 4: Build Compose File List
 # =============================================================================
 
 # --- Apache Detection (sets flag file for compose-files.sh) ---
@@ -670,7 +635,7 @@ if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
     fi
 
     # =============================================================================
-    # PHASE 8: Register Bouncer API Key
+    # PHASE 5: Register Bouncer API Key
     # =============================================================================
     # Re-register the Traefik Bouncer key on each start to ensure consistency.
     # Delete first (silently) in case it already exists, then add fresh.
@@ -686,7 +651,7 @@ if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
     fi
 
     # =============================================================================
-    # PHASE 9: CrowdSec Console Enrollment (Optional)
+    # PHASE 5: CrowdSec Console Enrollment (Optional)
     # =============================================================================
     # If CROWDSEC_ENROLLMENT_KEY is set, enroll this instance with CrowdSec Console
     # for access to community blocklists and centralized management.
@@ -712,7 +677,7 @@ else
 fi
 
 # =============================================================================
-# PHASE 10: Deploy Remaining Services
+# PHASE 6: Deploy Remaining Services
 # =============================================================================
 # Now that the security layer is ready, deploy everything else.
 # --remove-orphans cleans up any old containers not in current config.

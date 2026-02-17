@@ -24,6 +24,9 @@ config/anubis/assets/static/img/happy.webp
 config/anubis/assets/static/img/pensive.webp
 config/anubis/assets/static/img/reject.webp
 
+# Runtime flags
+.apache_host_available
+
 # Python cache files
 __pycache__
 .venv/

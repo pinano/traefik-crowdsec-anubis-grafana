@@ -147,8 +147,6 @@ prompt_val "DASHBOARD_SUBDOMAIN" "Dashboard Subdomain (e.g. 'dashboard' for dash
 
 prompt_val "CROWDSEC_UPDATE_INTERVAL" "CrowdSec update interval (seconds)"
 
-prompt_val "CROWDSEC_UPDATE_INTERVAL" "CrowdSec update interval (seconds)"
-
 echo ""
 read -p "👉 Disable CrowdSec Firewall completely? (y/N): " disable_cs
 if [[ "$disable_cs" == "y" || "$disable_cs" == "Y" ]]; then
@@ -255,10 +253,6 @@ else
     fi
 fi
 
-# 2. TRAEFIK & DOZZLE DASHBOARD AUTH (REMOVED - Managed by Domain Manager SSO)
-# echo ""
-# echo "🔐  Authentication is managed by Domain Manager (SSO)."
-# echo "    Legacy basic auth generation skipped."
 
 # 3. CROWDSEC_API_KEY
 DISABLE_CS=$(grep "^CROWDSEC_DISABLE=" "$ENV_FILE" | cut -d'=' -f2-)

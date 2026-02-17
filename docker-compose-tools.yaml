@@ -104,6 +104,11 @@ services:
         limits:
           cpus: 0.10
           memory: 64M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # ===========================
   #  ANUBIS-ASSETS

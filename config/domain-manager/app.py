@@ -817,6 +817,5 @@ def restart_stream():
     return Response(generate(), mimetype='text/event-stream')
 
 if __name__ == '__main__':
+    log.debug(f"Startup - URL Map: {app.url_map}")
     app.run(host='0.0.0.0', port=5000)
-
-log.debug(f"Startup - URL Map: {app.url_map}")

@@ -201,7 +201,7 @@ certs-watch: ## Monitor ACME logs (Requires TRAEFIK_LOG_LEVEL=DEBUG in .env)
 	@echo "Monitoring ACME/Certificate logs... (Ctrl+C to stop)"
 	@$(DOCKER_COMPOSE) logs -f traefik | \
 		grep --line-buffered -iE 'obtained|validated|solve.*challenge|acme.*error|fail' | \
-		grep --line-buffered -vE 'Trying to challenge|Adding certificate|Looking for|No ACME.*required|RequestHost|global-compress|BasicAuth|Authentication failed'
+		grep --line-buffered -vE 'Trying to challenge|Adding certificate|Looking for|No ACME.*required|RequestHost|global-compress'
 
 .PHONY: certs-info
 certs-info: ## Analyze acme.json certificates against domains.csv (Summary)
