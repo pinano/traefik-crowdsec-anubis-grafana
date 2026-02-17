@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - dashboard.{{ domain }}</title>
+    <title>Login - {{ dashboard_subdomain }}.{{ domain }}</title>
     <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.png') }}" type="image/png">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link
@@ -15,7 +15,7 @@
 <body class="login-page">
     <div class="login-container">
         <div class="login-box">
-            <h1>dashboard.{{ domain }}</h1>
+            <h1>{{ dashboard_subdomain }}.{{ domain }}</h1>
 
             {% if error %}
             <div class="alert alert-danger">{{ error }}</div>

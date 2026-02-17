@@ -434,7 +434,7 @@ def login():
         
         # Log failure (useful for external monitoring or security logs)
         log.warning(f"SECURITY: Failed login attempt for user '{user}' from {request.remote_addr}")
-        return render_template('login.html', error='Invalid credentials', domain=DOMAIN, next=next_url)
+        return render_template('login.html', error='Invalid credentials', domain=DOMAIN, dashboard_subdomain=DASHBOARD_SUBDOMAIN, next=next_url)
     
     # GET: Capture 'next' from query or Referer or X-Replaced-Path
     next_url = request.args.get('next') or request.headers.get('X-Replaced-Path') or request.referrer
@@ -444,7 +444,7 @@ def login():
         next_url = None
     
     log.debug(f"LOGIN GET: Next={next_url}")
-    return render_template('login.html', domain=DOMAIN, next=next_url)
+    return render_template('login.html', domain=DOMAIN, dashboard_subdomain=DASHBOARD_SUBDOMAIN, next=next_url)
 
 @app.route('/logout')
 def logout():
