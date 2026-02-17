@@ -345,24 +345,48 @@ def check_host_file(domain):
     return False
 
 def get_external_services():
+    """Return Docker container names available as proxy targets.
+    
+    Excludes containers belonging to this stack (by PROJECT_NAME label)
+    and adds 'apache-host' as a virtual entry when Apache is detected.
+    """
+    project_name = os.environ.get('PROJECT_NAME', 'stack').lower()
+    apache_available = os.environ.get('APACHE_HOST_AVAILABLE', 'false').lower() == 'true'
+    
+    services = []
+    
+    # Add apache-host virtual service if host Apache was detected by start.sh
+    if apache_available:
+        services.append('apache-host')
+    
     try:
-        # Per user request: strictly use container names.
-        # This allows selecting specific containers like 'ib1-api' vs 'ib2-api'.
-        # NOTE: This means for stack services you must use the full container name (e.g. stack-traefik-1)
-        cmd = ["docker", "ps", "--format", "{{.Names}}"]
+        # Get container names with their compose project label
+        cmd = [
+            "docker", "ps", "--format",
+            "{{.Names}}\t{{.Label \"com.docker.compose.project\"}}"
+        ]
         result = subprocess.run(cmd, capture_output=True, text=True)
         
         if result.returncode == 0:
-            services = result.stdout.strip().split('\n')
-            unique_services = sorted(list(set([s.strip() for s in services if s.strip()])))
-            log.debug(f"Found containers: {unique_services}")
-            return unique_services
-        
-        log.debug(f"Error running docker ps: {result.stderr}")
-        return []
+            for line in result.stdout.strip().split('\n'):
+                if not line.strip():
+                    continue
+                parts = line.split('\t', 1)
+                name = parts[0].strip()
+                compose_project = parts[1].strip().lower() if len(parts) > 1 else ''
+                
+                # Skip containers belonging to our own stack
+                if compose_project == project_name:
+                    continue
+                
+                if name:
+                    services.append(name)
+        else:
+            log.debug(f"Error running docker ps: {result.stderr}")
     except Exception as e:
         log.error(f"Error getting services: {e}")
-        return []
+    
+    return sorted(set(services))
 
 @app.route('/login', methods=['GET', 'POST'])
 @limiter.limit("5 per minute")
