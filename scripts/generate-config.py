@@ -219,9 +219,6 @@ def process_router(entry, http_section, domain_to_cert_def):
     # -------------------------------------------------------------------------
     # 1. Bypass Router (Good User Agents - No CrowdSec) - Priority 15000
     # -------------------------------------------------------------------------
-    # -------------------------------------------------------------------------
-    # 1. Bypass Router (Good User Agents - No CrowdSec) - Priority 15000
-    # -------------------------------------------------------------------------
     if GOOD_USER_AGENTS:
         bypass_router_name = f"good-user-agents-{safe_domain}"
         
@@ -240,9 +237,6 @@ def process_router(entry, http_section, domain_to_cert_def):
         }
         http_section['routers'][bypass_router_name] = bypass_conf
 
-    # -------------------------------------------------------------------------
-    # 2. User-Agent Blocking Router (Per-Domain) - Priority 12000
-    # -------------------------------------------------------------------------
     # -------------------------------------------------------------------------
     # 2. User-Agent Blocking Router (Per-Domain) - Priority 12000
     # -------------------------------------------------------------------------
