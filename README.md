@@ -243,6 +243,7 @@ Access the management interface at `https://domains.<your-domain>`.
 | `TRAEFIK_HSTS_MAX_AGE` | HSTS header duration (seconds). | `31536000` |
 | `TRAEFIK_BLOCKED_PATHS` | Comma-separated list of paths to block globally (e.g., `/wp-admin`). | - |
 | `TRAEFIK_BAD_USER_AGENTS` | Comma-separated list of User-Agent regex patterns to block natively (e.g., `(?i).*curl.*`). | - |
+| `TRAEFIK_GOOD_USER_AGENTS` | Comma-separated list of User-Agents to **whitelist** (bypass CrowdSec & Blocklist). | - |
 | `TRAEFIK_ACCESS_LOG_BUFFER` | Number of log lines to buffer before writing to disk/stdout. | `1000` |
 | `TRAEFIK_FRAME_ANCESTORS` | External domains allowed to embed your sites in iframes. | - |
 | `APACHE_HOST_IP` | IP of the host machine as seen from Docker (docker0 bridge). | `172.17.0.1` |
