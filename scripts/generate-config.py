@@ -372,7 +372,13 @@ def generate_configs():
     if error_count > 0:
         print(f"    ⚠️ Total: {error_count} lines skipped due to errors.")
 
-    print(f"   ⚙️ Global Config: Rate={G_RATE_AVG}/{G_RATE_BURST}, HSTS={HSTS_SECONDS}s")
+    print(f"   ⚙️ Traefik Global Config: Rate={G_RATE_AVG}/{G_RATE_BURST}, HSTS={HSTS_SECONDS}s")
+
+    if GOOD_USER_AGENTS:
+        print(f"   😇 Good User-Agents Whitelisted: {len(GOOD_USER_AGENTS)}")
+
+    if BAD_USER_AGENTS:
+        print(f"   🚫 Bad User-Agents Blacklisted: {len(BAD_USER_AGENTS)}")
 
     services = {}
 
