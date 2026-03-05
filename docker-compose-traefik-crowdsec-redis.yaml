@@ -4,7 +4,7 @@ services:
   #  TRAEFIK
   # ===========================
   traefik:
-    image: traefik:v3.6.8
+    image: traefik:v3.6.9
     restart: always
     ports:
       - "${TRAEFIK_LISTEN_IP:-0.0.0.0}:80:80"
@@ -97,7 +97,7 @@ services:
   #  REDIS ("valkey" backend for Anubis)
   # ===========================
   redis:
-    image: valkey/valkey:9.0.1-alpine
+    image: valkey/valkey:9.0.3-alpine
     command: redis-server /redis.conf --requirepass "${REDIS_PASSWORD}"
     restart: unless-stopped
     environment:
