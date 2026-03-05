@@ -1,4 +1,5 @@
 bots:
+  - import: (data)/clients/docker-client.yaml
   - name: cloudflare-workers
     headers_regex:
       CF-Worker: .*
