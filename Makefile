@@ -62,7 +62,7 @@ check_service = \
 
 # Helper: Extract arguments for logs and shell commands
 # This allows using "make logs redis" instead of "make logs s=redis"
-SUPPORTED_COMMANDS := logs shell
+SUPPORTED_COMMANDS := logs shell restart
 SUPPORTS_ARGS := $(filter $(firstword $(MAKECMDGOALS)),$(SUPPORTED_COMMANDS))
 ifneq "$(SUPPORTS_ARGS)" ""
   # The remaining arguments are the service names
@@ -91,7 +91,17 @@ stop: ## Stop the stack (calls stop.sh)
 	@./scripts/stop.sh
 
 .PHONY: restart
-restart: stop start ## Restart the stack
+restart: ## Restart the stack or a specific service (usage: make restart [service])
+ifneq ($(strip $(SERVICE_ARGS)),)
+	@echo "Restarting service(s): $(SERVICE_ARGS)..."
+	@$(DOCKER_COMPOSE) restart $(SERVICE_ARGS)
+else ifdef s
+	@echo "Restarting service: $(s)..."
+	@$(DOCKER_COMPOSE) restart $(s)
+else
+	@./scripts/stop.sh
+	@./scripts/start.sh
+endif
 
 .PHONY: rebuild
 rebuild: ## Rebuild services from Dockerfile (default: domain-manager watchdog)
