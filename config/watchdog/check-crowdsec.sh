@@ -179,7 +179,7 @@ else
     done
     
     if [ -n "$STALE_ALERTS" ]; then
-        send_telegram "Some bouncers appear to be stale:%0A%0A${STALE_ALERTS}%0A👉 *Action Required:* Check bouncer connectivity."
+        send_telegram "Some bouncers appear to be stale:%0A%0A${STALE_ALERTS}%0A👉 *Action Required:* Access the host to check CrowdSec log/status. If the issue persists, try restarting it (e.g., \`make restart s=crowdsec\`)."
     fi
     
     rm -rf "$GROUP_DIR"

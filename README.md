@@ -229,6 +229,10 @@ Access the management interface at `https://domains.<your-domain>`.
 | `CROWDSEC_COLLECTIONS` | List of security scenarios to load (Traefik, SSH, DDoS, etc.). | *Defaults included* |
 | `CROWDSEC_ENROLLMENT_KEY` | Optional key to connect to the [CrowdSec Console](https://app.crowdsec.net). | - |
 
+#### CrowdSec Fail-Open Behavior
+The stack is configured by default for High Availability (**Fail Open**).
+If the CrowdSec LAPI or the Redis cache become unreachable, the Traefik plugin will **not** block legitimate traffic (it won't return 403 errors). This is achieved through specific CrowdSec plugin settings generated automatically (`updateMaxFailure: -1` and `redisCacheUnreachableBlock: false`).
+
 #### Traefik (Edge Routing)
 
 | Variable | Description | Default |

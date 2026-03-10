@@ -487,6 +487,9 @@ def generate_configs():
                     'crowdsecLapiKey': CROWDSEC_API_KEY,
                     'crowdsecMode': 'stream',
                     'updateIntervalSeconds': CS_UPDATE_INTERVAL,
+                    # Fail-open behavior: never block traffic if LAPI or Redis are unreachable/down
+                    'updateMaxFailure': -1,
+                    'redisCacheUnreachableBlock': False,
                     # Redis Caching (highly recommended for high traffic)
                     # We use the existing Redis service (Valkey) as backend
                     'redisCacheEnabled': True,
