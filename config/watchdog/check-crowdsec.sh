@@ -62,7 +62,7 @@ done
 
 if [ -z "$REAL_CONTAINER_ID" ] || [ -z "$CONTAINER_STATUS" ]; then
     echo -e "${RED}❌ CrowdSec container not found or Docker API error after $MAX_RETRIES attempts!${NC}"
-    send_telegram "CrowdSec container not found or Docker API error!%0A👉 *Action Required:* Check if the container exists and is properly configured."
+    send_telegram "CrowdSec container not found or Docker API error!%0A👉 *Action Required:* Check if the container exists and is properly configured. If necessary, you can try restarting it (e.g., \`make restart crowdsec\`)."
     exit 1
 fi
 
@@ -71,7 +71,7 @@ CROWDSEC_CONTAINER="$REAL_CONTAINER_ID"
 
 if [ "$CONTAINER_STATUS" != "running" ]; then
     echo -e "${RED}❌ CrowdSec container is not running (status: $CONTAINER_STATUS)${NC}"
-    send_telegram "CrowdSec container is *not running*!%0ACurrent status: \`${CONTAINER_STATUS}\`%0A👉 *Action Required:* Restart the CrowdSec container."
+    send_telegram "CrowdSec container is *not running*!%0ACurrent status: \`${CONTAINER_STATUS}\`%0A👉 *Action Required:* Restart the CrowdSec container (e.g., \`make restart crowdsec\`)."
     exit 1
 fi
 
@@ -84,7 +84,7 @@ LAPI_EXIT_CODE=$?
 if [ $LAPI_EXIT_CODE -ne 0 ]; then
     echo -e "${RED}❌ CrowdSec LAPI is not healthy!${NC}"
     echo "$LAPI_STATUS"
-    send_telegram "CrowdSec LAPI is *not healthy*!%0A%0AError output:%0A\`\`\`%0A$(echo "$LAPI_STATUS" | head -5)%0A\`\`\`%0A👉 *Action Required:* Check CrowdSec logs."
+    send_telegram "CrowdSec LAPI is *not healthy*!%0A%0AError output:%0A\`\`\`%0A$(echo "$LAPI_STATUS" | head -5)%0A\`\`\`%0A👉 *Action Required:* Check CrowdSec logs, and if necessary, restart the container (e.g., \`make restart crowdsec\`)."
     exit 1
 fi
 
@@ -96,7 +96,7 @@ BOUNCER_COUNT=$(echo "$BOUNCERS" | jq 'length' 2>/dev/null || echo "0")
 
 if [ "$BOUNCER_COUNT" = "0" ] || [ -z "$BOUNCER_COUNT" ]; then
     echo -e "${YELLOW}⚠️ No bouncers registered with CrowdSec${NC}"
-    send_telegram "No bouncers are registered with CrowdSec!%0A%0A👉 *Action Required:* Register the Traefik bouncer to enable protection."
+    send_telegram "No bouncers are registered with CrowdSec!%0A%0A👉 *Action Required:* Register the Traefik bouncer to enable protection. If they should be registered, try restarting the container (e.g., \`make restart crowdsec\`)."
 else
     echo -e "${GREEN}✅ $BOUNCER_COUNT bouncer(s) registered${NC}"
     
