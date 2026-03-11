@@ -39,6 +39,12 @@ Get the stack running in minutes. Choose the environment that matches your needs
   sudo dnf install make python3-pip
   ```
 - Ports `80` and `443` free on the host machine.
+- **Kernel memory overcommit enabled** (required by Redis/Valkey):
+  ```bash
+  echo 'vm.overcommit_memory = 1' | sudo tee -a /etc/sysctl.conf
+  sudo sysctl vm.overcommit_memory=1
+  ```
+  > Without this, Redis may fail background saves or replication under memory pressure. See [Troubleshooting](#redis-memory-overcommit-warning) for details.
 
 ### Option A: Local Development
 
@@ -822,6 +828,59 @@ This stack supports locally trusted certificates to prevent browser security war
 - Check Traefik logs: `docker logs traefik`.
 - Verify ACME email is correct in `.env`.
 - For testing, use `TRAEFIK_ACME_ENV_TYPE=staging` to avoid rate limits.
+
+### Redis Memory Overcommit Warning
+
+Redis (Valkey) logs the following warning on startup:
+
+```
+WARNING Memory overcommit must be enabled! Without it, a background save
+or replication may fail under low memory condition.
+```
+
+#### What it means
+
+Linux uses a memory allocation policy called **overcommit**. By default (`vm.overcommit_memory = 0`), the kernel checks whether there is enough free memory before granting an allocation. If the system is under pressure, it can deny the `fork()` call that Redis uses to write data to disk (a **background save / BGSAVE / AOF rewrite**).
+
+With memory overcommit enabled (`vm.overcommit_memory = 1`), the kernel always grants memory allocation requests regardless of the current available memory, relying on the OOM killer as a last resort. This is the de-facto standard for Redis and Valkey in production because:
+
+- Redis forks a child process to do a Copy-on-Write (CoW) snapshot — the kernel must "promise" the same memory to both parent and child.
+- Without overcommit, that `fork()` can fail even when there is still plenty of RAM, because the kernel refuses to commit to a total allocation that exceeds physical + swap.
+
+#### Impact if left unconfigured
+
+| Scenario | Risk |
+|----------|----- |
+| Background RDB save (`BGSAVE`) | May fail silently; last good snapshot could be stale |
+| AOF rewrite | Can be skipped; AOF file grows without compaction |
+| Inbound replication | New replica sync may fail |
+| Low-memory conditions | Redis logs errors, data persistence degrades |
+
+In this stack Redis is used for **Anubis session state** and **CrowdSec's ban cache**. A failed BGSAVE does not cause immediate data loss (AOF is active), but it does mean the periodic RDB snapshot is unreliable.
+
+#### Fix (permanent)
+
+Run the following two commands **on the Docker host** (not inside any container):
+
+```bash
+# 1. Persist the setting across reboots
+echo 'vm.overcommit_memory = 1' | sudo tee -a /etc/sysctl.conf
+
+# 2. Apply immediately without rebooting
+sudo sysctl vm.overcommit_memory=1
+```
+
+Verify it took effect:
+
+```bash
+cat /proc/sys/vm/kernel.overcommit_memory
+# Expected output: 1
+```
+
+After this, the Redis warning will disappear on next container restart.
+
+> [!NOTE]
+> This is a **host kernel setting** — it cannot be changed from inside the container. It must be applied directly on the machine running Docker. On managed cloud VMs (Oracle Cloud, AWS EC2, etc.) you have full `sudo` access to do this.
 
 ---
 
