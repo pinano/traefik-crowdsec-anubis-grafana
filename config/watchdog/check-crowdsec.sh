@@ -29,7 +29,7 @@ send_telegram() {
 
 # Verify docker socket is available
 if [ ! -S /var/run/docker.sock ]; then
-    echo -e "${RED}❌ Error: Docker socket not available.${NC}"
+    printf '%b\n' "${RED}❌ Error: Docker socket not available.${NC}"
     exit 1
 fi
 
@@ -55,13 +55,13 @@ while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
     
     RETRY_COUNT=$((RETRY_COUNT + 1))
     if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-        echo -e "${YELLOW}⚠️ Warning: CrowdSec container not found (Attempt $RETRY_COUNT/$MAX_RETRIES). Retrying in 2s...${NC}"
+        printf '%b\n' "${YELLOW}⚠️ Warning: CrowdSec container not found (Attempt $RETRY_COUNT/$MAX_RETRIES). Retrying in 2s...${NC}"
         sleep 2
     fi
 done
 
 if [ -z "$REAL_CONTAINER_ID" ] || [ -z "$CONTAINER_STATUS" ]; then
-    echo -e "${RED}❌ CrowdSec container not found or Docker API error after $MAX_RETRIES attempts!${NC}"
+    printf '%b\n' "${RED}❌ CrowdSec container not found or Docker API error after $MAX_RETRIES attempts!${NC}"
     send_telegram "CrowdSec container not found or Docker API error!%0A👉 *Action Required:* Check if the container exists and is properly configured. If necessary, you can try restarting it (e.g., \`make restart crowdsec\`)."
     exit 1
 fi
@@ -70,46 +70,49 @@ fi
 CROWDSEC_CONTAINER="$REAL_CONTAINER_ID"
 
 if [ "$CONTAINER_STATUS" != "running" ]; then
-    echo -e "${RED}❌ CrowdSec container is not running (status: $CONTAINER_STATUS)${NC}"
+    printf '%b\n' "${RED}❌ CrowdSec container is not running (status: $CONTAINER_STATUS)${NC}"
     send_telegram "CrowdSec container is *not running*!%0ACurrent status: \`${CONTAINER_STATUS}\`%0A👉 *Action Required:* Restart the CrowdSec container (e.g., \`make restart crowdsec\`)."
     exit 1
 fi
 
-echo -e "${GREEN}✅ CrowdSec container is running${NC}"
+printf '%b\n' "${GREEN}✅ CrowdSec container is running${NC}"
 
 # Check LAPI status
 LAPI_STATUS=$(docker exec "$CROWDSEC_CONTAINER" cscli lapi status 2>&1)
 LAPI_EXIT_CODE=$?
 
 if [ $LAPI_EXIT_CODE -ne 0 ]; then
-    echo -e "${RED}❌ CrowdSec LAPI is not healthy!${NC}"
+    printf '%b\n' "${RED}❌ CrowdSec LAPI is not healthy!${NC}"
     echo "$LAPI_STATUS"
     send_telegram "CrowdSec LAPI is *not healthy*!%0A%0AError output:%0A\`\`\`%0A$(echo "$LAPI_STATUS" | head -5)%0A\`\`\`%0A👉 *Action Required:* Check CrowdSec logs, and if necessary, restart the container (e.g., \`make restart crowdsec\`)."
     exit 1
 fi
 
-echo -e "${GREEN}✅ CrowdSec LAPI is healthy${NC}"
+printf '%b\n' "${GREEN}✅ CrowdSec LAPI is healthy${NC}"
 
 # Check registered bouncers
 BOUNCERS=$(docker exec "$CROWDSEC_CONTAINER" cscli bouncers list -o json 2>/dev/null)
 BOUNCER_COUNT=$(echo "$BOUNCERS" | jq 'length' 2>/dev/null || echo "0")
 
 if [ "$BOUNCER_COUNT" = "0" ] || [ -z "$BOUNCER_COUNT" ]; then
-    echo -e "${YELLOW}⚠️ No bouncers registered with CrowdSec${NC}"
+    printf '%b\n' "${YELLOW}⚠️ No bouncers registered with CrowdSec${NC}"
     send_telegram "No bouncers are registered with CrowdSec!%0A%0A👉 *Action Required:* Register the Traefik bouncer to enable protection. If they should be registered, try restarting the container (e.g., \`make restart crowdsec\`)."
 else
-    echo -e "${GREEN}✅ $BOUNCER_COUNT bouncer(s) registered${NC}"
+    printf '%b\n' "${GREEN}✅ $BOUNCER_COUNT bouncer(s) registered${NC}"
     
     CURRENT_TIME=$(date +%s)
     STALE_THRESHOLD=600 # 10 minutes (to avoid false positives with Traefik plugins)
     PRUNE_THRESHOLD=172800 # 48 hours (to cleanup very old stale entries)
     
     # Use a temp directory to group bouncers
-    GROUP_DIR="/tmp/crowdsec_bouncers"
-    rm -rf "$GROUP_DIR" && mkdir -p "$GROUP_DIR"
+    GROUP_DIR=$(mktemp -d /tmp/crowdsec_bouncers_XXXXXX)
     
     # Process bouncers and group them by base name
-    echo "$BOUNCERS" | jq -r '.[] | "\(.name)|\(.last_pull)"' 2>/dev/null | while IFS='|' read -r full_name last_pull; do
+    # NOTE: We read into a temp file first to avoid subshell variable scope issues
+    BOUNCER_LIST_FILE=$(mktemp /tmp/crowdsec_list_XXXXXX)
+    echo "$BOUNCERS" | jq -r '.[] | "\(.name)|\(.last_pull)"' 2>/dev/null > "$BOUNCER_LIST_FILE"
+
+    while IFS='|' read -r full_name last_pull; do
         # Extract base name (e.g., traefik-bouncer from traefik-bouncer@172.19.0.6)
         base_name=$(echo "$full_name" | cut -d'@' -f1)
         
@@ -126,23 +129,25 @@ else
                 DIFF=$((CURRENT_TIME - LAST_PULL_TS))
                 [ $DIFF -le $STALE_THRESHOLD ] && IS_STALE=0
                 [ $DIFF -gt $PRUNE_THRESHOLD ] && IS_REALLY_OLD=1
-                
-                # Auto-prune very old bouncers to keep the list clean
-                if [ $IS_REALLY_OLD -eq 1 ]; then
-                    echo -e "${YELLOW}🧹 Auto-pruning very old bouncer: $full_name (last pull: $((DIFF / 3600))h ago)${NC}"
-                    docker exec "$CROWDSEC_CONTAINER" cscli bouncers delete "$full_name" > /dev/null 2>&1
-                    continue # Don't account for pruned bouncers in group status
-                fi
             fi
         fi
-        
-        # Record status for the group
+
+        # Auto-prune very old bouncers — do this BEFORE recording group status
+        if [ $IS_REALLY_OLD -eq 1 ]; then
+            DIFF_H=$((( CURRENT_TIME - LAST_PULL_TS ) / 3600))
+            printf '%b\n' "${YELLOW}🧹 Auto-pruning very old bouncer: $full_name (last pull: ${DIFF_H}h ago)${NC}"
+            docker exec "$CROWDSEC_CONTAINER" cscli bouncers delete "$full_name" > /dev/null 2>&1
+            continue # Skip to next bouncer — don't record this one in group status
+        fi
+
+        # Record status for the group (only for non-pruned bouncers)
         if [ $IS_STALE -eq 0 ]; then
             touch "$GROUP_DIR/${base_name}.active"
         else
             echo "$full_name" >> "$GROUP_DIR/${base_name}.stale_list"
         fi
-    done
+    done < "$BOUNCER_LIST_FILE"
+    rm -f "$BOUNCER_LIST_FILE"
     
     # Evaluate groups and build alert message
     STALE_ALERTS=""
@@ -171,10 +176,10 @@ else
                 fi
                 
                 STALE_ALERTS="${STALE_ALERTS}• *$name*: last pull was ${MSG_TIME}%0A"
-                echo -e "${YELLOW}⚠️ Bouncer '$name' is STALE (last pull: ${MSG_TIME})${NC}"
+                printf '%b\n' "${YELLOW}⚠️ Bouncer '$name' is STALE (last pull: ${MSG_TIME})${NC}"
             done < "$group_file"
         else
-            echo -e "${GREEN}✅ Group '$base_name' is active (some instances are stale but at least one is healthy)${NC}"
+            printf '%b\n' "${GREEN}✅ Group '$base_name' is active (some instances are stale but at least one is healthy)${NC}"
         fi
     done
     
@@ -193,7 +198,7 @@ if [ "$DECISION_COUNT" = "null" ] || [ -z "$DECISION_COUNT" ]; then
     DECISION_COUNT="0"
 fi
 
-echo -e "${GREEN}📊 Active decisions (bans): $DECISION_COUNT${NC}"
+printf '%b\n' "${GREEN}📊 Active decisions (bans): $DECISION_COUNT${NC}"
 
 # Get metrics summary
 ALERTS_24H=$(docker exec "$CROWDSEC_CONTAINER" cscli alerts list --since 24h -o json 2>/dev/null | jq 'length' 2>/dev/null || echo "0")
@@ -201,7 +206,7 @@ if [ "$ALERTS_24H" = "null" ] || [ -z "$ALERTS_24H" ]; then
     ALERTS_24H="0"
 fi
 
-echo -e "${GREEN}📊 Alerts in last 24h: $ALERTS_24H${NC}"
+printf '%b\n' "${GREEN}📊 Alerts in last 24h: $ALERTS_24H${NC}"
 
 echo ""
 echo "✅ CrowdSec health check completed successfully."

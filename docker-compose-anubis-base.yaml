@@ -33,7 +33,11 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - ./config/anubis/botPolicy-generated.yaml:/botPolicy.yaml:ro
     healthcheck:
-      disable: true
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     logging:
       driver: "json-file"
       options:

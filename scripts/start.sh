@@ -156,6 +156,24 @@ validate_env() {
         fi
     fi
 
+    # 5. Check for trivial default passwords (only for staging/production)
+    if [ "$TRAEFIK_ACME_ENV_TYPE" != "local" ]; then
+        local trivial_passwords=0
+        if [ "$GRAFANA_ADMIN_PASSWORD" = "password" ] || [ "$GRAFANA_ADMIN_PASSWORD" = "admin" ]; then
+            echo "⚠️  Warning: GRAFANA_ADMIN_PASSWORD is set to a trivial value."
+            trivial_passwords=$((trivial_passwords + 1))
+        fi
+        if [ "$DOMAIN_MANAGER_ADMIN_PASSWORD" = "password" ] || [ "$DOMAIN_MANAGER_ADMIN_PASSWORD" = "admin" ]; then
+            echo "⚠️  Warning: DOMAIN_MANAGER_ADMIN_PASSWORD is set to a trivial value."
+            trivial_passwords=$((trivial_passwords + 1))
+        fi
+        if [ $trivial_passwords -gt 0 ]; then
+            echo ""
+            echo "🛑 Trivial passwords detected for a non-local environment. Please update your .env."
+            exit 1
+        fi
+    fi
+
     if [ $error_count -gt 0 ]; then
         echo ""
         echo "🛑 Validation failed with $error_count errors. Please fix your .env file."
@@ -182,13 +200,17 @@ generate_hash() {
 }
 
 # Helper to update variables in .env efficiently
+# Handles values containing '#' by escaping them for sed
 update_env_var() {
     local var_name=$1
     local new_val=$2
     local TMP_ENV=$(mktemp)
     
-    # Use '#' as delimiter for safety with paths/hashes
-    sed "s#^${var_name}=.*#${var_name}=${new_val}#" "$ENV_FILE" > "$TMP_ENV"
+    # Escape '#' in value to prevent sed treating it as a delimiter
+    local escaped_val=$(echo "$new_val" | sed 's|#|\\#|g')
+    
+    # Use '|' as delimiter (safe for most values including paths with #)
+    sed "s|^${var_name}=.*|${var_name}=${escaped_val}|" "$ENV_FILE" > "$TMP_ENV"
     cat "$TMP_ENV" > "$ENV_FILE"
     rm "$TMP_ENV"
 }
@@ -641,12 +663,13 @@ if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
     # Delete first (silently) in case it already exists, then add fresh.
 
     docker exec "$CROWDSEC_ID" cscli bouncers delete traefik-bouncer > /dev/null 2>&1 || true
-    docker exec "$CROWDSEC_ID" cscli bouncers add traefik-bouncer --key "${CROWDSEC_API_KEY}" > /dev/null
+    ADD_OUTPUT=$(docker exec "$CROWDSEC_ID" cscli bouncers add traefik-bouncer --key "${CROWDSEC_API_KEY}" 2>&1)
+    ADD_EXIT=$?
 
-    if [ $? -eq 0 ]; then
+    if [ $ADD_EXIT -eq 0 ]; then
         echo "   🔑 Bouncer key registered."
     else
-        echo "⚠️ Error registering bouncer key. Check CrowdSec logs."
+        echo "❌ Error registering bouncer key: $ADD_OUTPUT"
         exit 1
     fi
 

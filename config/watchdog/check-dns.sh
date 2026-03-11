@@ -100,15 +100,15 @@ while IFS=, read -r domain rest || [ -n "$domain" ]; do
     result=$?
     
     if [ $result -eq 1 ]; then
-        echo -e "${YELLOW}[WARN] $domain - No A record found (will recheck)${NC}"
+        printf '%b\n' "${YELLOW}[WARN] $domain - No A record found (will recheck)${NC}"
         FAILED_DOMAINS="${FAILED_DOMAINS}${domain}|"
         FAILED_REASONS="${FAILED_REASONS}no_record|"
     elif [ $result -eq 2 ]; then
-        echo -e "${YELLOW}[WARN] $domain -> $RESOLVED_IP (expected: $HOST_IP) (will recheck)${NC}"
+        printf '%b\n' "${YELLOW}[WARN] $domain -> $RESOLVED_IP (expected: $HOST_IP) (will recheck)${NC}"
         FAILED_DOMAINS="${FAILED_DOMAINS}${domain}|"
         FAILED_REASONS="${FAILED_REASONS}mismatch:${RESOLVED_IP}|"
     else
-        echo -e "${GREEN}[OK] $domain -> $RESOLVED_IP${NC}"
+        printf '%b\n' "${GREEN}[OK] $domain -> $RESOLVED_IP${NC}"
     fi
 done < "$DOMAINS_FILE"
 
@@ -118,8 +118,11 @@ MISMATCHED_DOMAINS=""
 
 if [ -n "$FAILED_DOMAINS" ]; then
     echo ""
-    echo -e "${CYAN}⏳ Waiting ${DNS_RECHECK_DELAY} seconds before double-checking failed domains...${NC}"
+    printf '%b\n' "${CYAN}⏳ Waiting ${DNS_RECHECK_DELAY} seconds before double-checking failed domains...${NC}"
     sleep "$DNS_RECHECK_DELAY"
+    
+    # Unique temp file for collecting errors from the subshell
+    DNS_ERRORS_FILE=$(mktemp /tmp/dns_errors_XXXXXX.txt)
     
     echo ""
     echo "📋 Second pass: Double-checking failed domains..."
@@ -132,22 +135,22 @@ if [ -n "$FAILED_DOMAINS" ]; then
         result=$?
         
         if [ $result -eq 1 ]; then
-            echo -e "${RED}[FAIL] $domain - No A record found (confirmed)${NC}"
+            printf '%b\n' "${RED}[FAIL] $domain - No A record found (confirmed)${NC}"
             # Write to temp file since we're in a subshell
-            echo "• *${domain}*: No A record found%0A" >> /tmp/dns_errors.txt
+            echo "• *${domain}*: No A record found%0A" >> "$DNS_ERRORS_FILE"
         elif [ $result -eq 2 ]; then
-            echo -e "${RED}[FAIL] $domain -> $RESOLVED_IP (expected: $HOST_IP) (confirmed)${NC}"
-            echo "• *${domain}*: Points to \`${RESOLVED_IP}\` instead of \`${HOST_IP}\`%0A" >> /tmp/dns_errors.txt
+            printf '%b\n' "${RED}[FAIL] $domain -> $RESOLVED_IP (expected: $HOST_IP) (confirmed)${NC}"
+            echo "• *${domain}*: Points to \`${RESOLVED_IP}\` instead of \`${HOST_IP}\`%0A" >> "$DNS_ERRORS_FILE"
         else
-            echo -e "${GREEN}[OK] $domain -> $RESOLVED_IP (recovered)${NC}"
+            printf '%b\n' "${GREEN}[OK] $domain -> $RESOLVED_IP (recovered)${NC}"
         fi
     done
     
-    # Read errors from temp file
-    if [ -f /tmp/dns_errors.txt ]; then
-        MISMATCHED_DOMAINS=$(cat /tmp/dns_errors.txt)
-        ERRORS=$(wc -l < /tmp/dns_errors.txt | tr -d ' ')
-        rm -f /tmp/dns_errors.txt
+    # Read errors from unique temp file
+    if [ -f "$DNS_ERRORS_FILE" ]; then
+        MISMATCHED_DOMAINS=$(cat "$DNS_ERRORS_FILE")
+        ERRORS=$(wc -l < "$DNS_ERRORS_FILE" | tr -d ' ')
+        rm -f "$DNS_ERRORS_FILE"
     fi
 fi
 
@@ -156,10 +159,10 @@ if [ $ERRORS -gt 0 ]; then
     MESSAGE="Found *${ERRORS}* domain(s) with DNS issues (confirmed after double-check):%0A%0A${MISMATCHED_DOMAINS}%0A👉 *Action Required:* Update DNS records to point to \`${HOST_IP}\`"
     send_telegram "$MESSAGE"
     echo ""
-    echo -e "${RED}⚠️ DNS check completed with $ERRORS confirmed error(s). Alert sent.${NC}"
+    printf '%b\n' "${RED}⚠️ DNS check completed with $ERRORS confirmed error(s). Alert sent.${NC}"
 else
     echo ""
-    echo -e "${GREEN}✅ DNS check completed. All $TOTAL domains point correctly to $HOST_IP${NC}"
+    printf '%b\n' "${GREEN}✅ DNS check completed. All $TOTAL domains point correctly to $HOST_IP${NC}"
 fi
 
 echo "📊 Summary: $TOTAL domains checked, $ERRORS with confirmed issues."

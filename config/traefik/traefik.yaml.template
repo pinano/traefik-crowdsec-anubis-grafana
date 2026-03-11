@@ -30,8 +30,8 @@ entryPoints:
         writeTimeout: "TRAEFIK_TIMEOUT_ACTIVE_PLACEHOLDER"
         idleTimeout: "TRAEFIK_TIMEOUT_IDLE_PLACEHOLDER"
 
-  mariadb:
-    address: ":3306"
+  # NOTE: Add TCP entrypoints here if needed (e.g. mariadb: ":3306")
+  # and expose the port in docker-compose-traefik-crowdsec-redis.yaml.
 
 certificatesResolvers:
   le:

@@ -71,16 +71,14 @@ for CERT_B64 in $CERTS; do
     
     if [ $DIFF -lt $WARNING_SECONDS ]; then
         DAYS_LEFT=$((DIFF / 86400))
-        echo -e "${RED}[DANGER] $DOMAIN expires in $DAYS_LEFT days ($END_DATE_STR)${NC}"
+        printf '%b\n' "${RED}[DANGER] $DOMAIN expires in $DAYS_LEFT days ($END_DATE_STR)${NC}"
         
         # Send Telegram alert
         MESSAGE="The certificate for *${DOMAIN}* expires in *${DAYS_LEFT} days* (threshold: ${WATCHDOG_CERT_DAYS_WARNING} days).%0AAutomatic renewal has failed or is delayed.%0A👉 *Action Required:* Review Traefik renewal process immediately."
         send_telegram "$MESSAGE"
         ERRORS=$((ERRORS + 1))
     else
-        # Debug comment, usually silenced to keep logs clean
-        # echo -e "${GREEN}[OK] $DOMAIN ($((DIFF / 86400)) days left)${NC}"
-        :
+        printf '%b\n' "${GREEN}[OK] $DOMAIN ($((DIFF / 86400)) days left)${NC}"
     fi
     COUNT=$((COUNT + 1))
 done
