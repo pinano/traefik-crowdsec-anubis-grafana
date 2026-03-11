@@ -639,7 +639,7 @@ def generate_configs():
                 'address': f"http://{anubis_service_name}:8080/.within.website/x/cmd/anubis/api/check",
                 'trustForwardHeader': True,
                 'authResponseHeaders': ["X-Anubis-Ray-Id"],
-                'maxResponseBodyBytes': 1048576  # 1MB – Anubis challenge HTML is always small
+                'maxResponseBodySize': 1048576  # 1MB – Anubis challenge HTML is always small
             }
         }
 
