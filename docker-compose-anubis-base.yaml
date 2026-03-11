@@ -32,12 +32,12 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ./config/anubis/botPolicy-generated.yaml:/botPolicy.yaml:ro
+    # NOTE: Anubis uses a chainguard static base image with no shell/wget.
+    # To enable healthcheck, confirm the probe endpoint from:
+    # https://github.com/TecharoHQ/anubis/releases
+    # Then use: test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/<endpoint>"]
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/healthz"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
+      disable: true
     logging:
       driver: "json-file"
       options:
