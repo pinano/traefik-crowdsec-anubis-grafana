@@ -110,9 +110,9 @@ else
     # Process bouncers and group them by base name
     # NOTE: We read into a temp file first to avoid subshell variable scope issues
     BOUNCER_LIST_FILE=$(mktemp /tmp/crowdsec_list_XXXXXX)
-    echo "$BOUNCERS" | jq -r '.[] | "\(.name)|\(.last_pull)"' 2>/dev/null > "$BOUNCER_LIST_FILE"
+    echo "$BOUNCERS" | jq -r '.[] | "\(.name)|\(.last_pull)|\(.created_at)"' 2>/dev/null > "$BOUNCER_LIST_FILE"
 
-    while IFS='|' read -r full_name last_pull; do
+    while IFS='|' read -r full_name last_pull created_at; do
         # Extract base name (e.g., traefik-bouncer from traefik-bouncer@172.19.0.6)
         base_name=$(echo "$full_name" | cut -d'@' -f1)
         
@@ -129,6 +129,17 @@ else
                 DIFF=$((CURRENT_TIME - LAST_PULL_TS))
                 [ $DIFF -le $STALE_THRESHOLD ] && IS_STALE=0
                 [ $DIFF -gt $PRUNE_THRESHOLD ] && IS_REALLY_OLD=1
+            fi
+        else
+            # last_pull is null: bouncer has never pulled yet.
+            # Give it a grace period equal to STALE_THRESHOLD based on its creation time.
+            # This avoids false positives on stack startup (Traefik takes ~1-2 min to connect).
+            if [ -n "$created_at" ] && [ "$created_at" != "null" ]; then
+                CREATED_TS=$(date -d "$created_at" +%s 2>/dev/null)
+                if [ -n "$CREATED_TS" ] && echo "$CREATED_TS" | grep -q '^[0-9]\+$'; then
+                    AGE=$((CURRENT_TIME - CREATED_TS))
+                    [ $AGE -le $STALE_THRESHOLD ] && IS_STALE=0
+                fi
             fi
         fi
 
