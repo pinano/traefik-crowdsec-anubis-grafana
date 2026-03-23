@@ -19,7 +19,7 @@ services:
     working_dir: ${DOMAIN_MANAGER_APP_PATH_HOST}/config/domain-manager
     volumes:
       - ./domains.csv:${DOMAIN_MANAGER_APP_PATH_HOST}/domains.csv
-      - ./.env:${DOMAIN_MANAGER_APP_PATH_HOST}/.env:ro
+      - ./.env:${DOMAIN_MANAGER_APP_PATH_HOST}/.env
       - ./.env.dist:${DOMAIN_MANAGER_APP_PATH_HOST}/.env.dist:ro
       - ./scripts:${DOMAIN_MANAGER_APP_PATH_HOST}/scripts:ro
       - ./docker-compose-traefik-crowdsec-redis.yaml:${DOMAIN_MANAGER_APP_PATH_HOST}/docker-compose-traefik-crowdsec-redis.yaml:ro
