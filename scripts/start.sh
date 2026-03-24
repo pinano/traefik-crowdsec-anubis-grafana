@@ -47,7 +47,7 @@ ENV_FILE=".env"
 if [ ! -f "$ENV_FILE" ]; then
     echo "⚠️  $ENV_FILE not found. Running initialization..."
     if [ -f "./scripts/initialize-env.sh" ]; then
-        chmod +x ./scripts/initialize-env.sh
+        [ -w "./scripts/initialize-env.sh" ] && chmod +x ./scripts/initialize-env.sh
         ./scripts/initialize-env.sh
         exit 0
     else
@@ -463,7 +463,7 @@ fi
 if [ "$TRAEFIK_ACME_ENV_TYPE" == "local" ]; then
     echo "   🔐 Local Mode detected. Automating certificate generation..."
     if [ -f "./scripts/create-local-certs.sh" ]; then
-        chmod +x ./scripts/create-local-certs.sh
+        [ -w "./scripts/create-local-certs.sh" ] && chmod +x ./scripts/create-local-certs.sh
         ./scripts/create-local-certs.sh
     else
         echo "   ⚠️ Warning: ./create-local-certs.sh not found. Skipping auto-generation."
