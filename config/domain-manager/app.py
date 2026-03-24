@@ -333,15 +333,20 @@ def resolve_domain(domain):
         return None
 
 def check_host_file(domain):
-    try:
-        with open('/etc/hosts', 'r') as f:
-            for line in f:
-                if not line.strip().startswith('#'):
-                    parts = line.split()
-                    if len(parts) >= 2 and domain in parts[1:]:
-                        return True
-    except Exception:
-        pass
+    # Try /etc/hosts-host first if it exists (mounted host's hosts file in container)
+    hosts_paths = ['/etc/hosts-host', '/etc/hosts']
+    for path in hosts_paths:
+        if not os.path.exists(path):
+            continue
+        try:
+            with open(path, 'r') as f:
+                for line in f:
+                    if not line.strip().startswith('#'):
+                        parts = line.split()
+                        if len(parts) >= 2 and domain in parts[1:]:
+                            return True
+        except Exception:
+            pass
     return False
 
 def get_external_services():

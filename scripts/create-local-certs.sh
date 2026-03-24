@@ -14,7 +14,14 @@ fi
 # Ensure output directory exists
 mkdir -p "$CERT_DIR"
 
-echo "   🔍 Scanning /etc/hosts for 127.0.0.1 entries..."
+# Determine which hosts file to use (support for running inside domain-manager container)
+HOSTS_FILE="/etc/hosts"
+if [ -f "/etc/hosts-host" ]; then
+    HOSTS_FILE="/etc/hosts-host"
+    echo "   ℹ️ Container environment detected. Using $HOSTS_FILE for resolution."
+fi
+
+echo "   🔍 Scanning $HOSTS_FILE for 127.0.0.1 entries..."
 
 # Extract all hostnames pointing to 127.0.0.1
 # 1. grep lines starting with 127.0.0.1
@@ -22,10 +29,10 @@ echo "   🔍 Scanning /etc/hosts for 127.0.0.1 entries..."
 # 3. replace spaces/tabs with newlines to get one host per line
 # 4. filter out common defaults and empty lines
 # 5. sort and uniq
-DOMAINS=$(grep "^127\.0\.0\.1" /etc/hosts | sed 's/127\.0\.0\.1//' | tr '[:space:]' '\n' | grep -v "localhost" | grep -v "broadcasthost" | grep -v "^$" | sort -u | tr '\n' ' ')
+DOMAINS=$(grep "^127\.0\.0\.1" "$HOSTS_FILE" | sed 's/127\.0\.0\.1//' | tr '[:space:]' '\n' | grep -v "localhost" | grep -v "broadcasthost" | grep -v "^$" | sort -u | tr '\n' ' ')
 
 if [ -z "$DOMAINS" ]; then
-    echo "❌ No local domains found in /etc/hosts (pointing to 127.0.0.1, excluding localhost)."
+    echo "❌ No local domains found in $HOSTS_FILE (pointing to 127.0.0.1, excluding localhost)."
     exit 1
 fi
 

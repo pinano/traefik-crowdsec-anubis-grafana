@@ -36,6 +36,12 @@ cleanup() {
     fi
 }
 
+# Determine which hosts file to use (support for running inside domain-manager container)
+HOSTS_FILE="/etc/hosts"
+if [ -f "/etc/hosts-host" ]; then
+    HOSTS_FILE="/etc/hosts-host"
+fi
+
 trap cleanup EXIT INT TERM
 
 # Ensures .env exists and is up to date with .env.dist structure.
@@ -739,8 +745,8 @@ resolve_host() {
         ping -c 1 -t 1 "$host" >/dev/null 2>&1 || ping -c 1 -W 1 "$host" >/dev/null 2>&1
         return $?
     else
-        # Fallback: simple grep in /etc/hosts for local dev, though imperfect for real DNS
-        grep -q "[[:space:]]$host" /etc/hosts
+        # Fallback: simple grep in $HOSTS_FILE for local dev, though imperfect for real DNS
+        grep -q "[[:space:]]$host" "$HOSTS_FILE"
         return $?
     fi
 }
