@@ -468,11 +468,24 @@ fi
 
 if [ "$TRAEFIK_ACME_ENV_TYPE" == "local" ]; then
     echo "   🔐 Local Mode detected. Automating certificate generation..."
-    if [ -f "./scripts/create-local-certs.sh" ]; then
-        [ -w "./scripts/create-local-certs.sh" ] && chmod +x ./scripts/create-local-certs.sh
-        ./scripts/create-local-certs.sh
+    # If running internally (inside container), skip generation to preserve host trust.
+    # If certs are missing, FAIL and tell the user to run them on the host.
+    if [[ "$DOMAIN_MANAGER_INTERNAL" == "true" ]]; then
+        CERTS_DIR="./config/traefik/certs-local-dev" # Define CERTS_DIR here for internal check
+        if [ -f "$CERTS_DIR/local-cert.pem" ]; then
+            echo "   ℹ️ Certificates already exist. Skipping internal generation to preserve host trust."
+        else
+            echo "   ❌ ERROR: Local certificates not found in $CERTS_DIR."
+            echo "   👉 Please run 'make certs-create-local' on your host first."
+            exit 1
+        fi
     else
-        echo "   ⚠️ Warning: ./create-local-certs.sh not found. Skipping auto-generation."
+        if [ -f "./scripts/create-local-certs.sh" ]; then
+            [ -w "./scripts/create-local-certs.sh" ] && chmod +x ./scripts/create-local-certs.sh
+            ./scripts/create-local-certs.sh
+        else
+            echo "   ⚠️ Warning: ./scripts/create-local-certs.sh not found. Skipping auto-generation."
+        fi
     fi
 
     echo "   🔐 Checking for local trusted certificates (Local Mode)..."
@@ -733,22 +746,30 @@ MISSING_DNS=()
 # Helper for DNS resolution (cross-platform)
 resolve_host() {
     local host="$1"
+    
+    # 0. Check /etc/hosts first (Reliable for local dev, respects $HOSTS_FILE)
+    if grep -qE "[[:space:]]${host}([[:space:]]|$)" "$HOSTS_FILE"; then
+        return 0
+    fi
+
+    # 1. System-level resolution
     if command -v getent >/dev/null 2>&1; then
         getent ahosts "$host" >/dev/null 2>&1
         return $?
-    elif command -v host >/dev/null 2>&1; then
-        host -t A "$host" >/dev/null 2>&1
+    elif command -v dscacheutil >/dev/null 2>&1; then
+        # macOS specific resolution check
+        dscacheutil -q host -a name "$host" | grep -q "ip_address:"
         return $?
     elif command -v ping >/dev/null 2>&1; then
-        # Ping once, timeout 1s. Mac usage: -c 1 -t 1. Linux usage: -c 1 -W 1.
-        # We try a common subset or fallback.
+        # Ping as fallback for resolution (timeout 1s)
         ping -c 1 -t 1 "$host" >/dev/null 2>&1 || ping -c 1 -W 1 "$host" >/dev/null 2>&1
         return $?
-    else
-        # Fallback: simple grep in $HOSTS_FILE for local dev, though imperfect for real DNS
-        grep -q "[[:space:]]$host" "$HOSTS_FILE"
+    elif command -v host >/dev/null 2>&1; then
+        # DNS only (will ignore /etc/hosts)
+        host -t A "$host" >/dev/null 2>&1
         return $?
     fi
+    return 1
 }
 
 for sub in "${CORE_SUBS[@]}"; do
