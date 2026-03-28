@@ -256,7 +256,8 @@ If the CrowdSec LAPI or the Redis cache become unreachable, the Traefik plugin w
 | `TRAEFIK_GOOD_USER_AGENTS` | Comma-separated list of User-Agents to **whitelist** (bypass CrowdSec & Blocklist). | - |
 | `TRAEFIK_ACCESS_LOG_BUFFER` | Number of log lines to buffer before writing to disk/stdout. | `1000` |
 | `TRAEFIK_FRAME_ANCESTORS` | External domains allowed to embed your sites in iframes. | - |
-| `APACHE_HOST_IP` | IP of the host machine as seen from Docker (docker0 bridge). | `172.17.0.1` |
+| `APACHE_HOST_IP` | IP of the host machine as seen from Docker (docker0 bridge). Used for Apache auto-detection and as the proxy target. | `172.17.0.1` |
+| `APACHE_HOST_PORT` | Port where host Apache listens. The stack probes this port at startup to auto-detect Apache. | `8080` |
 
 #### When to adjust Log Buffering (`TRAEFIK_ACCESS_LOG_BUFFER`)
 
@@ -597,10 +598,31 @@ make shell crowdsec -- cscli decisions add --ip <IP> --duration 24h --reason "Ma
 
 ## Apache Legacy Configuration
 
-This section covers the configuration required for legacy Apache installations running directly on the host (not in Docker containers). When using the `apache-host` service type in `domains.csv`, Traefik proxies requests to Apache on `<APACHE_HOST_IP>:8080` (default: `172.17.0.1`, the docker0 bridge on Linux).
+This section covers the configuration required for legacy Apache installations running directly on the host (not in Docker containers). When using the `apache-host` service type in `domains.csv`, Traefik proxies requests to Apache on `<APACHE_HOST_IP>:<APACHE_HOST_PORT>` (default: `172.17.0.1:8080`, the docker0 bridge on Linux).
+
+### Auto-Detection of Host Apache
+
+The stack **automatically detects** whether Apache is running on the host by probing `APACHE_HOST_IP:APACHE_HOST_PORT` at startup using a TCP socket connection. No manual configuration or flags are needed.
+
+This probe runs in two different contexts:
+
+| Context | Probe target | How |
+|---------|-------------|-----|
+| `start.sh` on the **host** | `localhost:APACHE_HOST_PORT` | `bash /dev/tcp` |
+| `start.sh` inside the **domain-manager container** ("Restart Stack" button) | `APACHE_HOST_IP:APACHE_HOST_PORT` | `bash /dev/tcp` |
+| Domain Manager **service validation** (per-domain check) | `APACHE_HOST_IP:APACHE_HOST_PORT` | Python `socket` |
+
+Detection results drive three behaviors:
+
+- **`docker-compose-apache-logs.yaml`** is included in the compose file list only when Apache is detected (flag file `.apache_host_available` created by `start.sh`).
+- **Traefik dynamic config** is generated with the `apache-host-8080` backend service pointing to `APACHE_HOST_IP:APACHE_HOST_PORT`.
+- **Domain Manager UI** exposes `apache-host` as a valid service option in the domain inventory.
 
 > [!TIP]
 > If you're running Docker Desktop (macOS/Windows), set `APACHE_HOST_IP=host.docker.internal` in your `.env`.
+
+> [!NOTE]
+> Apache must be **actively listening** on the configured port for detection to succeed. A stopped Apache service (even if installed) will not be detected.
 
 ### Real Client IP Forwarding
 
@@ -656,7 +678,7 @@ sudo systemctl restart apache2
 
 ### Apache Log Aggregation (Optional)
 
-To include Apache host logs in the Grafana/Loki observability pipeline, the stack provides `docker-compose-apache-logs.yaml`. This is automatically included by `start.sh` when `/var/log/apache2` exists on the host.
+To include Apache host logs in the Grafana/Loki observability pipeline, the stack provides `docker-compose-apache-logs.yaml`. This file is automatically included by `start.sh` when Apache is detected via the port probe (see [Auto-Detection of Host Apache](#auto-detection-of-host-apache) above). It mounts `/var/log/apache2` from the host into the Alloy collector container.
 
 #### Parsed Labels
 

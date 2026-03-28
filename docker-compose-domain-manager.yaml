@@ -15,7 +15,8 @@ services:
       - DOMAIN_MANAGER_INTERNAL=true
       - TRAEFIK_ACME_ENV_TYPE=${TRAEFIK_ACME_ENV_TYPE}
       - DASHBOARD_SUBDOMAIN=${DASHBOARD_SUBDOMAIN}
-      - APACHE_HOST_AVAILABLE=${APACHE_HOST_AVAILABLE:-false}
+      - APACHE_HOST_IP=${APACHE_HOST_IP:-172.17.0.1}
+      - APACHE_HOST_PORT=${APACHE_HOST_PORT:-8080}
     working_dir: ${DOMAIN_MANAGER_APP_PATH_HOST}/config/domain-manager
     volumes:
       - ./domains.csv:${DOMAIN_MANAGER_APP_PATH_HOST}/domains.csv

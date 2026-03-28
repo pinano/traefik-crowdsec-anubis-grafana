@@ -349,27 +349,36 @@ def check_host_file(domain):
             pass
     return False
 
+def is_apache_on_host() -> bool:
+    """Probe port 8080 on the Docker host to confirm Apache is actually running.
+
+    Uses APACHE_HOST_IP (same variable as generate-config.py, default 172.17.0.1)
+    so there is a single configurable source for the host gateway IP.
+    Timeout is capped at 1 s to keep the UI responsive.
+    """
+    host_ip = os.environ.get('APACHE_HOST_IP', '172.17.0.1')
+    port    = int(os.environ.get('APACHE_HOST_PORT', '8080'))
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(1)
+        result = s.connect_ex((host_ip, port))
+        s.close()
+        return result == 0
+    except Exception:
+        return False
+
 def get_external_services():
     """Return Docker container names available as proxy targets.
-    
+
     Excludes containers belonging to this stack (by PROJECT_NAME label)
-    and adds 'apache-host' as a virtual entry when Apache is detected.
+    and prepends 'apache-host' when Apache is detected on port 8080.
     """
     project_name = os.environ.get('PROJECT_NAME', 'stack').lower()
-    apache_available = os.environ.get('APACHE_HOST_AVAILABLE', 'false').lower() == 'true'
-    if not apache_available:
-        # Fallback: check the flag file written by start.sh on the host.
-        # The env var is only set at container startup time, so if start.sh ran
-        # after the container was already up (e.g. internal restart), the env var
-        # won't reflect the current state. The flag file on the shared volume is
-        # the source of truth.
-        flag_file = os.path.join(BASE_DIR, '.apache_host_available')
-        apache_available = os.path.isfile(flag_file)
-    
+
     services = []
-    
-    # Add apache-host virtual service if host Apache was detected by start.sh
-    if apache_available:
+
+    # Live port probe — works whether start.sh ran on the host or inside the container.
+    if is_apache_on_host():
         services.append('apache-host')
     
     try:

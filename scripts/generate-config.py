@@ -38,8 +38,10 @@ GOOD_USER_AGENTS_STR = os.getenv('TRAEFIK_GOOD_USER_AGENTS', '').strip()
 # Frame Ancestors (for iframes)
 FRAME_ANCESTORS = os.getenv('TRAEFIK_FRAME_ANCESTORS', '').strip()
 
-# Apache Host IP (docker0 bridge on Linux = 172.17.0.1)
-APACHE_HOST_IP = os.getenv('APACHE_HOST_IP', '172.17.0.1').strip()
+# Apache Host IP and Port (docker0 bridge on Linux = 172.17.0.1:8080)
+APACHE_HOST_IP   = os.getenv('APACHE_HOST_IP',   '172.17.0.1').strip()
+APACHE_HOST_PORT = os.getenv('APACHE_HOST_PORT',  '8080').strip()
+APACHE_SVC_NAME  = f'apache-host-{APACHE_HOST_PORT}'  # Traefik service name, derived from port
 
 # Robust stripping of surrounding quotes
 if (BLOCKED_PATHS_STR.startswith('"') and BLOCKED_PATHS_STR.endswith('"')) or \
@@ -200,7 +202,7 @@ def process_router(entry, http_section, domain_to_cert_def):
 
     if service == 'apache-host':
         mw_list.append('apache-forward-headers')
-        target_service = 'apache-host-8080'
+        target_service = APACHE_SVC_NAME
     else:
         target_service = f"{service}@docker"
 
@@ -463,12 +465,11 @@ def generate_configs():
             },
             'routers': {},
             'services': {
-                # 1. External Backend Service (Host Apache on 8080)
-                'apache-host-8080': {
+                # 1. External Backend Service (Host Apache — configurable via APACHE_HOST_IP / APACHE_HOST_PORT)
+                APACHE_SVC_NAME: {
                     'loadBalancer': {
                         'serversTransport': 'legacy-transport',
-                        # Configurable via APACHE_HOST_IP env var (default: 172.17.0.1 for Linux docker0 bridge)
-                        'servers': [{'url': f'http://{APACHE_HOST_IP}:8080'}],
+                        'servers': [{'url': f'http://{APACHE_HOST_IP}:{APACHE_HOST_PORT}'}],
                         'passHostHeader': True
                     }
                 }

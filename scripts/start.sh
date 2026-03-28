@@ -612,23 +612,27 @@ fi
 # PHASE 4: Build Compose File List
 # =============================================================================
 
-# --- Apache Detection (sets flag file for compose-files.sh) ---
+# --- Apache Detection ---
+# Probe port 8080 on the host — the only source of truth.
+# Avoids dpkg-query (Debian-only, detects installed-but-STOPPED Apache) and
+# flag files / env-var propagation headaches.
+# When running on the host:      target = localhost
+# When running in a container:   target = APACHE_HOST_IP (docker0 gateway, default 172.17.0.1)
 APACHE_FLAG_FILE=".apache_host_available"
+APACHE_CHECK_PORT="${APACHE_HOST_PORT:-8080}"
 
-# If we are in the host (dpkg-query exists), do the real check
-if command -v dpkg-query >/dev/null 2>&1; then
-    if dpkg-query -W -f='${Status}' apache2 2>/dev/null | grep -q "ok installed"; then
-        export APACHE_HOST_AVAILABLE="true"
-        touch "$APACHE_FLAG_FILE"
-    else
-        export APACHE_HOST_AVAILABLE="false"
-        rm -f "$APACHE_FLAG_FILE"
-    fi
-# If we are in the container (no dpkg-query), rely on the flag file created by the host
-elif [ -f "$APACHE_FLAG_FILE" ]; then
+if [[ "$DOMAIN_MANAGER_INTERNAL" == "true" ]]; then
+    APACHE_CHECK_HOST="${APACHE_HOST_IP:-172.17.0.1}"
+else
+    APACHE_CHECK_HOST="localhost"
+fi
+
+if bash -c ">/dev/tcp/${APACHE_CHECK_HOST}/${APACHE_CHECK_PORT}" 2>/dev/null; then
     export APACHE_HOST_AVAILABLE="true"
+    touch "$APACHE_FLAG_FILE"
 else
     export APACHE_HOST_AVAILABLE="false"
+    rm -f "$APACHE_FLAG_FILE"
 fi
 
 # --- Build compose file list (shared with stop.sh and Makefile) ---
