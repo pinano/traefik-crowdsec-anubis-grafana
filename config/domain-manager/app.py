@@ -876,7 +876,7 @@ def apply_config_stream():
 
         process.stdout.close()
         return_code = process.wait()
-        yield f"data: \n[Process finished with code {return_code}]\n\n"
+        yield f"data: [Process finished with code {return_code}]\n\n"
 
     return Response(generate(), mimetype='text/event-stream')
 
@@ -911,7 +911,7 @@ def restart_stream():
         
         process.stdout.close()
         return_code = process.wait()
-        yield f"data: \n[Process finished with code {return_code}]\n\n"
+        yield f"data: [Process finished with code {return_code}]\n\n"
 
     return Response(generate(), mimetype='text/event-stream')
 
