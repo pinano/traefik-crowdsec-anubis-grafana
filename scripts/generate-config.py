@@ -118,12 +118,19 @@ def sanitize_name(name):
     return name.replace('.', '-').replace('_', '-').lower()
 
 def atomic_write_yaml(data, filepath, header=None):
-    temp_path = f"{filepath}.tmp"
-    with open(temp_path, 'w') as f:
+    # On macOS with Docker Desktop (virtiofs/gRPC FUSE) and some Linux inotify setups, os.replace
+    # generates asynchronous REMOVE and CREATE events that Traefik's directory watcher misinterprets
+    # as a deleted configuration, resulting in a brief global 404 state.
+    # We use in-place modification (r+ or w+) with truncation instead. This preserves the INODE
+    # and only emits MODIFY events. If Traefik reads mid-write, the YAML parse error is safely ignored
+    # (keeping the old state active) until the file is fully written and correctly hot-reloaded.
+    mode = 'r+' if os.path.exists(filepath) else 'w+'
+    with open(filepath, mode) as f:
+        f.seek(0)
         if header:
             f.write(f"{header}\n")
         yaml.dump(data, f, Dumper=IndentDumper, default_flow_style=False, sort_keys=False)
-    os.replace(temp_path, filepath)
+        f.truncate()
 
 # Unifies SSL/TLS configuration for any router
 def apply_tls_config(router_conf, domain, domain_to_cert_def):
