@@ -6,6 +6,8 @@
 # A lightweight restart that regenerates config and applies changes
 # WITHOUT recreating existing containers.
 #
+# Designed to run INSIDE the domain-manager container.
+#
 # Strategy:
 #   1. Regenerate dynamic config (Traefik routes, Anubis compose, policies)
 #   2. Fix file permissions (container runs as root)
