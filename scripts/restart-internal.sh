@@ -4,14 +4,24 @@
 # restart-internal.sh - Targeted Stack Restart for Domain Manager UI
 # =============================================================================
 # A lightweight restart that regenerates config and applies changes
-# WITHOUT recreating containers unnecessarily.
+# WITHOUT recreating existing containers.
 #
-# Designed to run INSIDE the domain-manager container with a CLEAN
-# environment (only .env vars + system essentials, no container leakage).
+# Strategy:
+#   1. Regenerate dynamic config (Traefik routes, Anubis compose, policies)
+#   2. Fix file permissions (container runs as root)
+#   3. Use `docker compose up -d --no-recreate --remove-orphans` to:
+#      - Create NEW containers (e.g., new Anubis instances)
+#      - Remove ORPHANED containers (e.g., deleted Anubis instances)
+#      - Leave EXISTING containers untouched (no environment drift risk)
+#
+# Traefik picks up routing changes via its built-in file watcher — no
+# container restart needed for new/changed domains. ACME certificates
+# for new domains are requested automatically by Traefik when it detects
+# a new router with certResolver=le.
 #
 # This replaces the previous approach of calling the full start.sh,
-# which caused Docker Compose to see environment drift and recreate
-# all containers on every restart.
+# which caused Docker Compose environment drift and recreated all
+# containers on every restart from the UI.
 # =============================================================================
 
 set -e
@@ -106,13 +116,20 @@ source scripts/compose-files.sh
 # Build compose command with explicit project name
 COMPOSE_CMD="docker compose -p ${PROJECT_NAME:-stack}"
 
-# Audit config for drift (helpful in modal log for debugging)
-echo "   🔍 Auditing configuration for drift..."
+# Audit config for drift (helpful for debugging in modal log)
+echo "   🔍 Validating compose configuration..."
 $COMPOSE_CMD $COMPOSE_FILES config --quiet 2>&1 || echo "   ⚠️ Warning: Config validation produced warnings."
 
-# Apply changes — Docker Compose will only recreate containers whose config changed
-echo "   🚀 Running docker compose up -d..."
-$COMPOSE_CMD $COMPOSE_FILES up -d --remove-orphans 2>&1 | sed 's/^/   /'
+# Apply changes with --no-recreate:
+#   - Creates NEW containers (new Anubis instances from updated compose)
+#   - Removes ORPHANED containers (deleted Anubis instances)
+#   - Does NOT touch existing containers (avoids env drift recreation)
+#
+# Routing changes are picked up by Traefik's file watcher automatically.
+# ACME certs for new domains are requested by Traefik when it sees a new
+# router with certResolver=le in the dynamic config.
+echo "   🚀 Running docker compose up -d --no-recreate..."
+$COMPOSE_CMD $COMPOSE_FILES up -d --no-recreate --remove-orphans 2>&1 | sed 's/^/   /'
 
 echo ""
 echo "========================================================"
