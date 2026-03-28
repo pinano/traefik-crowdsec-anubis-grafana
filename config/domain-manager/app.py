@@ -133,6 +133,9 @@ def get_subprocess_env():
                         local_env[k.strip()] = v
         except Exception as e:
             log.error(f"Error reading .env for subprocess: {e}")
+    
+    # Forensic Log: Only log keys to avoid leaking secrets
+    log.info(f"Subprocess env prepared. Keys: {sorted(local_env.keys())}")
     return local_env
 
 def validate_domain_data(entry):
@@ -896,10 +899,15 @@ def apply_config_stream():
 @login_required
 def restart_stack():
     # We still keep the old restart for compatibility or simple trigger
+    # Re-apply complete environment
+    full_env = get_subprocess_env()
+    log.info("Initiating stack restart...")
+
     try:
-        subprocess.Popen(['bash', START_SCRIPT], cwd=BASE_DIR, env=get_subprocess_env())
+        subprocess.Popen(['bash', START_SCRIPT], cwd=BASE_DIR, env=full_env)
         return jsonify({'status': 'success', 'message': 'Stack restart initiated'})
     except Exception as e:
+        log.error(f"Failed to start restart script: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/dm-api/restart-stream')

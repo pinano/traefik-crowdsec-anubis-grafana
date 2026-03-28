@@ -211,23 +211,28 @@ update_env_var() {
     local var_name=$1
     local new_val=$2
     
-    # Check current value in .env
+    # Check if variable exists and extract current value properly (stripping quotes/spaces)
     local current_line=$(grep "^${var_name}=" "$ENV_FILE" | head -n 1)
-    local expected_line="${var_name}=${new_val}"
     
-    if [ "$current_line" == "$expected_line" ]; then
-        # Already correct, skip writing to preserve mtime
-        return
+    if [ -n "$current_line" ]; then
+        # Parse current value: everything after '=', then strip surrounding quotes
+        local current_val=$(echo "$current_line" | cut -d'=' -f2- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+        
+        if [ "$current_val" == "$new_val" ]; then
+            # Value is functionally identical. Avoid touching the file to maintain mtime.
+            return
+        fi
+        
+        # If different, update the existing line
+        local TMP_ENV=$(mktemp)
+        local escaped_val=$(echo "$new_val" | sed 's|#|\\#|g')
+        sed "s|^${var_name}=.*|${var_name}=${escaped_val}|" "$ENV_FILE" > "$TMP_ENV"
+        cat "$TMP_ENV" > "$ENV_FILE"
+        rm "$TMP_ENV"
+    else
+        # Variable does not exist, append it
+        echo "${var_name}=${new_val}" >> "$ENV_FILE"
     fi
-
-    local TMP_ENV=$(mktemp)
-    # Escape '#' in value to prevent sed treating it as a delimiter
-    local escaped_val=$(echo "$new_val" | sed 's|#|\\#|g')
-    
-    # Use '|' as delimiter (safe for most values including paths with #)
-    sed "s|^${var_name}=.*|${var_name}=${escaped_val}|" "$ENV_FILE" > "$TMP_ENV"
-    cat "$TMP_ENV" > "$ENV_FILE"
-    rm "$TMP_ENV"
 }
 
 # Domain Manager Secret Key (auto-generate on first run)
