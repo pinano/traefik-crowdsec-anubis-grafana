@@ -1023,7 +1023,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Disable restart button to prevent unnecessary full restarts
         restartBtn.disabled = true;
-        restartBtn.title = "Only available when Anubis configurations change";
+        restartBtn.title = "Only available when adding/removing domains or changing Anubis configurations";
         applyConfigBtn.disabled = true;
         applyConfigBtn.title = "Only available when there are routing changes to apply";
 
