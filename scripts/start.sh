@@ -557,8 +557,10 @@ if [[ "$CROWDSEC_DISABLE" != "true" ]]; then
         done
     fi
 
-    # Build the YAML whitelist file
-    cat > "$WHITELIST_FILE" << 'EOF'
+    # Build the YAML whitelist file in a temporary location
+    TMP_WHITELIST=$(mktemp)
+    
+    cat > "$TMP_WHITELIST" << 'EOF'
 # ============================================================================
 # CrowdSec IP Whitelist - Auto-generated
 # ============================================================================
@@ -573,18 +575,26 @@ EOF
 
     # Write IP section
     if [ ${#IPS_LIST[@]} -gt 0 ]; then
-        echo "  ip:" >> "$WHITELIST_FILE"
+        echo "  ip:" >> "$TMP_WHITELIST"
         for ip in "${IPS_LIST[@]}"; do
-            echo "    - \"$ip\"" >> "$WHITELIST_FILE"
+            echo "    - \"$ip\"" >> "$TMP_WHITELIST"
         done
     fi
 
     # Write CIDR section
     if [ ${#CIDRS_LIST[@]} -gt 0 ]; then
-        echo "  cidr:" >> "$WHITELIST_FILE"
+        echo "  cidr:" >> "$TMP_WHITELIST"
         for cidr in "${CIDRS_LIST[@]}"; do
-            echo "    - \"$cidr\"" >> "$WHITELIST_FILE"
+            echo "    - \"$cidr\"" >> "$TMP_WHITELIST"
         done
+    fi
+
+    # Only overwrite the real file if content changed
+    if [ -f "$WHITELIST_FILE" ] && cmp -s "$TMP_WHITELIST" "$WHITELIST_FILE"; then
+        rm "$TMP_WHITELIST"
+    else
+        cat "$TMP_WHITELIST" > "$WHITELIST_FILE"
+        rm "$TMP_WHITELIST"
     fi
     
     TOTAL_ENTRIES=$((${#IPS_LIST[@]} + ${#CIDRS_LIST[@]}))
