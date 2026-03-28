@@ -58,10 +58,10 @@
                 <button id="save-btn" class="btn btn-success" disabled>
                     <i data-lucide="save"></i> Save Changes
                 </button>
-                <button id="apply-config-btn" class="btn btn-apply" title="Regenerate Traefik config and apply in-place (zero downtime). Use for rate/burst/concurrency changes.">
+                <button id="apply-config-btn" class="btn btn-apply" disabled title="Only available when there are routing changes to apply">
                     <i data-lucide="zap"></i> Apply Config
                 </button>
-                <button id="restart-btn" class="btn btn-danger">
+                <button id="restart-btn" class="btn btn-danger" disabled title="Only available when Anubis configurations change">
                     <i data-lucide="refresh-cw"></i> Restart Stack
                 </button>
                 <a href="{{ url_for('logout') }}" class="btn btn-secondary">

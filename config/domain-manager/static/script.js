@@ -1020,6 +1020,12 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.classList.remove('has-notification');
         restartBtn.classList.remove('btn-restart-needed');
         applyConfigBtn.classList.remove('btn-apply-needed');
+        
+        // Disable restart button to prevent unnecessary full restarts
+        restartBtn.disabled = true;
+        restartBtn.title = "Only available when Anubis configurations change";
+        applyConfigBtn.disabled = true;
+        applyConfigBtn.title = "Only available when there are routing changes to apply";
 
         const eventSource = new EventSource(streamUrl);
 
@@ -1115,6 +1121,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         applyConfigBtn.classList.remove('btn-apply-needed');
         restartBtn.classList.add('btn-restart-needed');
+        restartBtn.disabled = false;
+        restartBtn.removeAttribute('title');
     }
 
     function markApplyNeeded() {
@@ -1124,6 +1132,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         applyConfigBtn.classList.add('btn-apply-needed');
+        applyConfigBtn.disabled = false;
+        applyConfigBtn.removeAttribute('title');
     }
 
     // Help Modal Event Listeners
