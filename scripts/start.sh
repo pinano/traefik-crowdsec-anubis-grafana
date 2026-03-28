@@ -376,8 +376,6 @@ fi
 {
     mkdir -p ./config/traefik/dynamic-config
     mkdir -p ./config/anubis
-    : > ./config/traefik/dynamic-config/routers-generated.yaml
-    : > ./config/anubis/botPolicy-generated.yaml
 } || {
     echo "❌ Error: Could not clean up generated files due to permissions."
     echo "   This usually happens if Docker created the directories as root."
@@ -390,8 +388,7 @@ if [ -d "docker-compose-anubis-generated.yaml" ]; then
     echo "⚠️ Cleaning up directory collision: docker-compose-anubis-generated.yaml"
     rm -rf docker-compose-anubis-generated.yaml || echo "   ⚠️  Warning: Could not remove directory 'docker-compose-anubis-generated.yaml'. If it's a mount point, this is expected."
 else
-    # Instead of rm, we truncate to avoid "Resource busy" if the file is mounted
-    : > docker-compose-anubis-generated.yaml
+    echo "   ✅ docker-compose-anubis-generated.yaml directory check passed."
 fi
 
 # Safety check: if domains.csv is a directory (Docker artifact), remove it
