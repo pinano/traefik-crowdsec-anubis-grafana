@@ -24,6 +24,11 @@
             style="vertical-align: middle; margin-right: 0.5rem; width: 1.2rem; height: 1.2rem;"></i>
         Changes pending. Please restart the stack to apply.
     </div>
+    <div id="apply-notification" class="apply-needed-banner">
+        <i data-lucide="zap"
+            style="vertical-align: middle; margin-right: 0.5rem; width: 1.2rem; height: 1.2rem;"></i>
+        Changes saved. Click "Apply Config" to deploy without downtime.
+    </div>
 
     <div class="container">
         <header>
@@ -49,6 +54,9 @@
                 </button>
                 <button id="validate-btn" class="btn btn-validate">
                     <i data-lucide="check-circle-2"></i> Validate Records
+                </button>
+                <button id="apply-config-btn" class="btn btn-apply" title="Regenerate Traefik config and apply in-place (zero downtime). Use for rate/burst/concurrency changes.">
+                    <i data-lucide="zap"></i> Apply Config
                 </button>
                 <button id="save-btn" class="btn btn-success" disabled>
                     <i data-lucide="save"></i> Save Changes
@@ -164,11 +172,11 @@
     <div id="restart-modal" class="modal-overlay">
         <div class="modal">
             <div class="modal-header">
-                <h2>Stack Restart Progress</h2>
+                <h2 id="restart-modal-title">Stack Restart Progress</h2>
                 <button id="close-modal-btn" class="btn btn-secondary btn-sm" style="display: none;">Close</button>
             </div>
             <div class="modal-body modal-body-console">
-                <pre id="log-container">Initializing restart stream...</pre>
+                <pre id="log-container">Initializing stream...</pre>
             </div>
         </div>
     </div>
@@ -258,10 +266,17 @@
                                 to save.</span>
                         </li>
                         <li style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.5rem;">
+                            <i data-lucide="zap"
+                                style="color: #0d9488; flex-shrink: 0; margin-top: 2px;"></i>
+                            <span><strong>Apply Config:</strong> Regenerates Traefik's dynamic config <em>without
+                                stopping any container</em>. Zero downtime. Use for rate, burst, concurrency,
+                                and routing-only changes.</span>
+                        </li>
+                        <li style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.5rem;">
                             <i data-lucide="refresh-cw"
                                 style="color: var(--danger-color); flex-shrink: 0; margin-top: 2px;"></i>
-                            <span><strong>Restart Stack:</strong> Applies changes. Only required if saved data actually
-                                changed.</span>
+                            <span><strong>Restart Stack:</strong> Full stop &amp; start. Required for new Anubis
+                                instances or static Traefik config changes. <em>Interrupts connections briefly.</em></span>
                         </li>
                     </ul>
                 </div>

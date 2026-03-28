@@ -4,13 +4,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const checkBtn = document.getElementById('validate-btn');
     const exportBtn = document.getElementById('export-btn');
     const restartBtn = document.getElementById('restart-btn');
+    const applyConfigBtn = document.getElementById('apply-config-btn');
     const searchInput = document.getElementById('search-input');
     const addRowBtn = document.getElementById('add-row-btn');
     const globalDropdown = document.getElementById('global-service-dropdown');
     const sortableHeaders = document.querySelectorAll('.sortable');
     const unsavedNotification = document.getElementById('unsaved-notification');
     const restartNotification = document.getElementById('restart-notification');
+    const applyNotification = document.getElementById('apply-notification');
     const restartModal = document.getElementById('restart-modal');
+    const restartModalTitle = document.getElementById('restart-modal-title');
     const logContainer = document.getElementById('log-container');
     const closeModalBtn = document.getElementById('close-modal-btn');
     const toast = document.getElementById('toast');
@@ -780,6 +783,38 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function determinePostSaveAction(oldDataStr, newDataStr) {
+        if (!oldDataStr || !newDataStr) return 'restart'; // Failsafe
+
+        try {
+            const oldData = JSON.parse(oldDataStr);
+            const newData = JSON.parse(newDataStr);
+
+            // A restart is required if active Anubis configurations have changed.
+            // This includes adding an Anubis domain, removing it, or updating its name/subdomain.
+            const getAnubisConfigs = (data) => {
+                return data
+                    .filter(d => Boolean(d.enabled) && Boolean(d.anubis_subdomain && d.anubis_subdomain.trim() !== ''))
+                    .map(d => `${(d.domain || '').trim().toLowerCase()}|${(d.anubis_subdomain || '').trim().toLowerCase()}`)
+                    .sort()
+                    .join(',');
+            };
+
+            const oldAnubis = getAnubisConfigs(oldData);
+            const newAnubis = getAnubisConfigs(newData);
+
+            if (oldAnubis !== newAnubis) {
+                return 'restart';
+            }
+        } catch (e) {
+            console.error("Error parsing payload for action determination", e);
+            return 'restart';
+        }
+
+        // If no Anubis-related structural changes occurred, a hot-reload is sufficient.
+        return 'apply';
+    }
+
     async function saveDomains(showSuccess = true) {
         // Disable save button and show state
         saveBtn.disabled = true;
@@ -825,13 +860,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
 
-                // Compare with previous state to see if restart is actually needed
+                // Compare with previous state to see if restart or apply config is actually needed
                 const currentPayloadStr = JSON.stringify(payload);
-                const restartNeeded = currentPayloadStr !== pristineData;
-
-                if (restartNeeded) {
+                if (currentPayloadStr !== pristineData) {
+                    const actionRequired = determinePostSaveAction(pristineData, currentPayloadStr);
                     pristineData = currentPayloadStr;
-                    markRestartNeeded();
+                    
+                    if (actionRequired === 'restart') {
+                        markRestartNeeded();
+                    } else {
+                        markApplyNeeded();
+                    }
                 }
 
                 // Force UI to clear all unsaved highlights and hide banner
@@ -892,38 +931,27 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     restartBtn.addEventListener('click', () => {
-        // Re-use the confirm modal for restart confirmation, or creation of a new one.
-        // For simplicity, we'll just use a direct confirmation prompt via a new modal or reusing the existing one with customized text.
-        // However, the cleanest UX is to use the confirm modal we already have but customize it.
-
-        rowToDelete = null; // Ensure no row deletion logic interferes
-        // We need a way to distinguish between delete and restart confirmation if we reuse the same modal.
-        // Let's create a specialized confirmation function or just separate handlers.
-
-        // Let's use the browser confirm for now as a fallback OR implement a proper "custom confirm" state.
-        // Given the requirement "se supone que tiene que mostrar una alerta ... pero en móvil nunca la muestra", 
-        // implies the native confirm() is flaky.
-
-        // We will repurpose the existing Confirm Modal for generic confirmations.
+        rowToDelete = null;
         confirmTitle.textContent = 'Confirm Restart';
         confirmMsg.textContent = 'Are you sure you want to restart the stack? This will interrupt connections briefly.';
-
-        // We need to change the behavior of the "Delete" button.
-        // Let's change the text of the button and its event listener temporarily.
-        const originalBtnText = confirmDeleteBtn.textContent;
-        const originalBtnClass = confirmDeleteBtn.className;
-
         confirmDeleteBtn.textContent = 'Restart';
-        confirmDeleteBtn.className = 'btn btn-danger'; // Keep it red
-
-        // Remove old listener (not easily possible with anonymous functions) or use a state flag.
-        // Let's use a state flag: confirmAction
-
+        confirmDeleteBtn.className = 'btn btn-danger';
         confirmAction = 'restart';
         confirmModal.classList.add('show');
     });
 
-    let confirmAction = 'delete'; // 'delete' or 'restart'
+    applyConfigBtn.addEventListener('click', () => {
+        rowToDelete = null;
+        confirmTitle.textContent = 'Apply Config (Zero Downtime)';
+        confirmMsg.textContent = 'This will regenerate the Traefik dynamic config and apply it in-place. No containers will be stopped — traffic continues uninterrupted.\n\nUse this for: rate, burst, concurrency, or routing-only changes.\nUse "Restart Stack" for: new Anubis instances or static config changes.';
+        confirmDeleteBtn.textContent = 'Apply';
+        confirmDeleteBtn.className = 'btn btn-apply';
+        confirmAction = 'apply-config';
+        confirmModal.classList.add('show');
+    });
+
+
+    let confirmAction = 'delete'; // 'delete', 'restart', 'apply-config', or 'permanent-delete'
 
     confirmDeleteBtn.addEventListener('click', () => {
         if (confirmAction === 'delete') {
@@ -956,25 +984,45 @@ document.addEventListener('DOMContentLoaded', () => {
             confirmAction = 'delete';
         } else if (confirmAction === 'restart') {
             confirmModal.classList.remove('show');
-            initiateRestart();
+            initiateStream(
+                `/dm-api/restart-stream?csrf_token=${csrfToken}`,
+                'Stack Restart Progress',
+                '✅ Restart completed successfully.'
+            );
+        } else if (confirmAction === 'apply-config') {
+            confirmModal.classList.remove('show');
+            initiateStream(
+                `/dm-api/apply-config-stream?csrf_token=${csrfToken}`,
+                'Apply Config — Zero Downtime',
+                '✅ Config applied. Traefik is hot-reloading the new rules.'
+            );
         }
     });
 
-    function initiateRestart() {
+    /**
+     * Generic SSE stream launcher — used for both Restart and Apply Config.
+     * @param {string} streamUrl  - The SSE endpoint URL (with CSRF token already appended)
+     * @param {string} modalTitle - Title displayed in the progress modal
+     * @param {string} successMsg - Message shown on process exit code 0
+     */
+    function initiateStream(streamUrl, modalTitle, successMsg) {
+        if (restartModalTitle) restartModalTitle.textContent = modalTitle;
         restartModal.classList.add('show');
-        logContainer.textContent = 'Connecting to restart stream...\n';
+        logContainer.textContent = 'Connecting...\n';
         closeModalBtn.style.display = 'none';
 
-        // Hide notification
+        // Hide notifications
         restartNotification.classList.remove('show');
+        applyNotification.classList.remove('show');
         document.body.classList.remove('has-notification');
         restartBtn.classList.remove('btn-restart-needed');
+        applyConfigBtn.classList.remove('btn-apply-needed');
 
-        const eventSource = new EventSource(`/dm-api/restart-stream?csrf_token=${csrfToken}`);
+        const eventSource = new EventSource(streamUrl);
 
         eventSource.onmessage = (event) => {
             if (event.data.trim() === "[Process finished with code 0]") {
-                logContainer.textContent += '\n✅ Restart completed successfully.\n';
+                logContainer.textContent += `\n${successMsg}\n`;
                 closeModalBtn.style.display = 'block';
                 eventSource.close();
             } else if (event.data.includes("[Process finished with code")) {
@@ -987,11 +1035,20 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
-        eventSource.onerror = (error) => {
-            logContainer.textContent += '\n\n🔄 Connection closed. This is expected as Traefik is reloading the new configuration.\n✅ The stack should be up in a few seconds.';
+        eventSource.onerror = () => {
+            logContainer.textContent += '\n\n🔄 Connection closed. This is expected as Traefik reloads the new configuration.\n✅ The stack should be up in a few seconds.';
             closeModalBtn.style.display = 'block';
             eventSource.close();
         };
+    }
+
+    // Keep backward-compatible alias
+    function initiateRestart() {
+        initiateStream(
+            `/dm-api/restart-stream?csrf_token=${csrfToken}`,
+            'Stack Restart Progress',
+            '✅ Restart completed successfully.'
+        );
     }
 
     closeModalBtn.addEventListener('click', () => {
@@ -1048,11 +1105,22 @@ document.addEventListener('DOMContentLoaded', () => {
     function markRestartNeeded() {
         // Only show restart needed if not currently showing unsaved changes (priority to unsaved)
         if (!unsavedNotification.classList.contains('show')) {
+            applyNotification.classList.remove('show');
             restartNotification.classList.add('show');
             document.body.classList.add('has-notification');
         }
 
+        applyConfigBtn.classList.remove('btn-apply-needed');
         restartBtn.classList.add('btn-restart-needed');
+    }
+
+    function markApplyNeeded() {
+        if (!unsavedNotification.classList.contains('show') && !restartNotification.classList.contains('show')) {
+            applyNotification.classList.add('show');
+            document.body.classList.add('has-notification');
+        }
+
+        applyConfigBtn.classList.add('btn-apply-needed');
     }
 
     // Help Modal Event Listeners
@@ -1084,6 +1152,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (hasChanges) {
             unsavedNotification.classList.add('show');
             restartNotification.classList.remove('show');
+            applyNotification.classList.remove('show');
             document.body.classList.add('has-notification');
             saveBtn.classList.add('btn-save-needed');
             saveBtn.disabled = false;
@@ -1092,7 +1161,7 @@ document.addEventListener('DOMContentLoaded', () => {
             saveBtn.classList.remove('btn-save-needed');
             saveBtn.disabled = true;
             // Banner is gone, so if no other notification, remove the margin
-            if (!restartNotification.classList.contains('show')) {
+            if (!restartNotification.classList.contains('show') && !applyNotification.classList.contains('show')) {
                 document.body.classList.remove('has-notification');
             }
         }

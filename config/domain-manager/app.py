@@ -58,6 +58,7 @@ if ADMIN_PASS in ('password', 'admin', ''):
 BASE_DIR = os.environ.get('DOMAIN_MANAGER_APP_PATH_HOST', os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 CSV_PATH = os.path.join(BASE_DIR, 'domains.csv')
 START_SCRIPT = os.path.join(BASE_DIR, 'scripts/start.sh')
+GENERATE_CONFIG_SCRIPT = os.path.join(BASE_DIR, 'scripts/generate-config.py')
 ACME_FILE = os.path.join(BASE_DIR, 'config/traefik/acme.json')
 
 log.debug(f"BASE_DIR={BASE_DIR}")
@@ -104,8 +105,8 @@ def check_csrf():
         if not token or token != session.get('csrf_token'):
             return jsonify({'error': 'CSRF token missing or invalid'}), 403
 
-    # Special check for restart-stream (GET side-effect)
-    if request.endpoint == 'restart_stream':
+    # Special check for SSE streams (GET side-effects)
+    if request.endpoint in ('restart_stream', 'apply_config_stream'):
         token = request.args.get('csrf_token')
         if not token or token != session.get('csrf_token'):
             return jsonify({'error': 'CSRF token missing or invalid'}), 403
@@ -826,6 +827,44 @@ def check_domain():
              status_response['status'] = 'mismatch'
 
     return jsonify(status_response)
+
+@app.route('/dm-api/apply-config-stream')
+@login_required
+def apply_config_stream():
+    """
+    Zero-downtime config application.
+    Runs generate-config.py only — Traefik detects the changed dynamic-config files
+    via its file-watcher and hot-reloads them without any container restart.
+    Suitable for changes to: rate, burst, concurrency, domain routing, middlewares.
+    NOT suitable for: new Anubis containers, traefik.yaml static config changes.
+    """
+    def generate():
+        # Determine Python interpreter (prefer venv)
+        for candidate in ['.venv/bin/python3', 'venv/bin/python3', 'python3']:
+            if candidate.startswith('python') or os.path.isfile(os.path.join(BASE_DIR, candidate)):
+                python_cmd = candidate if candidate.startswith('python') else os.path.join(BASE_DIR, candidate)
+                break
+        else:
+            python_cmd = 'python3'
+
+        process = subprocess.Popen(
+            [python_cmd, GENERATE_CONFIG_SCRIPT],
+            cwd=BASE_DIR,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            env=ENV
+        )
+
+        for line in process.stdout:
+            yield f"data: {line}\n\n"
+
+        process.stdout.close()
+        return_code = process.wait()
+        yield f"data: \n[Process finished with code {return_code}]\n\n"
+
+    return Response(generate(), mimetype='text/event-stream')
 
 @app.route('/dm-api/restart', methods=['POST'])
 @login_required

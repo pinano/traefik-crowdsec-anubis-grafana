@@ -234,6 +234,16 @@ body.has-notification .header-scrolled {
     background-color: var(--validate-hover);
 }
 
+.btn-apply {
+    background-color: #0d9488;
+    /* Teal-600 — zero-downtime feel */
+    color: white;
+}
+
+.btn-apply:hover {
+    background-color: #14b8a6;
+}
+
 .btn-sm {
     padding: 0.25rem 0.5rem;
     font-size: 0.75rem;
@@ -1011,6 +1021,32 @@ input:focus {
     align-items: center;
 }
 
+/* Apply Notification */
+.apply-needed-banner {
+    background: linear-gradient(90deg, #0d9488, #2dd4bf);
+    /* Teal gradient */
+    color: #fff;
+    text-align: center;
+    padding: 1rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 9999;
+    display: none;
+    /* Hidden by default */
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+
+.apply-needed-banner.show {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
 /* Adjust body padding so banner doesn't cover content when shown */
 body.has-notification {
     padding-top: 60px;
@@ -1063,6 +1099,53 @@ body.has-notification {
     border: 2px solid white;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
+
+@keyframes pulse-teal {
+    0% {
+        box-shadow: 0 0 0 0 rgba(13, 148, 136, 0.7);
+        transform: scale(1);
+    }
+
+    50% {
+        box-shadow: 0 0 0 15px rgba(13, 148, 136, 0);
+        transform: scale(1.05);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(13, 148, 136, 0);
+        transform: scale(1);
+    }
+}
+
+.btn-apply-needed {
+    animation: pulse-teal 1.5s infinite;
+    background-color: #0d9488 !important;
+    /* Teal-600 */
+    border-color: #0d9488 !important;
+    position: relative;
+    overflow: visible;
+}
+
+.btn-apply-needed::after {
+    content: '!';
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background-color: #14b8a6;
+    /* Teal warning */
+    color: white;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 12px;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
 
 /* Unsaved Changes Notification */
 .unsaved-changes-banner {
