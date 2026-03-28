@@ -790,20 +790,20 @@ document.addEventListener('DOMContentLoaded', () => {
             const oldData = JSON.parse(oldDataStr);
             const newData = JSON.parse(newDataStr);
 
-            // A restart is required if active Anubis configurations have changed.
-            // This includes adding an Anubis domain, removing it, or updating its name/subdomain.
-            const getAnubisConfigs = (data) => {
+            // A restart is required if any structural changes occurred (new domains, removed domains, or Anubis changes).
+            // This is because Traefik Let's Encrypt batching needs a hard restart to detect new SANs for existing main domains.
+            const getStructuralConfigs = (data) => {
                 return data
-                    .filter(d => Boolean(d.enabled) && Boolean(d.anubis_subdomain && d.anubis_subdomain.trim() !== ''))
+                    .filter(d => Boolean(d.enabled) && Boolean(d.domain && d.domain.trim() !== ''))
                     .map(d => `${(d.domain || '').trim().toLowerCase()}|${(d.anubis_subdomain || '').trim().toLowerCase()}`)
                     .sort()
                     .join(',');
             };
 
-            const oldAnubis = getAnubisConfigs(oldData);
-            const newAnubis = getAnubisConfigs(newData);
+            const oldStruct = getStructuralConfigs(oldData);
+            const newStruct = getStructuralConfigs(newData);
 
-            if (oldAnubis !== newAnubis) {
+            if (oldStruct !== newStruct) {
                 return 'restart';
             }
         } catch (e) {
@@ -946,7 +946,7 @@ document.addEventListener('DOMContentLoaded', () => {
     applyConfigBtn.addEventListener('click', () => {
         rowToDelete = null;
         confirmTitle.textContent = 'Apply Config (Zero Downtime)';
-        confirmMsg.textContent = 'This will regenerate the Traefik dynamic config and apply it in-place. No containers will be stopped — traffic continues uninterrupted.\n\nUse this for: rate, burst, concurrency, or routing-only changes.\nUse "Restart Stack" for: new Anubis instances or static config changes.';
+        confirmMsg.textContent = 'This will regenerate the Traefik dynamic config and apply it in-place. No containers will be stopped — traffic continues uninterrupted.\n\nUse this for: changing rate limits, concurrencies, or editing existing traffic rules.\nUse "Restart Stack" for: adding/removing subdomains, new Anubis instances, or static config changes.';
         confirmDeleteBtn.textContent = 'Apply';
         confirmDeleteBtn.className = 'btn btn-apply';
         confirmAction = 'apply-config';
