@@ -142,6 +142,10 @@ def get_subprocess_env():
         else:
             local_env['TRAEFIK_CERT_RESOLVER'] = ''
             
+    # Ensure PROJECT_NAME is consistent
+    if 'PROJECT_NAME' not in local_env:
+        local_env['PROJECT_NAME'] = 'stack'
+            
     # Add common environment variables for well-behaved subprocesses
     local_env['TERM'] = 'xterm-256color'
     local_env['PYTHONUNBUFFERED'] = '1'

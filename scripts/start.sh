@@ -766,11 +766,18 @@ fi
 
 
 echo " --------------------------------------------------------"
-echo " [6/6] 🚀 Deploying application services..."
-
-# Deploy everything. Docker Compose will only recreate modified services.
-# It won't kill the running domain-manager if its configuration is up-to-date.
-$COMPOSE_CMD $COMPOSE_FILES up -d --remove-orphans
+# If running inside domain-manager, we must be extremely careful not to recreate our own container.
+# Recreating the panel kills the parent shell and the current script.
+if [[ "$DOMAIN_MANAGER_INTERNAL" == "true" ]]; then
+    echo "   🛡️ Internal run detected. Safe deployment mode ACTIVE."
+    # Get all services EXCEPT the panel
+    SERVICES=$($COMPOSE_CMD $COMPOSE_FILES config --services | grep -vxE "domain-manager" | xargs)
+    # Deploy without --remove-orphans to avoid Docker treating the panel as an orphan if it's not in the list.
+    $COMPOSE_CMD $COMPOSE_FILES up -d $SERVICES
+else
+    # Standard deploy for host runs (cleans up orphans/deleted domains)
+    $COMPOSE_CMD $COMPOSE_FILES up -d --remove-orphans
+fi
 sleep 1
 
 echo "   🔍 Verifying Core DNS records..."
