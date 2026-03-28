@@ -860,21 +860,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
 
-                // Compare with previous state to see if restart or apply config is actually needed
+                // Determine if an action is required before we update state
                 const currentPayloadStr = JSON.stringify(payload);
-                if (currentPayloadStr !== pristineData) {
-                    const actionRequired = determinePostSaveAction(pristineData, currentPayloadStr);
-                    pristineData = currentPayloadStr;
-                    
-                    if (actionRequired === 'restart') {
-                        markRestartNeeded();
-                    } else {
-                        markApplyNeeded();
-                    }
-                }
+                const actionRequired = currentPayloadStr !== pristineData 
+                    ? determinePostSaveAction(pristineData, currentPayloadStr) 
+                    : null;
+                
+                // Update pristineData immediately so refreshUnsavedUI knows there are no unsaved changes
+                pristineData = currentPayloadStr;
 
-                // Force UI to clear all unsaved highlights and hide banner
+                // Force UI to clear all unsaved highlights and hide the unsaved banner
                 clearUnsavedChanges();
+
+                // Now it is safe to display the post-save banners without being suppressed
+                if (actionRequired === 'restart') {
+                    markRestartNeeded();
+                } else if (actionRequired === 'apply') {
+                    markApplyNeeded();
+                }
             } else {
                 showToast('Error saving changes', 'danger');
                 saveBtn.disabled = false;
