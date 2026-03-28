@@ -790,8 +790,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const oldData = JSON.parse(oldDataStr);
             const newData = JSON.parse(newDataStr);
 
-            // A restart is required if any structural changes occurred (new domains, removed domains, or Anubis changes).
-            // This is because Traefik Let's Encrypt batching needs a hard restart to detect new SANs for existing main domains.
+            // A soft restart is required if any structural changes occurred (new domains, removed domains, or Anubis changes).
+            // This is because new Anubis containers need to be created/removed via docker compose.
             const getStructuralConfigs = (data) => {
                 return data
                     .filter(d => Boolean(d.enabled) && Boolean(d.domain && d.domain.trim() !== ''))
@@ -935,9 +935,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     restartBtn.addEventListener('click', () => {
         rowToDelete = null;
-        confirmTitle.textContent = 'Confirm Restart';
-        confirmMsg.textContent = 'Are you sure you want to restart the stack? This will interrupt connections briefly.';
-        confirmDeleteBtn.textContent = 'Restart';
+        confirmTitle.textContent = 'Confirm Soft Restart';
+        confirmMsg.textContent = 'This will regenerate config and deploy new/removed Anubis containers. Existing services will NOT be stopped or recreated.';
+        confirmDeleteBtn.textContent = 'Soft Restart';
         confirmDeleteBtn.className = 'btn btn-danger';
         confirmAction = 'restart';
         confirmModal.classList.add('show');
@@ -945,8 +945,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     applyConfigBtn.addEventListener('click', () => {
         rowToDelete = null;
-        confirmTitle.textContent = 'Apply Config (Zero Downtime)';
-        confirmMsg.textContent = 'This will regenerate the Traefik dynamic config and apply it in-place. No containers will be stopped — traffic continues uninterrupted.\n\nUse this for: changing rate limits, concurrencies, or editing existing traffic rules.\nUse "Restart Stack" for: adding/removing subdomains, new Anubis instances, or static config changes.';
+        confirmTitle.textContent = 'Hot Reload (Zero Downtime)';
+        confirmMsg.textContent = 'This will regenerate the Traefik dynamic config and apply it in-place. No containers will be stopped — traffic continues uninterrupted.\n\nUse this for: changing rate limits, concurrencies, or editing existing traffic rules.\nUse "Soft Restart" for: adding/removing subdomains, new Anubis instances.';
         confirmDeleteBtn.textContent = 'Apply';
         confirmDeleteBtn.className = 'btn btn-apply';
         confirmAction = 'apply-config';
@@ -989,21 +989,21 @@ document.addEventListener('DOMContentLoaded', () => {
             confirmModal.classList.remove('show');
             initiateStream(
                 `/dm-api/restart-stream?csrf_token=${csrfToken}`,
-                'Stack Restart Progress',
-                '✅ Restart completed successfully.'
+                'Soft Restart Progress',
+                '✅ Soft restart completed successfully.'
             );
         } else if (confirmAction === 'apply-config') {
             confirmModal.classList.remove('show');
             initiateStream(
                 `/dm-api/apply-config-stream?csrf_token=${csrfToken}`,
-                'Apply Config — Zero Downtime',
+                'Hot Reload — Zero Downtime',
                 '✅ Config applied. Traefik is hot-reloading the new rules.'
             );
         }
     });
 
     /**
-     * Generic SSE stream launcher — used for both Restart and Apply Config.
+     * Generic SSE stream launcher — used for both Soft Restart and Hot Reload.
      * @param {string} streamUrl  - The SSE endpoint URL (with CSRF token already appended)
      * @param {string} modalTitle - Title displayed in the progress modal
      * @param {string} successMsg - Message shown on process exit code 0
@@ -1055,8 +1055,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function initiateRestart() {
         initiateStream(
             `/dm-api/restart-stream?csrf_token=${csrfToken}`,
-            'Stack Restart Progress',
-            '✅ Restart completed successfully.'
+            'Soft Restart Progress',
+            '✅ Soft restart completed successfully.'
         );
     }
 

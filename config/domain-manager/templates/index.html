@@ -22,12 +22,12 @@
     <div id="restart-notification" class="restart-needed-banner">
         <i data-lucide="alert-triangle"
             style="vertical-align: middle; margin-right: 0.5rem; width: 1.2rem; height: 1.2rem;"></i>
-        Changes pending. Please restart the stack to apply.
+        Changes pending. Click "Soft Restart" to deploy.
     </div>
     <div id="apply-notification" class="apply-needed-banner">
         <i data-lucide="zap"
             style="vertical-align: middle; margin-right: 0.5rem; width: 1.2rem; height: 1.2rem;"></i>
-        Changes saved. Click "Apply Config" to deploy without downtime.
+        Changes saved. Click "Hot Reload" to deploy without downtime.
     </div>
 
     <div class="container">
@@ -59,10 +59,10 @@
                     <i data-lucide="save"></i> Save Changes
                 </button>
                 <button id="apply-config-btn" class="btn btn-apply" disabled title="Only available when there are routing changes to apply">
-                    <i data-lucide="zap"></i> Apply Config
+                    <i data-lucide="zap"></i> Hot Reload
                 </button>
                 <button id="restart-btn" class="btn btn-danger" disabled title="Only available when adding/removing domains or changing Anubis configurations">
-                    <i data-lucide="refresh-cw"></i> Restart Stack
+                    <i data-lucide="refresh-cw"></i> Soft Restart
                 </button>
                 <a href="{{ url_for('logout') }}" class="btn btn-secondary">
                     <i data-lucide="log-out"></i> Logout
@@ -172,7 +172,7 @@
     <div id="restart-modal" class="modal-overlay">
         <div class="modal">
             <div class="modal-header">
-                <h2 id="restart-modal-title">Stack Restart Progress</h2>
+                <h2 id="restart-modal-title">Soft Restart Progress</h2>
                 <button id="close-modal-btn" class="btn btn-secondary btn-sm" style="display: none;">Close</button>
             </div>
             <div class="modal-body modal-body-console">
@@ -268,14 +268,14 @@
                         <li style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.5rem;">
                             <i data-lucide="zap"
                                 style="color: #0d9488; flex-shrink: 0; margin-top: 2px;"></i>
-                            <span><strong>Apply Config:</strong> Regenerates Traefik's dynamic config <em>without
+                            <span><strong>Hot Reload:</strong> Regenerates Traefik's dynamic config <em>without
                                 stopping any container</em>. Zero downtime. Use for rate, burst, concurrency,
                                 and routing-only changes.</span>
                         </li>
                         <li style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.5rem;">
                             <i data-lucide="refresh-cw"
                                 style="color: var(--danger-color); flex-shrink: 0; margin-top: 2px;"></i>
-                            <span><strong>Restart Stack:</strong> Recreates modified containers. Required when adding/removing domains or changing Anubis configurations. <em>May interrupt connections to updated services briefly.</em></span>
+                            <span><strong>Soft Restart:</strong> Regenerates config and deploys new Anubis containers without stopping existing services. Required when adding/removing domains or changing Anubis configurations. <em>Zero downtime for existing services.</em></span>
                         </li>
                     </ul>
                 </div>

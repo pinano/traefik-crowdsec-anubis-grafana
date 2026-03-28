@@ -937,7 +937,7 @@ def check_domain():
 @login_required
 def apply_config_stream():
     """
-    Zero-downtime config application.
+    Zero-downtime hot reload.
     Runs generate-config.py only — Traefik detects the changed dynamic-config files
     via its file-watcher and hot-reloads them without any container restart.
     Suitable for changes to: rate, burst, concurrency, domain routing, middlewares.
@@ -976,7 +976,7 @@ def apply_config_stream():
 @app.route('/dm-api/restart', methods=['POST'])
 @login_required
 def restart_stack():
-    """Fire-and-forget restart trigger (kept for API compatibility)."""
+    """Fire-and-forget soft restart trigger (kept for API compatibility)."""
     log.info("Initiating targeted stack restart...")
     try:
         subprocess.Popen(
@@ -992,12 +992,12 @@ def restart_stack():
 @app.route('/dm-api/restart-stream')
 @login_required
 def restart_stream():
-    """SSE stream for the restart progress modal.
+    """SSE stream for the soft restart progress modal.
 
-    Uses restart-internal.sh (targeted) instead of start.sh (full).
-    Combined with build_compose_env() which provides a CLEAN environment
-    free of container-specific vars, Docker Compose sees identical
-    resolved config for unchanged services and skips recreation.
+    Uses restart-internal.sh which regenerates config and runs
+    docker compose up -d --no-recreate --remove-orphans.
+    Creates new containers (Anubis), removes orphans, leaves existing
+    services untouched.
     """
     def generate():
         process = subprocess.Popen(
