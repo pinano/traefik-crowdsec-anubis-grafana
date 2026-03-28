@@ -111,6 +111,30 @@ def check_csrf():
         if not token or token != session.get('csrf_token'):
             return jsonify({'error': 'CSRF token missing or invalid'}), 403
 
+def get_subprocess_env():
+    """
+    Constructs a complete environment mapping by combining current process env
+    with variables parsed from the .env file. This ensures calls to Docker
+    Compose have all necessary labels/variables to remain Up-to-date.
+    """
+    local_env = ENV.copy()
+    env_path = os.path.join(BASE_DIR, '.env')
+    if os.path.isfile(env_path):
+        try:
+            with open(env_path, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        k, v = line.split('=', 1)
+                        v = v.strip()
+                        # Clean quotes
+                        if (v.startswith('"') and v.endswith('"')) or (v.startswith("'") and v.endswith("'")):
+                            v = v[1:-1]
+                        local_env[k.strip()] = v
+        except Exception as e:
+            log.error(f"Error reading .env for subprocess: {e}")
+    return local_env
+
 def validate_domain_data(entry):
     # Strict validation to ensure no malicious content in CSV or shell injection
     # We restrict characters to alphanumeric, basic domain/path symbols
@@ -847,19 +871,7 @@ def apply_config_stream():
         else:
             python_cmd = 'python3'
 
-        # Ensure .env values are injected into the subprocess environment
-        local_env = ENV.copy()
-        env_path = os.path.join(BASE_DIR, '.env')
-        if os.path.isfile(env_path):
-            with open(env_path, 'r') as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith('#') and '=' in line:
-                        k, v = line.split('=', 1)
-                        v = v.strip()
-                        if (v.startswith('"') and v.endswith('"')) or (v.startswith("'") and v.endswith("'")):
-                            v = v[1:-1]
-                        local_env[k.strip()] = v
+        local_env = get_subprocess_env()
 
         process = subprocess.Popen(
             [python_cmd, GENERATE_CONFIG_SCRIPT],
@@ -885,7 +897,7 @@ def apply_config_stream():
 def restart_stack():
     # We still keep the old restart for compatibility or simple trigger
     try:
-        subprocess.Popen(['bash', START_SCRIPT], cwd=BASE_DIR, env=ENV)
+        subprocess.Popen(['bash', START_SCRIPT], cwd=BASE_DIR, env=get_subprocess_env())
         return jsonify({'status': 'success', 'message': 'Stack restart initiated'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -902,7 +914,7 @@ def restart_stream():
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,
-            env=ENV
+            env=get_subprocess_env()
         )
         
         for line in process.stdout:

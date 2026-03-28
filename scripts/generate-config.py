@@ -118,19 +118,26 @@ def sanitize_name(name):
     return name.replace('.', '-').replace('_', '-').lower()
 
 def atomic_write_yaml(data, filepath, header=None):
-    # On macOS with Docker Desktop (virtiofs/gRPC FUSE) and some Linux inotify setups, os.replace
-    # generates asynchronous REMOVE and CREATE events that Traefik's directory watcher misinterprets
-    # as a deleted configuration, resulting in a brief global 404 state.
-    # We use in-place modification (r+ or w+) with truncation instead. This preserves the INODE
-    # and only emits MODIFY events. If Traefik reads mid-write, the YAML parse error is safely ignored
-    # (keeping the old state active) until the file is fully written and correctly hot-reloaded.
-    # This also avoids 'Resource busy' errors on Linux when the file is an active mount.
+    # Prepare new content in memory
+    import io
+    stream = io.StringIO()
+    if header:
+        stream.write(f"{header}\n")
+    yaml.dump(data, stream, Dumper=IndentDumper, default_flow_style=False, sort_keys=False)
+    new_content = stream.getvalue()
+
+    # Check if file already exists and has identical content
+    if os.path.exists(filepath):
+        with open(filepath, 'r') as f:
+            if f.read() == new_content:
+                # No changes, do not touch the file (preserves mtime)
+                return
+
+    # If different, perform in-place write
     mode = 'r+' if os.path.exists(filepath) else 'w+'
     with open(filepath, mode) as f:
         f.seek(0)
-        if header:
-            f.write(f"{header}\n")
-        yaml.dump(data, f, Dumper=IndentDumper, default_flow_style=False, sort_keys=False)
+        f.write(new_content)
         f.truncate()
 
 # Unifies SSL/TLS configuration for any router

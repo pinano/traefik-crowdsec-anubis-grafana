@@ -210,8 +210,17 @@ generate_hash() {
 update_env_var() {
     local var_name=$1
     local new_val=$2
-    local TMP_ENV=$(mktemp)
     
+    # Check current value in .env
+    local current_line=$(grep "^${var_name}=" "$ENV_FILE" | head -n 1)
+    local expected_line="${var_name}=${new_val}"
+    
+    if [ "$current_line" == "$expected_line" ]; then
+        # Already correct, skip writing to preserve mtime
+        return
+    fi
+
+    local TMP_ENV=$(mktemp)
     # Escape '#' in value to prevent sed treating it as a delimiter
     local escaped_val=$(echo "$new_val" | sed 's|#|\\#|g')
     
@@ -351,16 +360,25 @@ fi
 # Export the resolver choice so Docker Compose can use it
 export TRAEFIK_CERT_RESOLVER
 
-# Generate traefik-generated.yaml from template
+# Generate traefik-generated.yaml from template (idempotent write)
 echo "   ⚙️ Generating Traefik static config..."
 if [ -f "./config/traefik/traefik.yaml.template" ]; then
+    TMP_TRAEFIK=$(mktemp)
     sed -e "s#TRAEFIK_ACME_EMAIL_PLACEHOLDER#${TRAEFIK_ACME_EMAIL}#g" \
         -e "s#TRAEFIK_ACME_CASERVER_PLACEHOLDER#${TRAEFIK_ACME_CA_SERVER}#g" \
         -e "s#TRAEFIK_TIMEOUT_ACTIVE_PLACEHOLDER#${TRAEFIK_TIMEOUT_ACTIVE:-60}s#g" \
         -e "s#TRAEFIK_TIMEOUT_IDLE_PLACEHOLDER#${TRAEFIK_TIMEOUT_IDLE:-90}s#g" \
         -e "s#TRAEFIK_ACCESS_LOG_BUFFER_PLACEHOLDER#${TRAEFIK_ACCESS_LOG_BUFFER:-1000}#g" \
         -e "s#TRAEFIK_LOG_LEVEL_PLACEHOLDER#${TRAEFIK_LOG_LEVEL:-INFO}#g" \
-        ./config/traefik/traefik.yaml.template > ./config/traefik/traefik-generated.yaml
+        ./config/traefik/traefik.yaml.template > "$TMP_TRAEFIK"
+    
+    TARGET_TRAEFIK="./config/traefik/traefik-generated.yaml"
+    if [ -f "$TARGET_TRAEFIK" ] && cmp -s "$TMP_TRAEFIK" "$TARGET_TRAEFIK"; then
+        rm "$TMP_TRAEFIK"
+    else
+        cat "$TMP_TRAEFIK" > "$TARGET_TRAEFIK"
+        rm "$TMP_TRAEFIK"
+    fi
 else
     echo "❌ Error: config/traefik/traefik.yaml.template not found!"
     exit 1
