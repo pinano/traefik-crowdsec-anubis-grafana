@@ -58,6 +58,7 @@ if ADMIN_PASS in ('password', 'admin', ''):
 BASE_DIR = os.environ.get('DOMAIN_MANAGER_APP_PATH_HOST', os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 CSV_PATH = os.path.join(BASE_DIR, 'domains.csv')
 START_SCRIPT = os.path.join(BASE_DIR, 'scripts/start.sh')
+RESTART_INTERNAL_SCRIPT = os.path.join(BASE_DIR, 'scripts/restart-internal.sh')
 GENERATE_CONFIG_SCRIPT = os.path.join(BASE_DIR, 'scripts/generate-config.py')
 ACME_FILE = os.path.join(BASE_DIR, 'config/traefik/acme.json')
 
@@ -111,13 +112,9 @@ def check_csrf():
         if not token or token != session.get('csrf_token'):
             return jsonify({'error': 'CSRF token missing or invalid'}), 403
 
-def get_subprocess_env():
-    """
-    Constructs a complete environment mapping by combining current process env
-    with variables parsed from the .env file. This ensures calls to Docker
-    Compose have all necessary labels/variables to remain Up-to-date.
-    """
-    local_env = ENV.copy()
+def _read_dotenv():
+    """Parse .env file into a dict. Strips quotes and whitespace."""
+    result = {}
     env_path = os.path.join(BASE_DIR, '.env')
     if os.path.isfile(env_path):
         try:
@@ -127,12 +124,22 @@ def get_subprocess_env():
                     if line and not line.startswith('#') and '=' in line:
                         k, v = line.split('=', 1)
                         v = v.strip()
-                        # Clean quotes
                         if (v.startswith('"') and v.endswith('"')) or (v.startswith("'") and v.endswith("'")):
                             v = v[1:-1]
-                        local_env[k.strip()] = v
+                        result[k.strip()] = v
         except Exception as e:
-            log.error(f"Error reading .env for subprocess: {e}")
+            log.error(f"Error reading .env: {e}")
+    return result
+
+def get_subprocess_env():
+    """
+    Constructs a complete environment mapping by combining current process env
+    with variables parsed from the .env file. This ensures calls to Docker
+    Compose have all necessary labels/variables to remain Up-to-date.
+    Used for: generate-config.py (which needs .env vars via os.getenv).
+    """
+    local_env = ENV.copy()
+    local_env.update(_read_dotenv())
     
     # Critical Hardenization: Ensure labels using these variables don't shift
     acme_type = local_env.get('TRAEFIK_ACME_ENV_TYPE', 'staging').lower()
@@ -157,6 +164,57 @@ def get_subprocess_env():
     # Forensic Log: Only log keys to avoid leaking secrets
     log.info(f"Subprocess env prepared. Critical keys: {[k for k in local_env.keys() if 'TRAEFIK' in k or 'DOMAIN' in k]}")
     return local_env
+
+def build_compose_env():
+    """
+    Build a CLEAN environment for `docker compose` that matches host execution.
+
+    The critical insight: when `make start` runs on the host, the process env
+    contains only system vars + sourced .env vars. When restarting from inside
+    the container, os.environ has container-specific vars (FLASK_SECRET_KEY,
+    DOMAIN_MANAGER_INTERNAL, etc.) that were NOT present on the host.
+    Docker Compose includes everything from the process env when resolving
+    ${VAR} placeholders in compose files. Any difference → container recreation.
+
+    This function builds an env dict from ONLY:
+    1. System essentials (PATH, HOME, etc.) needed for docker CLI
+    2. All variables from .env (the single source of truth)
+    3. Computed fallbacks for vars that start.sh normally exports
+    """
+    env = {}
+
+    # 1. System essentials for docker CLI to function
+    for key in ('PATH', 'HOME', 'USER', 'DOCKER_HOST', 'DOCKER_CONFIG',
+                'DOCKER_CERT_PATH', 'DOCKER_TLS_VERIFY', 'TMPDIR',
+                'XDG_RUNTIME_DIR', 'DOCKER_BUILDKIT'):
+        if key in os.environ:
+            env[key] = os.environ[key]
+
+    # 2. Read ALL vars from .env (source of truth, shared with host)
+    env.update(_read_dotenv())
+
+    # 3. Ensure computed vars have correct values
+    #    TRAEFIK_CERT_RESOLVER should now be in .env (persisted by start.sh)
+    #    but we provide a fallback just in case.
+    if 'TRAEFIK_CERT_RESOLVER' not in env:
+        acme_type = env.get('TRAEFIK_ACME_ENV_TYPE', 'staging').lower()
+        env['TRAEFIK_CERT_RESOLVER'] = '' if acme_type == 'local' else 'le'
+
+    if 'PROJECT_NAME' not in env:
+        env['PROJECT_NAME'] = 'stack'
+
+    # Normalize path to prevent trailing-slash drift
+    if 'DOMAIN_MANAGER_APP_PATH_HOST' in env:
+        env['DOMAIN_MANAGER_APP_PATH_HOST'] = env['DOMAIN_MANAGER_APP_PATH_HOST'].rstrip('/')
+
+    # Subprocess execution essentials
+    env['TERM'] = 'xterm-256color'
+    env['PYTHONUNBUFFERED'] = '1'
+
+    log.info(f"Clean compose env: {len(env)} vars. "
+             f"TRAEFIK_CERT_RESOLVER={env.get('TRAEFIK_CERT_RESOLVER', '?')}, "
+             f"PROJECT_NAME={env.get('PROJECT_NAME', '?')}")
+    return env
 
 def validate_domain_data(entry):
     # Strict validation to ensure no malicious content in CSV or shell injection
@@ -918,13 +976,14 @@ def apply_config_stream():
 @app.route('/dm-api/restart', methods=['POST'])
 @login_required
 def restart_stack():
-    # We still keep the old restart for compatibility or simple trigger
-    # Re-apply complete environment
-    full_env = get_subprocess_env()
-    log.info("Initiating stack restart...")
-
+    """Fire-and-forget restart trigger (kept for API compatibility)."""
+    log.info("Initiating targeted stack restart...")
     try:
-        subprocess.Popen(['bash', START_SCRIPT], cwd=BASE_DIR, env=full_env)
+        subprocess.Popen(
+            ['bash', RESTART_INTERNAL_SCRIPT],
+            cwd=BASE_DIR,
+            env=build_compose_env()
+        )
         return jsonify({'status': 'success', 'message': 'Stack restart initiated'})
     except Exception as e:
         log.error(f"Failed to start restart script: {e}")
@@ -933,22 +992,27 @@ def restart_stack():
 @app.route('/dm-api/restart-stream')
 @login_required
 def restart_stream():
+    """SSE stream for the restart progress modal.
+
+    Uses restart-internal.sh (targeted) instead of start.sh (full).
+    Combined with build_compose_env() which provides a CLEAN environment
+    free of container-specific vars, Docker Compose sees identical
+    resolved config for unchanged services and skips recreation.
+    """
     def generate():
-        # Using bash explicitly and passing current environment
         process = subprocess.Popen(
-            ['bash', START_SCRIPT],
+            ['bash', RESTART_INTERNAL_SCRIPT],
             cwd=BASE_DIR,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,
-            env=get_subprocess_env()
+            env=build_compose_env()
         )
-        
+
         for line in process.stdout:
-            # SSE format: "data: <content>\n\n"
             yield f"data: {line}\n\n"
-        
+
         process.stdout.close()
         return_code = process.wait()
         yield f"data: [Process finished with code {return_code}]\n\n"

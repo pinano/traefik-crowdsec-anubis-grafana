@@ -371,6 +371,10 @@ fi
 # Export the resolver choice so Docker Compose can use it
 export TRAEFIK_CERT_RESOLVER
 
+# Persist to .env so container-initiated restarts (domain-manager UI)
+# produce identical Docker Compose config and avoid spurious recreations.
+update_env_var "TRAEFIK_CERT_RESOLVER" "$TRAEFIK_CERT_RESOLVER"
+
 # Generate traefik-generated.yaml from template (idempotent write)
 echo "   ⚙️ Generating Traefik static config..."
 if [ -f "./config/traefik/traefik.yaml.template" ]; then
