@@ -847,6 +847,20 @@ def apply_config_stream():
         else:
             python_cmd = 'python3'
 
+        # Ensure .env values are injected into the subprocess environment
+        local_env = ENV.copy()
+        env_path = os.path.join(BASE_DIR, '.env')
+        if os.path.isfile(env_path):
+            with open(env_path, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        k, v = line.split('=', 1)
+                        v = v.strip()
+                        if (v.startswith('"') and v.endswith('"')) or (v.startswith("'") and v.endswith("'")):
+                            v = v[1:-1]
+                        local_env[k.strip()] = v
+
         process = subprocess.Popen(
             [python_cmd, GENERATE_CONFIG_SCRIPT],
             cwd=BASE_DIR,
@@ -854,7 +868,7 @@ def apply_config_stream():
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,
-            env=ENV
+            env=local_env
         )
 
         for line in process.stdout:
