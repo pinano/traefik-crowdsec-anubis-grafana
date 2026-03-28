@@ -627,7 +627,7 @@ else
     APACHE_CHECK_HOST="localhost"
 fi
 
-if bash -c ">/dev/tcp/${APACHE_CHECK_HOST}/${APACHE_CHECK_PORT}" 2>/dev/null; then
+if python3 -c "import socket; s = socket.socket(); s.settimeout(1); exit(0) if s.connect_ex(('${APACHE_CHECK_HOST}', int('${APACHE_CHECK_PORT}'))) == 0 else exit(1)" 2>/dev/null; then
     export APACHE_HOST_AVAILABLE="true"
     touch "$APACHE_FLAG_FILE"
 else
