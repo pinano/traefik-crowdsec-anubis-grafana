@@ -357,6 +357,14 @@ def get_external_services():
     """
     project_name = os.environ.get('PROJECT_NAME', 'stack').lower()
     apache_available = os.environ.get('APACHE_HOST_AVAILABLE', 'false').lower() == 'true'
+    if not apache_available:
+        # Fallback: check the flag file written by start.sh on the host.
+        # The env var is only set at container startup time, so if start.sh ran
+        # after the container was already up (e.g. internal restart), the env var
+        # won't reflect the current state. The flag file on the shared volume is
+        # the source of truth.
+        flag_file = os.path.join(BASE_DIR, '.apache_host_available')
+        apache_available = os.path.isfile(flag_file)
     
     services = []
     
