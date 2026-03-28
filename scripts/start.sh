@@ -736,7 +736,7 @@ echo " [6/6] 🚀 Deploying application services..."
 if [[ "$DOMAIN_MANAGER_INTERNAL" == "true" ]]; then
     echo "   ℹ️ Internal run detected. Excluding domain-manager from self-restart."
     # Get all services from all compose files, then filter out domain-manager exactly
-    SERVICES=$($COMPOSE_CMD $COMPOSE_FILES ps --services | grep -vxE "domain-manager" | xargs)
+    SERVICES=$($COMPOSE_CMD $COMPOSE_FILES config --services | grep -vxE "domain-manager" | xargs)
     $COMPOSE_CMD $COMPOSE_FILES up -d --remove-orphans $SERVICES
 else
     $COMPOSE_CMD $COMPOSE_FILES up -d --remove-orphans
