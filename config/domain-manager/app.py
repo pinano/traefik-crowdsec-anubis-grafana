@@ -145,6 +145,10 @@ def get_subprocess_env():
     # Ensure PROJECT_NAME is consistent
     if 'PROJECT_NAME' not in local_env:
         local_env['PROJECT_NAME'] = 'stack'
+        
+    # Normalize path if present to avoid trailing slash discrepancies that trigger recreations
+    if 'DOMAIN_MANAGER_APP_PATH_HOST' in local_env:
+        local_env['DOMAIN_MANAGER_APP_PATH_HOST'] = local_env['DOMAIN_MANAGER_APP_PATH_HOST'].rstrip('/')
             
     # Add common environment variables for well-behaved subprocesses
     local_env['TERM'] = 'xterm-256color'

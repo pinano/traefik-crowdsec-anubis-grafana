@@ -139,6 +139,13 @@ def atomic_write_yaml(data, filepath, header=None):
         f.seek(0)
         f.write(new_content)
         f.truncate()
+    
+    # Enforce read permissions for all (0o644) so Traefik (non-root) can read it
+    try:
+        os.chmod(filepath, 0o644)
+    except Exception as e:
+        # Don't fail the whole script if chmod fails (e.g. read-only mount)
+        pass
 
 # Unifies SSL/TLS configuration for any router
 def apply_tls_config(router_conf, domain, domain_to_cert_def):

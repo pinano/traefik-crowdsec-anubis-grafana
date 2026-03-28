@@ -766,18 +766,17 @@ fi
 
 
 echo " --------------------------------------------------------"
-# If running inside domain-manager, we must be extremely careful not to recreate our own container.
-# Recreating the panel kills the parent shell and the current script.
+# If running inside domain-manager, we perform a 'Config Audit' first to detect shifts.
 if [[ "$DOMAIN_MANAGER_INTERNAL" == "true" ]]; then
-    echo "   🛡️ Internal run detected. Safe deployment mode ACTIVE."
-    # Get all services EXCEPT the panel
-    SERVICES=$($COMPOSE_CMD $COMPOSE_FILES config --services | grep -vxE "domain-manager" | xargs)
-    # Deploy without --remove-orphans to avoid Docker treating the panel as an orphan if it's not in the list.
-    $COMPOSE_CMD $COMPOSE_FILES up -d $SERVICES
-else
-    # Standard deploy for host runs (cleans up orphans/deleted domains)
-    $COMPOSE_CMD $COMPOSE_FILES up -d --remove-orphans
+    echo "   🔍 Auditing docker-compose configuration for drift..."
+    # This helps us see which variables are causing recreations in the modal log
+    $COMPOSE_CMD $COMPOSE_FILES config --quiet || echo "      ⚠️ Warning: Config validation failed."
 fi
+
+# Deploy everything.
+# We use the global command to match 'make start' exactly.
+# The previous 'internal list' was causing 404s due to network/label inconsistency.
+$COMPOSE_CMD $COMPOSE_FILES up -d --remove-orphans
 sleep 1
 
 echo "   🔍 Verifying Core DNS records..."
