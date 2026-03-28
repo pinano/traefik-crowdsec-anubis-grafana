@@ -261,10 +261,16 @@ else
     DETECTED_PATH=$(pwd -P)
 fi
 
-# Update .env to ensure Docker Compose picks it up correctly even from the file
-update_env_var "DOMAIN_MANAGER_APP_PATH_HOST" "$DETECTED_PATH"
-export DOMAIN_MANAGER_APP_PATH_HOST="$DETECTED_PATH"
-echo "   ✅ Project path: $DETECTED_PATH"
+# Update .env only if it's currently missing or placeholder (REPLACE_ME).
+# This avoids 'path shifts' that trigger recreations when running via UI.
+if [ -z "$DOMAIN_MANAGER_APP_PATH_HOST" ] || [ "$DOMAIN_MANAGER_APP_PATH_HOST" == "REPLACE_ME" ] || [ "$DOMAIN_MANAGER_APP_PATH_HOST" == "null" ]; then
+    update_env_var "DOMAIN_MANAGER_APP_PATH_HOST" "$DETECTED_PATH"
+    export DOMAIN_MANAGER_APP_PATH_HOST="$DETECTED_PATH"
+    echo "   ✅ Project path initialized: $DETECTED_PATH"
+else
+    # Ensure current process has the value from .env, NOT the detected path in container
+    echo "   ✅ Using existing project path: $DOMAIN_MANAGER_APP_PATH_HOST"
+fi
 
 # Normalize CROWDSEC_DISABLE to lowercase
 CROWDSEC_DISABLE=$(echo "${CROWDSEC_DISABLE:-false}" | tr '[:upper:]' '[:lower:]')

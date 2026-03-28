@@ -134,8 +134,20 @@ def get_subprocess_env():
         except Exception as e:
             log.error(f"Error reading .env for subprocess: {e}")
     
+    # Critical Hardenization: Ensure labels using these variables don't shift
+    acme_type = local_env.get('TRAEFIK_ACME_ENV_TYPE', 'staging').lower()
+    if 'TRAEFIK_CERT_RESOLVER' not in local_env:
+        if acme_type != 'local':
+            local_env['TRAEFIK_CERT_RESOLVER'] = 'le'
+        else:
+            local_env['TRAEFIK_CERT_RESOLVER'] = ''
+            
+    # Add common environment variables for well-behaved subprocesses
+    local_env['TERM'] = 'xterm-256color'
+    local_env['PYTHONUNBUFFERED'] = '1'
+    
     # Forensic Log: Only log keys to avoid leaking secrets
-    log.info(f"Subprocess env prepared. Keys: {sorted(local_env.keys())}")
+    log.info(f"Subprocess env prepared. Critical keys: {[k for k in local_env.keys() if 'TRAEFIK' in k or 'DOMAIN' in k]}")
     return local_env
 
 def validate_domain_data(entry):
