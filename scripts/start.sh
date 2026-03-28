@@ -757,15 +757,9 @@ fi
 echo " --------------------------------------------------------"
 echo " [6/6] 🚀 Deploying application services..."
 
-# If running inside domain-manager, exclude it from the 'up' command to avoid killing this script
-if [[ "$DOMAIN_MANAGER_INTERNAL" == "true" ]]; then
-    echo "   ℹ️ Internal run detected. Excluding domain-manager from self-restart."
-    # Get all services from all compose files, then filter out domain-manager exactly
-    SERVICES=$($COMPOSE_CMD $COMPOSE_FILES config --services | grep -vxE "domain-manager" | xargs)
-    $COMPOSE_CMD $COMPOSE_FILES up -d --remove-orphans $SERVICES
-else
-    $COMPOSE_CMD $COMPOSE_FILES up -d --remove-orphans
-fi
+# Deploy everything. Docker Compose will only recreate modified services.
+# It won't kill the running domain-manager if its configuration is up-to-date.
+$COMPOSE_CMD $COMPOSE_FILES up -d --remove-orphans
 sleep 1
 
 echo "   🔍 Verifying Core DNS records..."
