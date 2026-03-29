@@ -3,15 +3,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveBtn = document.getElementById('save-btn');
     const checkBtn = document.getElementById('validate-btn');
     const exportBtn = document.getElementById('export-btn');
-    const restartBtn = document.getElementById('restart-btn');
-    const applyConfigBtn = document.getElementById('apply-config-btn');
+    const deployBtn = document.getElementById('deploy-btn');
+    const deployNotification = document.getElementById('deploy-notification');
+    const deployNotificationIcon = document.getElementById('deploy-notification-icon');
+    const deployNotificationText = document.getElementById('deploy-notification-text');
     const searchInput = document.getElementById('search-input');
     const addRowBtn = document.getElementById('add-row-btn');
     const globalDropdown = document.getElementById('global-service-dropdown');
     const sortableHeaders = document.querySelectorAll('.sortable');
     const unsavedNotification = document.getElementById('unsaved-notification');
-    const restartNotification = document.getElementById('restart-notification');
-    const applyNotification = document.getElementById('apply-notification');
     const restartModal = document.getElementById('restart-modal');
     const restartModalTitle = document.getElementById('restart-modal-title');
     const logContainer = document.getElementById('log-container');
@@ -62,6 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let allServices = [];
     let currentSort = { column: '_root_domain', direction: 'asc' };
     let rowToDelete = null;
+    let pendingAction = null; // 'apply' or 'restart'
 
     function getRootDomain(domain) {
         if (!domain) return '';
@@ -873,10 +874,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearUnsavedChanges();
 
                 // Now it is safe to display the post-save banners without being suppressed
-                if (actionRequired === 'restart') {
-                    markRestartNeeded();
-                } else if (actionRequired === 'apply') {
-                    markApplyNeeded();
+                if (actionRequired) {
+                    updateDeployUI(actionRequired);
                 }
             } else {
                 showToast('Error saving changes', 'danger');
@@ -933,23 +932,21 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.removeChild(link);
     });
 
-    restartBtn.addEventListener('click', () => {
+    deployBtn.addEventListener('click', () => {
         rowToDelete = null;
-        confirmTitle.textContent = 'Confirm Soft Restart';
-        confirmMsg.textContent = 'This will regenerate config and deploy new/removed Anubis containers. Existing services will NOT be stopped or recreated.';
-        confirmDeleteBtn.textContent = 'Soft Restart';
-        confirmDeleteBtn.className = 'btn btn-danger';
-        confirmAction = 'restart';
-        confirmModal.classList.add('show');
-    });
-
-    applyConfigBtn.addEventListener('click', () => {
-        rowToDelete = null;
-        confirmTitle.textContent = 'Hot Reload (Zero Downtime)';
-        confirmMsg.textContent = 'This will regenerate the Traefik dynamic config and apply it in-place. No containers will be stopped — traffic continues uninterrupted.\n\nUse this for: changing rate limits, concurrencies, or editing existing traffic rules.\nUse "Soft Restart" for: adding/removing subdomains, new Anubis instances.';
-        confirmDeleteBtn.textContent = 'Apply';
-        confirmDeleteBtn.className = 'btn btn-apply';
-        confirmAction = 'apply-config';
+        if (pendingAction === 'restart') {
+            confirmTitle.textContent = 'Confirm Soft Restart';
+            confirmMsg.textContent = 'This will regenerate config and deploy new/removed Anubis containers. Existing services will NOT be stopped or recreated.';
+            confirmDeleteBtn.textContent = 'Soft Restart';
+            confirmDeleteBtn.className = 'btn btn-danger';
+            confirmAction = 'restart';
+        } else {
+            confirmTitle.textContent = 'Hot Reload (Zero Downtime)';
+            confirmMsg.textContent = 'This will regenerate the Traefik dynamic config and apply it in-place. No containers will be stopped — traffic continues uninterrupted.\n\nUse this for: changing rate limits, concurrencies, or editing existing traffic rules.';
+            confirmDeleteBtn.textContent = 'Apply';
+            confirmDeleteBtn.className = 'btn btn-apply';
+            confirmAction = 'apply-config';
+        }
         confirmModal.classList.add('show');
     });
 
@@ -1015,17 +1012,16 @@ document.addEventListener('DOMContentLoaded', () => {
         closeModalBtn.style.display = 'none';
 
         // Hide notifications
-        restartNotification.classList.remove('show');
-        applyNotification.classList.remove('show');
+        deployNotification.classList.remove('show');
+        deployNotification.classList.remove('is-restart');
         document.body.classList.remove('has-notification');
-        restartBtn.classList.remove('btn-restart-needed');
-        applyConfigBtn.classList.remove('btn-apply-needed');
+        deployBtn.classList.remove('btn-deploy-needed');
+        deployBtn.classList.remove('is-restart');
         
-        // Disable restart button to prevent unnecessary full restarts
-        restartBtn.disabled = true;
-        restartBtn.title = "Only available when adding/removing domains or changing Anubis configurations";
-        applyConfigBtn.disabled = true;
-        applyConfigBtn.title = "Only available when there are routing changes to apply";
+        // Disable deploy button
+        deployBtn.disabled = true;
+        deployBtn.title = "Deployment in progress...";
+        pendingAction = null;
 
         const eventSource = new EventSource(streamUrl);
 
@@ -1111,29 +1107,33 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    function markRestartNeeded() {
-        // Only show restart needed if not currently showing unsaved changes (priority to unsaved)
+    function updateDeployUI(action) {
+        pendingAction = action;
+
+        if (action === 'restart') {
+            deployNotificationText.textContent = 'Structural changes detected. Click "Deploy Changes" for a Soft Restart.';
+            deployNotificationIcon.dataset.lucide = 'alert-triangle';
+            deployBtn.title = "Soft Restart: Required for adding/removing domains or Anubis updates.";
+            deployNotification.classList.add('is-restart');
+            deployBtn.classList.add('is-restart');
+        } else {
+            deployNotificationText.textContent = 'Routing changes saved. Click "Deploy Changes" for a Hot Reload (Zero Downtime).';
+            deployNotificationIcon.dataset.lucide = 'zap';
+            deployBtn.title = "Hot Reload: Zero-downtime config update.";
+            deployNotification.classList.remove('is-restart');
+            deployBtn.classList.remove('is-restart');
+        }
+
+        if (window.lucide) lucide.createIcons({ root: deployNotification });
+
+        // Only show notification if not currently showing unsaved changes (priority to unsaved)
         if (!unsavedNotification.classList.contains('show')) {
-            applyNotification.classList.remove('show');
-            restartNotification.classList.add('show');
+            deployNotification.classList.add('show');
             document.body.classList.add('has-notification');
         }
 
-        applyConfigBtn.classList.remove('btn-apply-needed');
-        restartBtn.classList.add('btn-restart-needed');
-        restartBtn.disabled = false;
-        restartBtn.removeAttribute('title');
-    }
-
-    function markApplyNeeded() {
-        if (!unsavedNotification.classList.contains('show') && !restartNotification.classList.contains('show')) {
-            applyNotification.classList.add('show');
-            document.body.classList.add('has-notification');
-        }
-
-        applyConfigBtn.classList.add('btn-apply-needed');
-        applyConfigBtn.disabled = false;
-        applyConfigBtn.removeAttribute('title');
+        deployBtn.classList.add('btn-deploy-needed');
+        deployBtn.disabled = false;
     }
 
     // Help Modal Event Listeners
@@ -1164,8 +1164,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (hasChanges) {
             unsavedNotification.classList.add('show');
-            restartNotification.classList.remove('show');
-            applyNotification.classList.remove('show');
+            deployNotification.classList.remove('show');
             document.body.classList.add('has-notification');
             saveBtn.classList.add('btn-save-needed');
             saveBtn.disabled = false;
@@ -1174,7 +1173,7 @@ document.addEventListener('DOMContentLoaded', () => {
             saveBtn.classList.remove('btn-save-needed');
             saveBtn.disabled = true;
             // Banner is gone, so if no other notification, remove the margin
-            if (!restartNotification.classList.contains('show') && !applyNotification.classList.contains('show')) {
+            if (!deployNotification.classList.contains('show')) {
                 document.body.classList.remove('has-notification');
             }
         }

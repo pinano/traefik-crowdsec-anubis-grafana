@@ -19,15 +19,10 @@
         <i data-lucide="save" style="vertical-align: middle; margin-right: 0.5rem; width: 1.2rem; height: 1.2rem;"></i>
         Unsaved changes. Don't forget to save!
     </div>
-    <div id="restart-notification" class="restart-needed-banner">
-        <i data-lucide="alert-triangle"
+    <div id="deploy-notification" class="deploy-needed-banner">
+        <i id="deploy-notification-icon" data-lucide="zap"
             style="vertical-align: middle; margin-right: 0.5rem; width: 1.2rem; height: 1.2rem;"></i>
-        Changes pending. Click "Soft Restart" to deploy.
-    </div>
-    <div id="apply-notification" class="apply-needed-banner">
-        <i data-lucide="zap"
-            style="vertical-align: middle; margin-right: 0.5rem; width: 1.2rem; height: 1.2rem;"></i>
-        Changes saved. Click "Hot Reload" to deploy without downtime.
+        <span id="deploy-notification-text">Changes saved. Ready to deploy.</span>
     </div>
 
     <div class="container">
@@ -58,11 +53,8 @@
                 <button id="save-btn" class="btn btn-success" disabled>
                     <i data-lucide="save"></i> Save Changes
                 </button>
-                <button id="apply-config-btn" class="btn btn-apply" disabled title="Only available when there are routing changes to apply">
-                    <i data-lucide="zap"></i> Hot Reload
-                </button>
-                <button id="restart-btn" class="btn btn-danger" disabled title="Only available when adding/removing domains or changing Anubis configurations">
-                    <i data-lucide="refresh-cw"></i> Soft Restart
+                <button id="deploy-btn" class="btn btn-apply" disabled title="Save changes first to enable deployment">
+                    <i data-lucide="rocket"></i> Deploy Changes
                 </button>
                 <a href="{{ url_for('logout') }}" class="btn btn-secondary">
                     <i data-lucide="log-out"></i> Logout
@@ -266,16 +258,9 @@
                                 to save.</span>
                         </li>
                         <li style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.5rem;">
-                            <i data-lucide="zap"
+                            <i data-lucide="rocket"
                                 style="color: #0d9488; flex-shrink: 0; margin-top: 2px;"></i>
-                            <span><strong>Hot Reload:</strong> Regenerates Traefik's dynamic config <em>without
-                                stopping any container</em>. Zero downtime. Use for rate, burst, concurrency,
-                                and routing-only changes.</span>
-                        </li>
-                        <li style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.5rem;">
-                            <i data-lucide="refresh-cw"
-                                style="color: var(--danger-color); flex-shrink: 0; margin-top: 2px;"></i>
-                            <span><strong>Soft Restart:</strong> Regenerates config and deploys new Anubis containers without stopping existing services. Required when adding/removing domains or changing Anubis configurations. <em>Zero downtime for existing services.</em></span>
+                            <span><strong>Deploy Changes:</strong> Applies your saved changes to the stack. The system will automatically choose between a <strong>Hot Reload</strong> (zero-downtime config update) or a <strong>Soft Restart</strong> (container updates for new domains/Anubis) based on the type of changes made.</span>
                         </li>
                     </ul>
                 </div>
