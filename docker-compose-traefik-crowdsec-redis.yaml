@@ -45,9 +45,10 @@ services:
     deploy:
       resources:
         reservations:
-          memory: 512M
-        limits:
+          cpus: '0.10'
           memory: 1G
+        limits:
+          memory: 2G
     logging:
       driver: "json-file"
       options:
@@ -83,9 +84,10 @@ services:
     deploy:
       resources:
         reservations:
-          memory: 512M
-        limits:
+          cpus: '0.10'
           memory: 1G
+        limits:
+          memory: 2G
     healthcheck:
       test: [ "CMD", "cscli", "lapi", "status" ]
       interval: 15s
