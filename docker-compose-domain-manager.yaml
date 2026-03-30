@@ -45,7 +45,7 @@ services:
       # 1. Forward Auth: checks /auth-check
       - "traefik.http.middlewares.dashboard-auth.forwardauth.address=http://domain-manager:5000/auth-check"
       - "traefik.http.middlewares.dashboard-auth.forwardauth.trustForwardHeader=true"
-      - "traefik.http.middlewares.dashboard-auth.forwardauth.maxResponseBodySize=1048576"  # 1MB cap
+      - "traefik.http.middlewares.dashboard-auth.forwardauth.maxResponseBodySize=1048576" # 1MB cap
       # 2. Error Page: Redirects 401 and 403 to /login
       - "traefik.http.middlewares.dashboard-error.errors.status=401-403"
       - "traefik.http.middlewares.dashboard-error.errors.service=domain-manager@docker"
@@ -55,7 +55,11 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-
+    deploy:
+      resources:
+        limits:
+          cpus: 0.10
+          memory: 512M
 networks:
   traefik:
     name: traefik

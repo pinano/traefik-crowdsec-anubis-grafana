@@ -18,7 +18,7 @@ services:
       resources:
         limits:
           cpus: 0.10
-          memory: 32M
+          memory: 64M
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"
@@ -105,7 +105,7 @@ services:
       resources:
         limits:
           cpus: 0.10
-          memory: 64M
+          memory: 96M
     logging:
       driver: "json-file"
       options:
