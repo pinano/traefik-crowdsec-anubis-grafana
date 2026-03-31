@@ -212,27 +212,26 @@ update_env_var() {
     local new_val=$2
     
     # Check if variable exists and extract current value properly (stripping quotes/spaces)
-    local current_line=$(grep "^${var_name}=" "$ENV_FILE" | head -n 1)
+    # Using awk for precision parsing: find line starting with name=, get everything after =
+    local current_val=$(awk -F= -v name="$var_name" '$1 == name { sub(/^[^=]*=/, ""); gsub(/^[[:space:]]*["'\'']?|["'\'']?[[:space:]]*$/, ""); print; exit }' "$ENV_FILE")
     
-    if [ -n "$current_line" ]; then
-        # Parse current value: everything after '=', then strip surrounding quotes
-        local current_val=$(echo "$current_line" | cut -d'=' -f2- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
-        
-        if [ "$current_val" == "$new_val" ]; then
-            # Value is functionally identical. Avoid touching the file to maintain mtime.
-            return
-        fi
-        
-        # If different, update the existing line
-        local TMP_ENV=$(mktemp)
-        local escaped_val=$(echo "$new_val" | sed 's|#|\\#|g')
-        sed "s|^${var_name}=.*|${var_name}=${escaped_val}|" "$ENV_FILE" > "$TMP_ENV"
-        cat "$TMP_ENV" > "$ENV_FILE"
-        rm "$TMP_ENV"
-    else
-        # Variable does not exist, append it
-        echo "${var_name}=${new_val}" >> "$ENV_FILE"
+    if [ "$current_val" == "$new_val" ]; then
+        # Value is functionally identical. Avoid touching the file to maintain mtime.
+        return
     fi
+    
+    # If different (or doesn't exist), update the line safely using awk + ENVIRON
+    # This handles ALL special characters (\, |, &, quotes) without delimiter hell.
+    local TMP_ENV=$(mktemp)
+    NEW_VAL="$new_val" awk -v name="$var_name" '
+        BEGIN { FS="="; val=ENVIRON["NEW_VAL"]; found=0 }
+        $1 == name { print name "=" val; found=1; next }
+        { print }
+        END { if (found == 0) print name "=" val }
+    ' "$ENV_FILE" > "$TMP_ENV"
+    
+    cat "$TMP_ENV" > "$ENV_FILE"
+    rm "$TMP_ENV"
 }
 
 # Domain Manager Secret Key (auto-generate on first run)
@@ -475,10 +474,10 @@ if [[ "$DOMAIN_MANAGER_INTERNAL" == "true" ]]; then
         chmod 600 ./config/traefik/acme.json
     fi
     
-    # If we can, try to chown to the owner of the config dir (which is likely the host user)
-    # This might fail if the container doesn't see the host users, but we can try referencing the UID of the folder.
-    TARGET_UID=$(stat -c '%u' ./config/traefik)
-    TARGET_GID=$(stat -c '%g' ./config/traefik)
+    # Match ownership to parent directory (host user)
+    # Linux stat uses -c, macOS uses -f; try Linux first.
+    TARGET_UID=$(stat -c '%u' ./config/traefik 2>/dev/null) || TARGET_UID=$(stat -f '%u' ./config/traefik 2>/dev/null) || TARGET_UID=""
+    TARGET_GID=$(stat -c '%g' ./config/traefik 2>/dev/null) || TARGET_GID=$(stat -f '%g' ./config/traefik 2>/dev/null) || TARGET_GID=""
     
     if [ -n "$TARGET_UID" ] && [ -n "$TARGET_GID" ]; then
          chown -R "$TARGET_UID:$TARGET_GID" ./config/traefik/dynamic-config

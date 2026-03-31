@@ -30,29 +30,36 @@ def parse_env_file_keys(filepath):
 def get_env_values(filepath):
     """
     Returns a dictionary of key-value pairs from a .env file.
+    Value is a tuple (prefix, value) where prefix is "export " or "".
     """
     values = {}
     if not os.path.exists(filepath):
         return values
     with open(filepath, 'r') as f:
         for line in f:
+            original_line = line
             line = line.strip()
             if not line or line.startswith('#'):
                 continue
+            
+            prefix = ""
             if line.startswith('export '):
+                prefix = "export "
                 line = line[7:]
+            
             if '=' in line:
                 parts = line.split('=', 1)
                 key = parts[0].strip()
                 value = parts[1]
-                values[key] = value
+                values[key] = (prefix, value)
     return values
 
 def sync_env(dist_file, env_file):
     """
     Synchronizes .env with .env.dist.
     - Adds missing variables from .env.dist (with default values).
-    - Removes extra variables from .env that are not in .env.dist.
+    - Preserves existing values for variables present in both files.
+    - Preserves extra variables from .env that are not in .env.dist (added at the end).
     - Preserves .env.dist structure and comments.
     """
     if not os.path.exists(dist_file):
@@ -83,10 +90,9 @@ def sync_env(dist_file, env_file):
             if '=' in stripped:
                 key = stripped.split('=', 1)[0].strip()
                 if key in current_values:
-                    # Use existing value
-                    # Check if original was exported
-                    prefix = "export " if original_line.strip().startswith('export ') else ""
-                    new_lines.append(f"{prefix}{key}={current_values[key]}\n")
+                    # Use existing value and preserve its prefix (prioritizing current .env)
+                    prefix, value = current_values[key]
+                    new_lines.append(f"{prefix}{key}={value}\n")
                 else:
                     # Keep .env.dist default
                     new_lines.append(line)
@@ -96,6 +102,18 @@ def sync_env(dist_file, env_file):
 
     with open(env_file, 'w') as f:
         f.writelines(new_lines)
+        
+        # Append extra variables that were in .env but not in .env.dist
+        dist_keys = parse_env_file_keys(dist_file)
+        extra_keys = [k for k in current_values.keys() if k not in dist_keys]
+        
+        if extra_keys:
+            f.write("\n")
+            f.write("# --- Custom variables (not in .env.dist) ---\n")
+            for key in sorted(extra_keys):
+                prefix, value = current_values[key]
+                f.write(f"{prefix}{key}={value}\n")
+            print(f"ℹ️  Preserved {len(extra_keys)} custom variables.")
 
     return True
 
@@ -111,13 +129,6 @@ def main():
         print(f"🔄 Synchronizing {env_file} with {dist_file}...")
         if sync_env(dist_file, env_file):
             print("✅ Environment synchronized successfully.")
-            # Verify after sync
-            dist_keys = parse_env_file_keys(dist_file)
-            env_keys = parse_env_file_keys(env_file)
-            extra_keys = env_keys - dist_keys
-            if extra_keys:
-                # This shouldn't happen with the current sync logic
-                print(f"⚠️ Warning: Found unexpected extra keys after sync: {', '.join(extra_keys)}")
         else:
             sys.exit(1)
         return
@@ -150,10 +161,10 @@ def main():
         print("")
 
     if extra_keys:
-        print("⚠️  EXTRA VARIABLES (Present in .env but not in .env.dist):")
+        print("ℹ️  CUSTOM VARIABLES (Present in .env but not in .env.dist):")
         for key in sorted(extra_keys):
             print(f"   + {key}")
-        print("   👉 Note: These will be removed if you run 'make sync'.")
+        print("   👉 Note: These will be preserved if you run 'make sync'.")
         print("")
 
     if not missing_keys and not extra_keys:

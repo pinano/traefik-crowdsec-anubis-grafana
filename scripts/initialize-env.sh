@@ -90,11 +90,15 @@ prompt_val() {
     read -p "   Enter value [${display_val}]: " input_val
 
     if [ -n "$input_val" ]; then
-        # Escape special characters for sed (basic)
-        local escaped_val=$(echo "$input_val" | sed -e 's/[]\/$*.^[]/\\&/g')
-        # Use a temporary file and 'cat' to preserve the inode
+        # Use a temporary file and awk + ENVIRON for a truly literal replacement.
+        # This handles ALL special characters (\, |, &, quotes) without delimiter hell.
         local TMP_FILE=$(mktemp)
-        sed "s|^${var_name}=.*|${var_name}=${input_val}|" "$ENV_FILE" > "$TMP_FILE"
+        NEW_VAL="$input_val" awk -v name="$var_name" '
+            BEGIN { FS="="; val=ENVIRON["NEW_VAL"]; found=0 }
+            $1 == name { print name "=" val; found=1; next }
+            { print }
+            END { if (found == 0) print name "=" val }
+        ' "$ENV_FILE" > "$TMP_FILE"
         cat "$TMP_FILE" > "$ENV_FILE"
         rm "$TMP_FILE"
         echo "   ✅ Set to: $input_val"
@@ -107,9 +111,14 @@ prompt_val() {
 replace_val() {
     local var_name=$1
     local new_val=$2
-    # Use a temporary file and 'cat' to preserve the inode
+    # Use a temporary file and awk + ENVIRON for a truly literal replacement.
     local TMP_FILE=$(mktemp)
-    sed "s|^${var_name}=.*|${var_name}=${new_val}|" "$ENV_FILE" > "$TMP_FILE"
+    NEW_VAL="$new_val" awk -v name="$var_name" '
+        BEGIN { FS="="; val=ENVIRON["NEW_VAL"]; found=0 }
+        $1 == name { print name "=" val; found=1; next }
+        { print }
+        END { if (found == 0) print name "=" val }
+    ' "$ENV_FILE" > "$TMP_FILE"
     cat "$TMP_FILE" > "$ENV_FILE"
     rm "$TMP_FILE"
 }

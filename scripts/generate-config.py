@@ -220,7 +220,7 @@ def process_router(entry, http_section, domain_to_cert_def):
         if not target.startswith("http"):
             target = f"https://{target}"
             
-        escaped_domain = domain.replace('.', r'\.')
+        escaped_domain = re.escape(domain)
         http_section['middlewares'][redirect_mw_name] = {
             'redirectRegex': {
                 'regex': f"^https?://{escaped_domain}/(.*)",
@@ -355,6 +355,10 @@ def generate_configs():
                     if not domain:
                         print(f"    ⚠️ Line {line_num}: Ignored (Empty domain field).")
                         error_count += 1
+                        continue
+
+                    # Skip header row if it's not a real domain
+                    if domain.lower() == 'domain' and service.lower() == 'service':
                         continue
 
                     # --- Robustness Check: Docker Service Name Format ---
