@@ -209,7 +209,6 @@ loki.process "apache_host" {
         
         stage.labels {
             values = {
-                client_ip = "",
                 method    = "",
                 status    = "",
             }
@@ -240,7 +239,6 @@ loki.process "apache_host" {
             values = {
                 level     = "",
                 module    = "",
-                client_ip = "",
             }
         }
         
