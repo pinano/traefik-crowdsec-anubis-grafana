@@ -520,6 +520,7 @@ A lightweight utility service that monitors the stack and sends Telegram alerts.
 | **Inspect Certificates** | `make certs-inspect` (Detailed) |
 | **Generate Local Certs** | `make certs-create-local` (Local mode only) |
 | **Traefik Health** | `make traefik-health` |
+| **CrowdSec Unban** | `make crowdsec-unban [IP]` |
 | **Redis Stats** | `make redis-info` / `make redis-monitor` |
 | **Show Help** | `make help` |
 
@@ -570,6 +571,10 @@ The easiest way to interact with CrowdSec is using the `Makefile` shortcuts.
 ```bash
 # View active decisions (bans)
 make crowdsec-decisions
+
+# Unban one or more IPs
+make crowdsec-unban 1.2.3.4
+make crowdsec-unban 1.1.1.1 2.2.2.2
 
 # List recent alerts
 make crowdsec-alerts
