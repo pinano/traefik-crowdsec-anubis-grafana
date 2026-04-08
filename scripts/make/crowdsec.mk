@@ -23,3 +23,14 @@ crowdsec-unban: ## Unban an IP address (usage: make crowdsec-unban 123.123.123.1
 		echo "Removing ban for IP: $$ip..."; \
 		$(call check_service,crowdsec,cscli decisions delete --ip $$ip); \
 	done
+
+.PHONY: crowdsec-appsec
+crowdsec-appsec: ## Show AppSec WAF status: loaded configs, rules, and metrics
+	@echo "=== AppSec Configs ==="
+	@$(call check_service,crowdsec,cscli appsec-configs list)
+	@echo ""
+	@echo "=== AppSec Rules (summary) ==="
+	@$(call check_service,crowdsec,cscli appsec-rules list)
+	@echo ""
+	@echo "=== AppSec Metrics ==="
+	@$(call check_service,crowdsec,cscli metrics show appsec)

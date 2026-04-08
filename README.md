@@ -136,8 +136,8 @@ graph TD
     subgraph "Traefik Middleware Chain"
         T_Entry --> MW_UA{1. UA Blacklist}:::security
         MW_UA -- Matched Bot --> Block[403 Forbidden]:::security
-        MW_UA -- Allowed --> MW_CS{2. CrowdSec Check}:::security
-        MW_CS -- Blocked IP --> Block
+        MW_UA -- Allowed --> MW_CS{"2. CrowdSec Check\n(IP Reputation + AppSec WAF)"}:::security
+        MW_CS -- Blocked IP/Payload --> Block
         MW_CS -- Allowed --> MW_Sec["3. Security Headers"]:::traefik
         MW_Sec --> MW_RL["4. Rate Limiting"]:::traefik
         MW_RL --> MW_Comp["5. Compression"]:::traefik
@@ -237,7 +237,7 @@ Access the management interface at `https://domains.<your-domain>`.
 
 #### CrowdSec Fail-Open Behavior
 The stack is configured by default for High Availability (**Fail Open**).
-If the CrowdSec LAPI or the Redis cache become unreachable, the Traefik plugin will **not** block legitimate traffic (it won't return 403 errors). This is achieved through specific CrowdSec plugin settings generated automatically (`updateMaxFailure: -1` and `redisCacheUnreachableBlock: false`).
+If the CrowdSec LAPI, AppSec engine, or the Redis cache become unreachable, the Traefik plugin will **not** block legitimate traffic (it won't return 403 errors). This is achieved through specific CrowdSec plugin settings generated automatically (`updateMaxFailure: -1`, `redisCacheUnreachableBlock: false`, `crowdsecAppsecFailureBlock: false`, `crowdsecAppsecUnreachableBlock: false`).
 
 #### Traefik (Edge Routing)
 
@@ -351,13 +351,14 @@ Every request passes through a sequential chain of middlewares designed to filte
 - **`redirect-regex`**: Handles 301/302 redirections defined in `domains.csv` with optimized regex matching.
 - **`anubis-assets-stripper`**: Internal helper to clean request paths for Anubis static assets.
 
-### CrowdSec (IPS)
+### CrowdSec (IPS + WAF)
 
-CrowdSec is a collaborative Intrusion Prevention System that analyzes behavior to detect attacks.
+CrowdSec is a collaborative security engine combining a behavioral **Intrusion Prevention System (IPS)** with a **Web Application Firewall (AppSec)**.
 
 - **Log Analysis**: Reads logs via the Docker socket, matching patterns against community scenarios.
 - **Community Blocklist**: Automatically shares and receives ban lists from the global network.
 - **Remediation**: Instructs Traefik to ban IPs (403 Forbidden) via the bouncer API.
+- **AppSec (WAF)**: Inspects HTTP request payloads in real time at Layer 7, blocking malicious content before it reaches the backend.
 
 #### Architecture
 
@@ -391,14 +392,40 @@ CrowdSec is a collaborative Intrusion Prevention System that analyzes behavior t
 
 #### Installed Collections
 
-| Collection | Description |
-|------------|-------------|
-| `crowdsecurity/traefik` | Parsers and scenarios for Traefik access logs |
-| `crowdsecurity/http-cve` | Detection of CVE exploits in HTTP requests |
-| `crowdsecurity/sshd` | SSH brute-force detection |
-| `crowdsecurity/whitelist-good-actors` | Whitelists known good bots (Google, Bing, etc.) |
-| `crowdsecurity/base-http-scenarios` | Common HTTP attack patterns (path traversal, SQL injection) |
-| `crowdsecurity/http-dos` | HTTP flood and DDoS detection |
+| Collection | Layer | Description |
+|------------|:---:|-------------|
+| `crowdsecurity/traefik` | L3/L4 | Parsers and scenarios for Traefik access logs |
+| `crowdsecurity/http-cve` | L3/L4 | Detection of CVE exploits in HTTP requests |
+| `crowdsecurity/sshd` | L3/L4 | SSH brute-force detection |
+| `crowdsecurity/whitelist-good-actors` | L3/L4 | Whitelists known good bots (Google, Bing, etc.) |
+| `crowdsecurity/base-http-scenarios` | L3/L4 | Common HTTP attack patterns (path traversal, SQL injection) |
+| `crowdsecurity/http-dos` | L3/L4 | HTTP flood and DDoS detection |
+| `crowdsecurity/appsec-virtual-patching` | **L7 (WAF)** | Virtual patches for known CVEs — blocks exploitation attempts before updates |
+| `crowdsecurity/appsec-generic-rules` | **L7 (WAF)** | OWASP-style rules: SQLi, XSS, LFI, RCE, SSTI, and more |
+
+#### AppSec (Web Application Firewall)
+
+In addition to IP-level detection, the CrowdSec **AppSec** component acts as a WAF, inspecting the *content* of each HTTP request in real time. The Traefik bouncer plugin forwards requests to the AppSec engine (listening on port `7422` internally) before they reach the backend.
+
+```
+                     ┌─────────────────────────────────┐
+  HTTP Request ──▶   │  Traefik Bouncer Plugin          │
+                     │  1. IP check (LAPI stream)        │
+                     │  2. Payload check (AppSec :7422) ─┼──▶ CrowdSec AppSec Engine
+                     └─────────────────────────────────┘           │
+                              │ Block (403) or Allow                │ 184 inband rules
+                              ▼                                     │ (vpatch-* + generic-*)
+                         Backend Service  ◀── Allow ────────────────┘
+```
+
+| AppSec Config | Role |
+|---|---|
+| `crowdsecurity/appsec-default` | Orchestrator config: defines inspection mode and loads rule sets |
+| `crowdsecurity/virtual-patching` | Inband rules: blocks requests matching known CVE exploit patterns |
+| `crowdsecurity/generic-rules` | Inband rules: blocks OWASP-style generic attack payloads |
+
+> [!NOTE]
+> The AppSec engine runs **fail-open**: if it is unreachable during a restart, Traefik continues serving traffic normally. The existing rate-limiting and Anubis layers remain active as a fallback.
 
 #### Aggressive Ban Policy
 
@@ -521,6 +548,7 @@ A lightweight utility service that monitors the stack and sends Telegram alerts.
 | **Generate Local Certs** | `make certs-create-local` (Local mode only) |
 | **Traefik Health** | `make traefik-health` |
 | **CrowdSec Unban** | `make crowdsec-unban [IP]` |
+| **CrowdSec AppSec Status** | `make crowdsec-appsec` |
 | **Redis Stats** | `make redis-info` / `make redis-monitor` |
 | **Show Help** | `make help` |
 
@@ -581,6 +609,9 @@ make crowdsec-alerts
 
 # View real-time metrics
 make crowdsec-metrics
+
+# AppSec WAF status: loaded configs, active rules, and traffic metrics
+make crowdsec-appsec
 ```
 
 #### Advanced Management (Manual)
