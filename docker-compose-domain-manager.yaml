@@ -28,7 +28,7 @@ services:
       - ./docker-compose-anubis-base.yaml:${DOMAIN_MANAGER_APP_PATH_HOST}/docker-compose-anubis-base.yaml:ro
       - ./docker-compose-anubis-generated.yaml:${DOMAIN_MANAGER_APP_PATH_HOST}/docker-compose-anubis-generated.yaml
       - ./docker-compose-apache-logs.yaml:${DOMAIN_MANAGER_APP_PATH_HOST}/docker-compose-apache-logs.yaml:ro
-      - ./docker-compose-grafana-loki-alloy.yaml:${DOMAIN_MANAGER_APP_PATH_HOST}/docker-compose-grafana-loki-alloy.yaml:ro
+      - ./docker-compose-grafana-loki-alloy-prometheus.yaml:${DOMAIN_MANAGER_APP_PATH_HOST}/docker-compose-grafana-loki-alloy-prometheus.yaml:ro
       - ./docker-compose-domain-manager.yaml:${DOMAIN_MANAGER_APP_PATH_HOST}/docker-compose-domain-manager.yaml:ro
       - ./config:${DOMAIN_MANAGER_APP_PATH_HOST}/config
       - /var/run/docker.sock:/var/run/docker.sock

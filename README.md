@@ -836,7 +836,7 @@ This stack supports locally trusted certificates to prevent browser security war
 └── Docker Compose Files:
     ├── docker-compose-traefik-crowdsec-redis.yaml   # Core infrastructure
     ├── docker-compose-tools.yaml                    # Tools & monitoring
-    ├── docker-compose-grafana-loki-alloy.yaml       # Observability stack
+    ├── docker-compose-grafana-loki-alloy-prometheus.yaml # Observability stack (LGT + Prometheus)
     ├── docker-compose-domain-manager.yaml           # Admin UI service
     ├── docker-compose-anubis-base.yaml              # Anubis template
     ├── docker-compose-anubis-generated.yaml         # Auto-generated Anubis instances

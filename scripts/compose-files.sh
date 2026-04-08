@@ -16,7 +16,7 @@
 # Base compose files (always included)
 COMPOSE_FILES="-f docker-compose-traefik-crowdsec-redis.yaml \
                -f docker-compose-tools.yaml \
-               -f docker-compose-grafana-loki-alloy.yaml \
+               -f docker-compose-grafana-loki-alloy-prometheus.yaml \
                -f docker-compose-domain-manager.yaml"
 
 # Add Anubis if generated config exists
