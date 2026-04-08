@@ -79,7 +79,7 @@ services:
       # Add the socket to read Traefik logs directly from Docker
       - /var/run/docker.sock:/var/run/docker.sock:ro
     expose:
-      - "7422"  # AppSec WAF listener (internal, traefik network only)
+      - "7422" # AppSec WAF listener (internal, traefik network only)
     networks:
       - traefik
     security_opt:
@@ -118,6 +118,22 @@ services:
       resources:
         limits:
           memory: 256M
+
+  # ===========================
+  #  REDIS EXPORTER
+  # ===========================
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.82.0
+    restart: unless-stopped
+    environment:
+      - REDIS_ADDR=redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    networks:
+      - traefik
+    deploy:
+      resources:
+        limits:
+          memory: 128M
 
 networks:
   traefik:

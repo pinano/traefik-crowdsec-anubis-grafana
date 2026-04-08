@@ -18,7 +18,8 @@ services:
       - TZ=${TZ}
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./config/grafana/config.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - /etc/localtime:/etc/localtime:ro
     networks:
       - traefik
@@ -88,6 +89,10 @@ services:
       - ./config/alloy/config.alloy:/etc/alloy/config.alloy:ro
       - alloy_data:/var/lib/alloy
       - /etc/localtime:/etc/localtime:ro
+      # Host mounts for prometheus.exporter.unix (Node Exporter equivalent)
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro,rslave
     # Alloy needs the 'run' argument and also to point at the config file
     command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
     networks:
@@ -102,10 +107,37 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # ===========================
+  #  PROMETHEUS (Metrics Storage)
+  # ===========================
+  prometheus:
+    image: prom/prometheus:v3.11.1
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=${PROMETHEUS_RETENTION_DAYS:-15}d'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-remote-write-receiver'
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - traefik
+    deploy:
+      resources:
+        limits:
+          memory: ${PROMETHEUS_MEM_LIMIT:-512M}
+        reservations:
+          memory: 128M
+
 volumes:
   grafana_data:
   loki_data:
   alloy_data:
+  prometheus_data:
 
 
 networks:

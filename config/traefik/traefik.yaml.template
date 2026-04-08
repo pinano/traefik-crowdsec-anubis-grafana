@@ -65,6 +65,12 @@ providers:
 log:
   level: TRAEFIK_LOG_LEVEL_PLACEHOLDER
 
+metrics:
+  prometheus:
+    addEntryPointsLabels: true
+    addRoutersLabels: true
+    addServicesLabels: true
+
 accessLog:
   format: json
   # Memory buffer so as not to hammer the disk with each line (batch writing)

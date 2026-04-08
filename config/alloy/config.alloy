@@ -254,3 +254,36 @@ loki.write "local" {
         url = "http://loki:3100/loki/api/v1/push"
     }
 }
+
+// ============================================
+// METRICS PIPELINE (PROMETHEUS)
+// ============================================
+
+// A. Host Metrics (Node Exporter equivalent)
+prometheus.exporter.unix "host" {
+    procfs_path = "/host/proc"
+    sysfs_path  = "/host/sys"
+    rootfs_path = "/host/root"
+}
+
+// B. Alloy Self Monitoring
+prometheus.exporter.self "alloy" {}
+
+// C. Scrape Targets
+prometheus.scrape "metrics" {
+    targets = [
+        {"__address__" = "traefik:8080", "job" = "traefik"},
+        {"__address__" = "crowdsec:6060", "job" = "crowdsec"},
+        {"__address__" = "redis-exporter:9121", "job" = "redis"},
+        {"__address__" = "localhost:12345", "job" = "alloy"},
+    ]
+    
+    forward_to = [prometheus.remote_write.local.receiver]
+}
+
+// D. Send to Prometheus (Output)
+prometheus.remote_write "local" {
+    endpoint {
+        url = "http://prometheus:9090/api/v1/write"
+    }
+}
