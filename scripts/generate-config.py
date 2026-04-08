@@ -521,6 +521,10 @@ def generate_configs():
                     'crowdsecLapiHost': 'crowdsec:8080',
                     'crowdsecLapiKey': CROWDSEC_API_KEY,
                     'crowdsecMode': 'stream',
+                    'crowdsecAppsecEnabled': True,
+                    'crowdsecAppsecHost': 'crowdsec:7422',
+                    'crowdsecAppsecFailureBlock': False,
+                    'crowdsecAppsecUnreachableBlock': False,
                     'updateIntervalSeconds': CS_UPDATE_INTERVAL,
                     # Fail-open behavior: never block traffic if LAPI or Redis are unreachable/down
                     'updateMaxFailure': -1,
@@ -539,7 +543,10 @@ def generate_configs():
                         '192.168.0.0/16'
                     ],
                     # Immediate Whitelist (Client IP)
-                    # These IPs bypass LAPI checks entirely
+                    # These IPs bypass LAPI stream checks entirely (no blocklist lookup),
+                    # but they do NOT bypass AppSec inspection — that requires the separate
+                    # 'crowdsecAppsecTrustedIPs' parameter, which we intentionally omit
+                    # so AppSec inspects all traffic regardless of source.
                     'clientTrustedIPs': [
                         '127.0.0.1/32',
                         '172.16.0.0/12',

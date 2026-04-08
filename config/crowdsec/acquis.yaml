@@ -17,3 +17,14 @@ labels:
   type: syslog
 
 ## NOTE: THE SEPARATOR --- IS REQUIRED BETWEEN THE TWO BLOCKS
+
+---
+
+# --- AppSec (WAF) Configuration ---
+appsec_configs:
+  - crowdsecurity/appsec-default
+labels:
+  type: appsec
+listen_addr: 0.0.0.0:7422
+source: appsec
+name: traefikAppSec
