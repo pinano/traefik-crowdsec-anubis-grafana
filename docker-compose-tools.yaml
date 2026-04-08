@@ -66,7 +66,7 @@ services:
           sleep 86400;
         done) &
         # Start CrowdSec check loop in background (if enabled)
-        (if [ \"$${CROWDSEC_DISABLE}\" != \"true\" ]; then
+        (if [ \"$${CROWDSEC_ENABLE}\" != \"false\" ]; then
           while true; do
             sh /check-crowdsec.sh;
             echo \"CrowdSec check: sleeping for $${WATCHDOG_CROWDSEC_CHECK_INTERVAL:-3600}s...\";
@@ -100,7 +100,7 @@ services:
       - WATCHDOG_DNS_CHECK_INTERVAL=${WATCHDOG_DNS_CHECK_INTERVAL:-21600}
       - WATCHDOG_CROWDSEC_CHECK_INTERVAL=${WATCHDOG_CROWDSEC_CHECK_INTERVAL:-3600}
       - CROWDSEC_CONTAINER=crowdsec
-      - CROWDSEC_DISABLE=${CROWDSEC_DISABLE:-false}
+      - CROWDSEC_ENABLE=${CROWDSEC_ENABLE:-true}
     deploy:
       resources:
         limits:

@@ -1,0 +1,20 @@
+# --- Docker Containers Surveillance (stdout) ---
+# Block 1: Traefik
+source: docker
+container_name_regexp:
+ - ".*traefik.*"
+labels:
+  type: traefik
+
+---
+
+# --- SFTP Container Surveillance (stdout) ---
+# Block 2: SFTP (Sidecar)
+source: docker
+container_name_regexp:
+ - ".*sftp.*"
+labels:
+  type: syslog
+
+## NOTE: THE SEPARATOR --- IS REQUIRED BETWEEN THE TWO BLOCKS
+## NOTE: Do NOT add AppSec config here. It is appended by start.sh when CROWDSEC_APPSEC_ENABLE=true.

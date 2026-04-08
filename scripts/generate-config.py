@@ -21,7 +21,8 @@ OUTPUT_TRAEFIK = 'config/traefik/dynamic-config/routers-generated.yaml'
 
 CROWDSEC_API_KEY = os.getenv('CROWDSEC_API_KEY')
 REDIS_PASSWORD = os.getenv('REDIS_PASSWORD')
-CROWDSEC_DISABLE = os.getenv('CROWDSEC_DISABLE', 'false').lower() == 'true'
+CROWDSEC_ENABLE = os.getenv('CROWDSEC_ENABLE', 'true').lower() == 'true'
+CROWDSEC_APPSEC_ENABLE = os.getenv('CROWDSEC_APPSEC_ENABLE', 'true').lower() == 'true'
 TRAEFIK_ENV_TYPE = os.getenv('TRAEFIK_ACME_ENV_TYPE', 'staging')
 IS_LOCAL_DEV = (TRAEFIK_ENV_TYPE == 'local')
 TRAEFIK_CERT_RESOLVER = os.getenv('TRAEFIK_CERT_RESOLVER', 'le')
@@ -90,7 +91,7 @@ VALID_SERVICE_NAME_REGEX = re.compile(r'^[a-z0-9-]+$')
 # Validation
 # -----------------------------------------------------------------------------
 
-if not CROWDSEC_DISABLE and not CROWDSEC_API_KEY:
+if CROWDSEC_ENABLE and not CROWDSEC_API_KEY:
     print("    ❌ FATAL ERROR: CROWDSEC_API_KEY environment variable not found.")
     exit(1)
 
@@ -171,7 +172,7 @@ def process_router(entry, http_section, domain_to_cert_def):
     router_name = f"router-{safe_domain}"
 
     mw_list = []
-    if not CROWDSEC_DISABLE:
+    if CROWDSEC_ENABLE:
         mw_list.append('crowdsec-check')
     
     # Protecting against Slowloris ASAP
@@ -512,7 +513,7 @@ def generate_configs():
     }
 
     # 1. CrowdSec API Check Plugin (The very first line of defense)
-    if not CROWDSEC_DISABLE:
+    if CROWDSEC_ENABLE:
         traefik_dynamic_conf['http']['middlewares']['crowdsec-check'] = {
             'plugin': {
                 'crowdsec': {
@@ -521,7 +522,8 @@ def generate_configs():
                     'crowdsecLapiHost': 'crowdsec:8080',
                     'crowdsecLapiKey': CROWDSEC_API_KEY,
                     'crowdsecMode': 'stream',
-                    'crowdsecAppsecEnabled': True,
+                    # AppSec (WAF) — controlled by CROWDSEC_APPSEC_ENABLE
+                    'crowdsecAppsecEnabled': CROWDSEC_APPSEC_ENABLE,
                     'crowdsecAppsecHost': 'crowdsec:7422',
                     'crowdsecAppsecFailureBlock': False,
                     'crowdsecAppsecUnreachableBlock': False,

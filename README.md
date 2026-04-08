@@ -228,11 +228,12 @@ Access the management interface at `https://domains.<your-domain>`.
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `REDIS_PASSWORD` | Password for the session store. | *Auto-generated* |
-| `CROWDSEC_DISABLE` | Set to `true` to completely disable the IPS (firewall). | `false` |
+| `CROWDSEC_ENABLE` | Set to `false` to completely disable the IPS/WAF (firewall). | `true` |
 | `CROWDSEC_API_KEY` | Secure key for the Traefik-CrowdSec communication. | *Auto-generated* |
 | `CROWDSEC_WHITELIST_IPS` | Comma-separated IPs/CIDRs that bypass all security checks. | - |
 | `CROWDSEC_UPDATE_INTERVAL` | How often (seconds) to download the global blacklist. | `60` |
-| `CROWDSEC_COLLECTIONS` | List of security scenarios to load (Traefik, SSH, DDoS, etc.). | *Defaults included* |
+| `CROWDSEC_APPSEC_ENABLE` | Enable the AppSec WAF component (Layer 7 inspection). AppSec collections are added automatically. | `true` |
+| `CROWDSEC_COLLECTIONS` | List of behavioral scenarios to load. AppSec collections are **not** listed here; they are injected by `start.sh` when AppSec is enabled. | *Defaults included* |
 | `CROWDSEC_ENROLLMENT_KEY` | Optional key to connect to the [CrowdSec Console](https://app.crowdsec.net). | - |
 
 #### CrowdSec Fail-Open Behavior

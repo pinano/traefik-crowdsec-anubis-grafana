@@ -231,6 +231,6 @@ ifeq ($(TRAEFIK_ACME_ENV_TYPE),local)
 endif
 
 # CrowdSec Targets (only if enabled)
-ifneq ($(CROWDSEC_DISABLE),true)
+ifneq ($(CROWDSEC_ENABLE),false)
     include scripts/make/crowdsec.mk
 endif

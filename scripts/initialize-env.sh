@@ -159,10 +159,10 @@ prompt_val "CROWDSEC_UPDATE_INTERVAL" "CrowdSec update interval (seconds)"
 echo ""
 read -p "👉 Disable CrowdSec Firewall completely? (y/N): " disable_cs
 if [[ "$disable_cs" == "y" || "$disable_cs" == "Y" ]]; then
-    replace_val "CROWDSEC_DISABLE" "true"
+    replace_val "CROWDSEC_ENABLE" "false"
     echo "   ✅ CrowdSec DISABLED"
 else
-    replace_val "CROWDSEC_DISABLE" "false"
+    replace_val "CROWDSEC_ENABLE" "true"
     echo "   ✅ CrowdSec ENABLED"
 fi
 
@@ -265,8 +265,8 @@ fi
 
 
 # 3. CROWDSEC_API_KEY
-DISABLE_CS=$(grep "^CROWDSEC_DISABLE=" "$ENV_FILE" | cut -d'=' -f2-)
-if [[ "$DISABLE_CS" != "true" ]]; then
+ENABLE_CS=$(grep "^CROWDSEC_ENABLE=" "$ENV_FILE" | cut -d'=' -f2-)
+if [[ "$ENABLE_CS" != "false" ]]; then
     echo ""
     read -p "👉 Generate NEW CrowdSec API Key (requires starting docker)? (y/N): " gen_cs
     if [[ "$gen_cs" == "y" || "$gen_cs" == "Y" ]]; then
