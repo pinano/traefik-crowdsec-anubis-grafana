@@ -92,7 +92,7 @@ services:
       # Host mounts for prometheus.exporter.unix (Node Exporter equivalent)
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
-      - /:/host/root:ro,rslave
+      - /:/host/root:ro
     # Alloy needs the 'run' argument and also to point at the config file
     command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
     networks:
