@@ -281,6 +281,29 @@ prometheus.scrape "metrics" {
     forward_to = [prometheus.remote_write.local.receiver]
 }
 
+// Scrape host metrics (Node Exporter)
+prometheus.scrape "node_exporter" {
+    targets    = prometheus.exporter.unix.host.targets
+    forward_to = [prometheus.relabel.node_exporter.receiver]
+}
+
+// Relabel metrics to match standard dashboard expectations
+prometheus.relabel "node_exporter" {
+    forward_to = [prometheus.remote_write.local.receiver]
+
+    // Set a standard job name that dashboards look for
+    rule {
+        target_label = "job"
+        replacement  = "node_exporter"
+    }
+
+    // Set the instance label to the domain name for easier filtering
+    rule {
+        target_label = "instance"
+        replacement  = sys.env("DOMAIN")
+    }
+}
+
 // D. Send to Prometheus (Output)
 prometheus.remote_write "local" {
     endpoint {
