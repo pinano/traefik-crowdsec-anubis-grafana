@@ -14,6 +14,7 @@
 - [Configuration Reference](#configuration-reference)
 - [Components (Technical Details)](#components-technical-details)
 - [Operations Manual](#operations-manual)
+  - [Grafana Alerting](#grafana-alerting)
 - [Apache Legacy Configuration](#apache-legacy-configuration)
 - [Trusted Local SSL (mkcert)](#trusted-local-ssl-mkcert)
 - [Project Structure](#project-structure)
@@ -499,11 +500,21 @@ The Domain Manager provides a user-friendly web interface to manage the `domains
 - **Strict Service Selection**: Dropdown automatically lists running Docker containers and detects `apache-host` availability.
 - **Security Defaults**: Enforces safe defaults for rate-limiting and Anubis protection.
 
-### Observability Stack (Alloy, Loki, Grafana)
+### Observability Stack (Alloy, Loki, Grafana, Prometheus)
 
-- **Alloy**: OpenTelemetry-compatible agent that discovers Docker containers and forwards logs to Loki.
-- **Loki**: Log aggregation system optimized for efficiency.
-- **Grafana**: Visual dashboards for traffic analysis and attack monitoring.
+- **Prometheus**: Time-series metrics database. Receives metrics from Alloy via `remote_write` and stores them for Grafana queries. It also evaluates alerting rules defined in `config/prometheus/rules.yml`.
+- **Alloy**: OpenTelemetry-compatible agent that discovers Docker containers, forwards logs to Loki, scrapes metrics from Traefik/CrowdSec/Redis/Node-Exporter, and pushes them to Prometheus.
+- **Loki**: Log aggregation system optimized for label-based filtering. Logs from all containers are stored here and queryable via LogQL in Grafana.
+- **Grafana**: Visual dashboard platform. Serves four pre-provisioned dashboards covering Traefik, CrowdSec, Redis, and host-level metrics (Node Exporter). Also manages **Grafana Alerting** (see below).
+
+#### Pre-provisioned Dashboards
+
+| Dashboard | Datasource | Panels |
+|-----------|-----------|--------|
+| **Traefik** | Prometheus | Request rates, error rates, latency percentiles, active connections |
+| **CrowdSec** | Prometheus + Loki | Active bans, decision rates, bouncer activity, WAF blocks, live logs |
+| **Redis** | Prometheus | Memory usage, hit rate, connected clients, commands/sec |
+| **Node Exporter** | Prometheus | CPU, RAM, disk I/O, network, filesystem health |
 
 ### Watchdog (Monitoring)
 
@@ -551,7 +562,87 @@ A lightweight utility service that monitors the stack and sends Telegram alerts.
 | **CrowdSec Unban** | `make crowdsec-unban [IP]` |
 | **CrowdSec AppSec Status** | `make crowdsec-appsec` |
 | **Redis Stats** | `make redis-info` / `make redis-monitor` |
+| **Setup Grafana Alerting** | `make grafana-setup-telegram` |
+| **Test Grafana Alert** | `make grafana-test-alert` |
 | **Show Help** | `make help` |
+
+---
+
+### Grafana Alerting
+
+Grafana Alerting is an integrated notification system that evaluates metrics and sends alert notifications directly to your configured channels — without any external dependency like Alertmanager.
+
+#### How it works
+
+```
+Prometheus (stores metrics)
+        │
+        ▼
+Grafana (evaluates alert rules every minute)
+        │
+        ├─ Rule fires? → Notification Policy
+        │                      │
+        │               ┌──────┴──────┐
+        │               │  Severity?  │
+        │               └──────┬──────┘
+        │                 critical / warning
+        │                      │
+        └──────────────────────▼
+                    Telegram Contact Point
+                    (your bot)
+```
+
+#### Pre-configured Alert Rules
+
+Thirteen rules organized in four groups, provisioned automatically from `config/grafana/provisioning/alerting/rules.yaml`:
+
+| Group | Alert | Trigger | Severity |
+|-------|-------|---------|----------|
+| Infrastructure | `TraefikDown` | `up{job="traefik"} == 0` for 1m | 🔴 critical |
+| Infrastructure | `CrowdSecDown` | `up{job="crowdsec"} == 0` for 1m | 🔴 critical |
+| Infrastructure | `RedisDown` | `up{job="redis"} == 0` for 1m | 🟡 warning |
+| Infrastructure | `NodeExporterDown` | `up{job="node_exporter"} == 0` for 2m | 🟡 warning |
+| Traefik HTTP | `HighErrorRate` | >5% 5xx over 5m | 🟡 warning |
+| Traefik HTTP | `TraefikConfigReloadFailure` | Any failed reload | 🟡 warning |
+| Host Resources | `HighMemoryUsage` | RAM >90% for 5m | 🟡 warning |
+| Host Resources | `CriticalMemoryUsage` | RAM >97% for 2m | 🔴 critical |
+| Host Resources | `HighCPULoad` | CPU >85% for 10m | 🟡 warning |
+| Host Resources | `DiskSpaceLow` | Disk <15% for 5m | 🟡 warning |
+| Host Resources | `DiskSpaceCritical` | Disk <5% for 2m | 🔴 critical |
+| Redis | `RedisHighMemoryUsage` | >85% of maxmemory for 5m | 🟡 warning |
+| Redis | `RedisRejectedConnections` | Any rejected connection | 🟡 warning |
+
+#### Notification Routing
+
+Alerts are routed to Telegram with different cadences based on severity:
+
+| Severity | Wait before send | Repeat interval |
+|----------|-----------------|------------------|
+| 🔴 critical | 10 seconds | Every 1 hour |
+| 🟡 warning | 30 seconds | Every 4 hours |
+
+Grouping is by `alertname` + `severity`, so related alerts are batched into a single message.
+
+#### Setup (automatic via `make start`)
+
+The Telegram contact point and notification policy cannot be configured via YAML files due to a Grafana 12.x limitation (numeric chat IDs undergo type coercion in YAML provisioning). Instead, they are created via the Grafana REST API with explicit JSON typing.
+
+`make start` calls `scripts/setup-grafana-alerting.sh` automatically after the stack is up. The script:
+
+1. Skips silently if `WATCHDOG_TELEGRAM_BOT_TOKEN` / `WATCHDOG_TELEGRAM_RECIPIENT_ID` are not set.
+2. Waits up to 2 minutes for Grafana to become healthy.
+3. Checks if the contact point already exists — skips creation if it does (idempotent).
+4. Creates the Telegram contact point and notification policy via the Grafana API.
+
+The same Telegram credentials used by the Watchdog are reused — no additional configuration is needed.
+
+> [!IMPORTANT]
+> **First-time setup**: If the stack was already running when you added the Telegram credentials, run `make grafana-setup-telegram` once manually to initialize the contact point.
+
+> [!TIP]
+> After setup, verify that notifications work with `make grafana-test-alert`. You should receive a test message on your Telegram bot.
+
+---
 
 ### Security First Boot Sequence
 
@@ -798,9 +889,11 @@ This stack supports locally trusted certificates to prevent browser security war
 │   ├── start.sh                           # Full stack startup orchestrator
 │   ├── stop.sh                            # Graceful stack shutdown
 │   ├── requirements.txt                   # Python dependencies
+│   ├── setup-grafana-alerting.sh          # Grafana Alerting API setup (auto-called by make start)
 │   └── make/                              # Conditional Makefile includes
 │       ├── certs.mk                       # Local cert targets
-│       └── crowdsec.mk                    # CrowdSec management targets
+│       ├── crowdsec.mk                    # CrowdSec management targets
+│       └── grafana.mk                     # Grafana Alerting targets
 │
 ├── config/
 │   ├── alloy/                             # Alloy log collector config
@@ -817,10 +910,26 @@ This stack supports locally trusted certificates to prevent browser security war
 │   │   ├── Dockerfile
 │   │   ├── static/
 │   │   └── templates/
-│   ├── grafana/                           # Grafana datasources
-│   │   └── config.yaml
+│   ├── grafana/                           # Grafana dashboards & provisioning
+│   │   ├── dashboards/                    # Pre-built JSON dashboards
+│   │   │   ├── traefik.json
+│   │   │   ├── crowdsec.json
+│   │   │   ├── redis.json
+│   │   │   └── node-exporter.json
+│   │   └── provisioning/
+│   │       ├── datasources/
+│   │       │   └── datasources.yaml       # Prometheus + Loki datasources (with stable UIDs)
+│   │       ├── dashboards/
+│   │       │   └── dashboards.yaml        # Dashboard loader config
+│   │       └── alerting/
+│   │           ├── rules.yaml             # 13 alert rules (infrastructure, HTTP, host, Redis)
+│   │           ├── contact-points.yaml    # Placeholder (contact point created via API at startup)
+│   │           └── notification-policies.yaml # Placeholder (policy created via API at startup)
 │   ├── loki/                              # Loki log storage
 │   │   └── config.yaml
+│   ├── prometheus/                        # Prometheus metrics
+│   │   ├── prometheus.yml                 # Scrape config + rule_files reference
+│   │   └── rules.yml                      # Alerting rules (mirrored as Grafana Managed Alerts)
 │   ├── redis/                             # Redis/Valkey session store
 │   │   └── redis.conf
 │   ├── watchdog/                          # Monitoring scripts
@@ -831,7 +940,7 @@ This stack supports locally trusted certificates to prevent browser security war
 │   └── traefik/                           # Traefik configuration
 │       ├── traefik.yaml.template          # Static config template
 │       ├── certs-local-dev/               # Local mkcert certificates
-│       └── dynamic-config/                # Generated routers/middlewares
+│       └── dynamic-config/               # Generated routers/middlewares
 │
 └── Docker Compose Files:
     ├── docker-compose-traefik-crowdsec-redis.yaml   # Core infrastructure

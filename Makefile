@@ -85,6 +85,7 @@ init: ## Initialize environment (.env)
 .PHONY: start
 start: ## Start the stack (calls start.sh)
 	@./scripts/start.sh
+	@$(MAKE) --no-print-directory grafana-setup-telegram
 
 .PHONY: stop
 stop: ## Stop the stack (calls stop.sh)
@@ -234,3 +235,6 @@ endif
 ifneq ($(CROWDSEC_ENABLE),false)
     include scripts/make/crowdsec.mk
 endif
+
+# Grafana Alerting setup targets
+include scripts/make/grafana.mk

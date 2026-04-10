@@ -1,31 +1,17 @@
 apiVersion: 1
 
-contactPoints:
-  - orgId: 1
-    name: Telegram
-    receivers:
-      - uid: telegram-main
-        type: telegram
-        settings:
-          # Grafana 12.x does type inference on YAML values: numeric-looking strings
-          # get promoted to integers, which breaks the chatid (string) field.
-          # Using !!str forces YAML to always treat this as a string regardless of content.
-          chatid: !!str "${GRAFANA_TELEGRAM_CHAT_ID}"
-          # Message format: HTML allows bold/italic for readability
-          parse_mode: "HTML"
-          disable_web_page_preview: true
-          message: |
-            {{ if eq .Status "firing" }}🔴{{ else }}✅{{ end }} <b>{{ .CommonLabels.alertname }}</b>
+# Contact points are NOT provisioned via this file.
+#
+# Reason: Grafana 12.x applies type inference when substituting env vars in
+# YAML settings — numeric-looking values (e.g. Telegram chat IDs) get promoted
+# to integers, which breaks the chatid field (type string). There is no YAML-level
+# workaround that survives Grafana's post-parse substitution.
+#
+# Solution: Use the Grafana Provisioning API to create the contact point with
+# explicit JSON typing. Run once after stack startup:
+#
+#   make grafana-setup-telegram
+#
+# The contact point is stored in Grafana's DB and persists across restarts.
 
-            {{ range .Alerts }}
-            {{- if eq .Status "firing" }}🔥 <b>FIRING</b>{{ else }}✅ <b>RESOLVED</b>{{ end }}
-            📌 <b>Severity:</b> {{ .Labels.severity }}
-            📝 {{ .Annotations.summary }}
-            {{ if .Annotations.description }}💬 {{ .Annotations.description }}{{ end }}
-            ⏰ {{ if eq .Status "firing" }}Since: {{ .StartsAt | since }}{{ else }}Resolved after: {{ .StartsAt | since }}{{ end }}
-            {{ end }}
-        # bottoken goes in secureJsonData: it's a secret and Grafana stores it encrypted.
-        # Values here are always treated as strings (no type inference).
-        secureJsonData:
-          bottoken: "${GRAFANA_TELEGRAM_BOT_TOKEN}"
-        disableResolveMessage: false
+contactPoints: []
