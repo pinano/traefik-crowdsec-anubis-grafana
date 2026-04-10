@@ -17,12 +17,16 @@ grafana-setup-telegram: ## Configure Grafana Alerting: Telegram contact point + 
 	 bash ./scripts/setup-grafana-alerting.sh
 
 .PHONY: grafana-test-alert
-grafana-test-alert: ## Send a test alert via Grafana to Telegram
-	@echo "🧪 Sending test alert to Telegram..."
-	@docker exec $(GRAFANA_CONTAINER) \
-		curl -sk -X POST \
-		-H "Content-Type: application/json" \
-		-u "$(GRAFANA_AUTH)" \
-		"http://localhost:3000/api/v1/provisioning/contact-points/test" \
-		--data-raw '{"receivers": [{"name": "Telegram"}]}' \
-		| python3 -m json.tool 2>/dev/null || echo "Done."
+grafana-test-alert: ## Send a test Telegram message to verify bot token and chat ID
+	@echo "🧪 Sending test message via Telegram Bot API..."
+	@RESPONSE=$$(curl -sS \
+		"https://api.telegram.org/bot$(WATCHDOG_TELEGRAM_BOT_TOKEN)/sendMessage" \
+		-d "chat_id=$(WATCHDOG_TELEGRAM_RECIPIENT_ID)" \
+		-d "parse_mode=HTML" \
+		--data-urlencode "text=🧪 <b>Grafana Alerting – Test OK</b>%0A%0AStack: <code>$(PROJECT_NAME)</code>%0ATime: $$(date '+%Y-%m-%d %H:%M:%S %Z')%0A%0AAlert notifications are correctly configured."); \
+	if echo "$$RESPONSE" | grep -q '"ok":true'; then \
+		echo "  ✅ Message sent! Check your Telegram bot."; \
+	else \
+		echo "  ❌ Failed. Response: $$RESPONSE"; \
+		echo "  Check WATCHDOG_TELEGRAM_BOT_TOKEN and WATCHDOG_TELEGRAM_RECIPIENT_ID in .env"; \
+	fi
