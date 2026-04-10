@@ -174,7 +174,7 @@ else
             "http://localhost:3000/api/v1/provisioning/contact-points/${EXISTING_UID}" \
             --data-raw "${PAYLOAD}")
 
-        if echo "${RESPONSE}" | grep -qE '"uid"|^$'; then
+        if echo "${RESPONSE}" | grep -qE '"uid"|"message"|^$'; then
             success "Contact point updated."
         else
             warn "Unexpected response while updating: ${RESPONSE}"
