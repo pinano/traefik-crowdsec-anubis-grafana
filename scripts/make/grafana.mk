@@ -20,10 +20,9 @@ grafana-setup-telegram: ## Configure Grafana Alerting: Telegram contact point + 
 grafana-test-alert: ## Send a test Telegram message to verify bot token and chat ID
 	@echo "🧪 Sending test message via Telegram Bot API..."
 	@RESPONSE=$$(curl -sS \
+		-H "Content-Type: application/json" \
 		"https://api.telegram.org/bot$(WATCHDOG_TELEGRAM_BOT_TOKEN)/sendMessage" \
-		-d "chat_id=$(WATCHDOG_TELEGRAM_RECIPIENT_ID)" \
-		-d "parse_mode=HTML" \
-		--data-urlencode "text=🧪 <b>Grafana Alerting – Test OK</b>%0A%0AStack: <code>$(PROJECT_NAME)</code>%0ATime: $$(date '+%Y-%m-%d %H:%M:%S %Z')%0A%0AAlert notifications are correctly configured."); \
+		--data-raw "{\"chat_id\": \"$(WATCHDOG_TELEGRAM_RECIPIENT_ID)\", \"parse_mode\": \"HTML\", \"text\": \"🧪 <b>Grafana Alerting \u2013 Test OK<\/b>\n\nStack: <code>$(PROJECT_NAME)<\/code>\nTime: $$(date '+%Y-%m-%d %H:%M:%S %Z')\n\nAlert notifications are correctly configured.\"}"); \
 	if echo "$$RESPONSE" | grep -q '"ok":true'; then \
 		echo "  ✅ Message sent! Check your Telegram bot."; \
 	else \
