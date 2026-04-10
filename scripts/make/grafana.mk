@@ -22,7 +22,7 @@ grafana-test-alert: ## Send a test Telegram message to verify bot token and chat
 	@RESPONSE=$$(curl -sS \
 		-H "Content-Type: application/json" \
 		"https://api.telegram.org/bot$(WATCHDOG_TELEGRAM_BOT_TOKEN)/sendMessage" \
-		--data-raw "{\"chat_id\": \"$(WATCHDOG_TELEGRAM_RECIPIENT_ID)\", \"parse_mode\": \"HTML\", \"text\": \"🧪 <b>Grafana Alerting \u2013 Test OK<\/b>\n\nStack: <code>$(PROJECT_NAME)<\/code>\nTime: $$(date '+%Y-%m-%d %H:%M:%S %Z')\n\nAlert notifications are correctly configured.\"}"); \
+		--data-raw "{\"chat_id\": \"$(WATCHDOG_TELEGRAM_RECIPIENT_ID)\", \"parse_mode\": \"HTML\", \"text\": \"🧪 <b>Grafana Alerting \u2013 Test OK<\/b>\n🌐 <code>$(DOMAIN)<\/code>\n\nStack: <code>$(PROJECT_NAME)<\/code>\nTime: $$(date '+%Y-%m-%d %H:%M:%S %Z')\n\nAlert notifications are correctly configured.\"}"); \
 	if echo "$$RESPONSE" | grep -q '"ok":true'; then \
 		echo "  ✅ Message sent! Check your Telegram bot."; \
 	else \
