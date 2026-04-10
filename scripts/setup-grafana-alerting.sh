@@ -93,10 +93,10 @@ fi
 if [[ "${CONTACT_POINT_EXISTS}" == "false" ]]; then
     info "Creating '${CONTACT_POINT_NAME}' contact point..."
 
-    # chatid is passed as a JSON string (quoted) — avoids Grafana 12.x YAML type inference bug.
-    # The API always handles types correctly regardless of whether the value looks like a number.
-    MESSAGE='{{ if eq .Status "firing" }}🔴{{ else }}✅{{ end }} <b>{{ .CommonLabels.alertname }}</b>\n\n{{ range .Alerts }}{{- if eq .Status "firing" }}🔥 <b>FIRING</b>{{ else }}✅ <b>RESOLVED</b>{{ end }}\n📌 <b>Severity:</b> {{ .Labels.severity }}\n📝 {{ .Annotations.summary }}\n{{ if .Annotations.description }}💬 {{ .Annotations.description }}\n{{ end }}{{ end }}'
-
+    # Note: 'message' field is intentionally omitted — the Go template syntax requires
+    # embedded double quotes (e.g. {{ if eq .Status "firing" }}) which break inline JSON.
+    # Grafana's default Telegram message format is already informative.
+    # To customize the message, edit the contact point via the Grafana UI after setup.
     RESPONSE=$(grafana_api -X POST \
         -H "Content-Type: application/json" \
         "http://localhost:3000/api/v1/provisioning/contact-points" \
@@ -106,8 +106,7 @@ if [[ "${CONTACT_POINT_EXISTS}" == "false" ]]; then
             \"settings\": {
                 \"chatid\": \"${WATCHDOG_TELEGRAM_RECIPIENT_ID}\",
                 \"parse_mode\": \"HTML\",
-                \"disable_web_page_preview\": true,
-                \"message\": \"${MESSAGE}\"
+                \"disable_web_page_preview\": true
             },
             \"secureSettings\": {
                 \"bottoken\": \"${WATCHDOG_TELEGRAM_BOT_TOKEN}\"
