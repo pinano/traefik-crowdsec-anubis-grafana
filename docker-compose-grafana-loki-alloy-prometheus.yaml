@@ -18,6 +18,7 @@ services:
       - GF_UNIFIED_ALERTING_ENABLED=true
       - GF_ALERTING_ENABLED=false
       - TZ=${TZ}
+      - DOMAIN=${DOMAIN}
       # Telegram credentials — shared with Watchdog, used by Grafana Alerting provisioning
       - GRAFANA_TELEGRAM_BOT_TOKEN=${WATCHDOG_TELEGRAM_BOT_TOKEN}
       - GRAFANA_TELEGRAM_CHAT_ID=${WATCHDOG_TELEGRAM_RECIPIENT_ID}
