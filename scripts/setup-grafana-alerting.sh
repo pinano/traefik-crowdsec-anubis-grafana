@@ -105,11 +105,9 @@ if [[ "${CONTACT_POINT_EXISTS}" == "false" ]]; then
             \"type\": \"telegram\",
             \"settings\": {
                 \"chatid\": \"${WATCHDOG_TELEGRAM_RECIPIENT_ID}\",
+                \"bottoken\": \"${WATCHDOG_TELEGRAM_BOT_TOKEN}\",
                 \"parse_mode\": \"HTML\",
                 \"disable_web_page_preview\": true
-            },
-            \"secureSettings\": {
-                \"bottoken\": \"${WATCHDOG_TELEGRAM_BOT_TOKEN}\"
             },
             \"disableResolveMessage\": false
         }")
