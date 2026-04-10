@@ -3,23 +3,25 @@
 # Configures Grafana Alerting (Telegram contact point + notification policy)
 # via the Grafana Provisioning REST API.
 #
+# All API calls are made INSIDE the Grafana container via docker exec,
+# so this works regardless of DNS resolution, TLS certificates, or
+# whether Traefik is fully ready. No external URL needed.
+#
 # Called automatically from `make start` and can also be run manually:
 #   make grafana-setup-telegram
 #
 # Exit codes:
-#   0 — success or intentional skip (tokens not set, Grafana not reachable)
-#   1 — unexpected failure (use for manual invocation debugging)
+#   0 — success or intentional skip (tokens not set, container not running)
+#   1 — unexpected script error (set -e)
 #
 # Environment variables required (loaded from .env by Makefile):
-#   GRAFANA_ADMIN_USER, GRAFANA_ADMIN_PASSWORD
+#   PROJECT_NAME, GRAFANA_ADMIN_USER, GRAFANA_ADMIN_PASSWORD
 #   WATCHDOG_TELEGRAM_BOT_TOKEN, WATCHDOG_TELEGRAM_RECIPIENT_ID
-#   DASHBOARD_SUBDOMAIN, DOMAIN
 
 set -euo pipefail
 
 # ─── Config ──────────────────────────────────────────────────────────────────
-GRAFANA_URL="https://${DASHBOARD_SUBDOMAIN}.${DOMAIN}/grafana"
-GRAFANA_API="${GRAFANA_URL}/api"
+GRAFANA_CONTAINER="${PROJECT_NAME:-stack}-grafana-1"
 AUTH="${GRAFANA_ADMIN_USER}:${GRAFANA_ADMIN_PASSWORD}"
 CONTACT_POINT_NAME="Telegram"
 
@@ -29,8 +31,10 @@ success() { echo "  ✅ $*"; }
 warn()    { echo "  ⚠️  $*"; }
 skip()    { echo "  ℹ️  $*"; exit 0; }
 
+# Run a curl command INSIDE the Grafana container (avoids DNS/TLS/Traefik issues)
 grafana_api() {
-    curl -sk -u "${AUTH}" "$@"
+    docker exec "${GRAFANA_CONTAINER}" \
+        curl -sk -u "${AUTH}" "$@"
 }
 
 # ─── Guard: skip if Telegram is not configured ───────────────────────────────
@@ -45,11 +49,22 @@ echo ""
 echo "🔔 Grafana Alerting setup (Telegram)"
 echo "────────────────────────────────────"
 
-# ─── Wait for Grafana to be reachable ────────────────────────────────────────
-info "Waiting for Grafana..."
+# ─── Guard: skip if Docker is not available ──────────────────────────────────
+if ! command -v docker &>/dev/null; then
+    skip "docker not found in PATH — skipping (run 'make grafana-setup-telegram' once Docker is available)."
+fi
+
+# ─── Wait for Grafana container to be running and healthy ─────────────────────
+info "Waiting for Grafana container..."
 GRAFANA_READY=false
 for i in $(seq 1 24); do
-    if grafana_api "${GRAFANA_API}/health" 2>/dev/null | grep -q '"database": "ok"'; then
+    # Check container is running first
+    if ! docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^${GRAFANA_CONTAINER}$"; then
+        sleep 5
+        continue
+    fi
+    # Then check Grafana's internal health endpoint
+    if grafana_api "http://localhost:3000/api/health" 2>/dev/null | grep -q '"database": "ok"'; then
         GRAFANA_READY=true
         break
     fi
@@ -57,18 +72,16 @@ for i in $(seq 1 24); do
 done
 
 if [[ "${GRAFANA_READY}" == "false" ]]; then
-    warn "Grafana did not respond after 2 minutes."
-    warn "Run 'make grafana-setup-telegram' manually once the stack is healthy."
+    warn "Grafana container '${GRAFANA_CONTAINER}' did not become healthy after 2 minutes."
+    warn "Run 'make grafana-setup-telegram' manually once Grafana is up."
     exit 0  # Non-fatal: don't break 'make start'
 fi
-success "Grafana is up."
+success "Grafana is up (container: ${GRAFANA_CONTAINER})."
 
 # ─── Check if Telegram contact point already exists ──────────────────────────
 info "Checking existing contact points..."
-EXISTING=$(grafana_api "${GRAFANA_API}/v1/provisioning/contact-points")
-CP_UID=$(echo "${EXISTING}" | grep -o '"uid":"[^"]*"' | head -1 | cut -d'"' -f4 || true)
+EXISTING=$(grafana_api "http://localhost:3000/api/v1/provisioning/contact-points")
 
-# Find if the Telegram one exists by name
 if echo "${EXISTING}" | grep -q "\"name\":\"${CONTACT_POINT_NAME}\""; then
     success "Contact point '${CONTACT_POINT_NAME}' already exists — skipping creation."
     CONTACT_POINT_EXISTS=true
@@ -80,12 +93,13 @@ fi
 if [[ "${CONTACT_POINT_EXISTS}" == "false" ]]; then
     info "Creating '${CONTACT_POINT_NAME}' contact point..."
 
-    # chatid is passed as a JSON string (quoted) — avoids Grafana YAML type inference bug
+    # chatid is passed as a JSON string (quoted) — avoids Grafana 12.x YAML type inference bug.
+    # The API always handles types correctly regardless of whether the value looks like a number.
     MESSAGE='{{ if eq .Status "firing" }}🔴{{ else }}✅{{ end }} <b>{{ .CommonLabels.alertname }}</b>\n\n{{ range .Alerts }}{{- if eq .Status "firing" }}🔥 <b>FIRING</b>{{ else }}✅ <b>RESOLVED</b>{{ end }}\n📌 <b>Severity:</b> {{ .Labels.severity }}\n📝 {{ .Annotations.summary }}\n{{ if .Annotations.description }}💬 {{ .Annotations.description }}\n{{ end }}{{ end }}'
 
     RESPONSE=$(grafana_api -X POST \
         -H "Content-Type: application/json" \
-        "${GRAFANA_API}/v1/provisioning/contact-points" \
+        "http://localhost:3000/api/v1/provisioning/contact-points" \
         --data-raw "{
             \"name\": \"${CONTACT_POINT_NAME}\",
             \"type\": \"telegram\",
@@ -108,9 +122,9 @@ if [[ "${CONTACT_POINT_EXISTS}" == "false" ]]; then
     fi
 fi
 
-# ─── Set notification policy (only if receiver is not already Telegram) ───────
+# ─── Set notification policy (only if not already routing to Telegram) ────────
 info "Checking notification policy..."
-CURRENT_POLICY=$(grafana_api "${GRAFANA_API}/v1/provisioning/policies")
+CURRENT_POLICY=$(grafana_api "http://localhost:3000/api/v1/provisioning/policies")
 CURRENT_RECEIVER=$(echo "${CURRENT_POLICY}" | grep -o '"receiver":"[^"]*"' | head -1 | cut -d'"' -f4 || true)
 
 if [[ "${CURRENT_RECEIVER}" == "${CONTACT_POINT_NAME}" ]]; then
@@ -119,7 +133,7 @@ else
     info "Setting notification policy → '${CONTACT_POINT_NAME}'..."
     RESPONSE=$(grafana_api -X PUT \
         -H "Content-Type: application/json" \
-        "${GRAFANA_API}/v1/provisioning/policies" \
+        "http://localhost:3000/api/v1/provisioning/policies" \
         --data-raw "{
             \"receiver\": \"${CONTACT_POINT_NAME}\",
             \"group_by\": [\"alertname\", \"severity\"],
