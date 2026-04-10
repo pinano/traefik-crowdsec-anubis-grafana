@@ -7,15 +7,13 @@ contactPoints:
       - uid: telegram-main
         type: telegram
         settings:
-          # These values are injected from Docker environment variables.
-          # See docker-compose-grafana-loki-alloy-prometheus.yaml
-          bottoken: "$GRAFANA_TELEGRAM_BOT_TOKEN"
-          chatid: "$GRAFANA_TELEGRAM_CHAT_ID"
+          # Grafana 12.x does type inference on YAML values: numeric-looking strings
+          # get promoted to integers, which breaks the chatid (string) field.
+          # Using !!str forces YAML to always treat this as a string regardless of content.
+          chatid: !!str "${GRAFANA_TELEGRAM_CHAT_ID}"
           # Message format: HTML allows bold/italic for readability
           parse_mode: "HTML"
-          # Include a link to the Grafana alert panel
           disable_web_page_preview: true
-          # Message template: brief and actionable
           message: |
             {{ if eq .Status "firing" }}🔴{{ else }}✅{{ end }} <b>{{ .CommonLabels.alertname }}</b>
 
@@ -24,6 +22,10 @@ contactPoints:
             📌 <b>Severity:</b> {{ .Labels.severity }}
             📝 {{ .Annotations.summary }}
             {{ if .Annotations.description }}💬 {{ .Annotations.description }}{{ end }}
-            ⏰ {{ if eq .Status "firing" }}Since: {{ .StartsAt | since }}{{ else }}Duration: {{ .StartsAt | since }}{{ end }}
+            ⏰ {{ if eq .Status "firing" }}Since: {{ .StartsAt | since }}{{ else }}Resolved after: {{ .StartsAt | since }}{{ end }}
             {{ end }}
+        # bottoken goes in secureJsonData: it's a secret and Grafana stores it encrypted.
+        # Values here are always treated as strings (no type inference).
+        secureJsonData:
+          bottoken: "${GRAFANA_TELEGRAM_BOT_TOKEN}"
         disableResolveMessage: false
