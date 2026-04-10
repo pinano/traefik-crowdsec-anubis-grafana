@@ -155,7 +155,7 @@ else
             ]
         }")
 
-    if echo "${RESPONSE}" | grep -q '"receiver"'; then
+    if echo "${RESPONSE}" | grep -qE '"policies updated"|"receiver"'; then
         success "Notification policy set."
     else
         warn "Unexpected response: ${RESPONSE}"
