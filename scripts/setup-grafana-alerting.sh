@@ -106,33 +106,76 @@ else
     CONTACT_POINT_EXISTS=false
 fi
 
+# ─── Custom Telegram message template (Go text/template + HTML) ──────────────
+# We use jq --arg to pass the template as a safe JSON string, avoiding the
+# shell quoting hell caused by Go's {{ if eq .Status "firing" }} syntax.
+read -r -d '' TELEGRAM_TEMPLATE << 'GOTEMPLATE' || true
+{{ if eq .Status "firing" }}🔴{{ else }}✅{{ end }} <b>{{ if eq .Status "firing" }}FIRING{{ else }}RESOLVED{{ end }}</b> — {{ (index .Alerts 0).Labels.rulename }}
+
+{{ range .Alerts }}
+<i>{{ .Annotations.description }}</i>
+
+📋 <b>Host:</b> {{ .Labels.host }}  |  <b>Severity:</b> {{ .Labels.severity }}
+📁 <b>Folder:</b> {{ .Labels.grafana_folder }}
+
+{{ if .GeneratorURL }}🔗 <a href="{{ .GeneratorURL }}">View Alert</a>{{ end }}{{ if .SilenceURL }}  ·  🔕 <a href="{{ .SilenceURL }}">Silence</a>{{ end }}
+{{ end }}
+GOTEMPLATE
+
+# Build the JSON payload safely with jq
+PAYLOAD=$(jq -n \
+    --arg name    "${CONTACT_POINT_NAME}" \
+    --arg chatid  "${WATCHDOG_TELEGRAM_RECIPIENT_ID}" \
+    --arg token   "${WATCHDOG_TELEGRAM_BOT_TOKEN}" \
+    --arg message "${TELEGRAM_TEMPLATE}" \
+    '{
+        name: $name,
+        type: "telegram",
+        settings: {
+            chatid:                   $chatid,
+            bottoken:                 $token,
+            parse_mode:               "HTML",
+            disable_web_page_preview: true,
+            message:                  $message
+        },
+        disableResolveMessage: false
+    }')
+
 # ─── Create contact point (only if it doesn't exist) ─────────────────────────
 if [[ "${CONTACT_POINT_EXISTS}" == "false" ]]; then
     info "Creating '${CONTACT_POINT_NAME}' contact point..."
 
-    # Note: 'message' field is intentionally omitted — the Go template syntax requires
-    # embedded double quotes (e.g. {{ if eq .Status "firing" }}) which break inline JSON.
-    # Grafana's default Telegram message format is already informative.
-    # To customize the message, edit the contact point via the Grafana UI after setup.
     RESPONSE=$(grafana_api -X POST \
         -H "Content-Type: application/json" \
         "http://localhost:3000/api/v1/provisioning/contact-points" \
-        --data-raw "{
-            \"name\": \"${CONTACT_POINT_NAME}\",
-            \"type\": \"telegram\",
-            \"settings\": {
-                \"chatid\": \"${WATCHDOG_TELEGRAM_RECIPIENT_ID}\",
-                \"bottoken\": \"${WATCHDOG_TELEGRAM_BOT_TOKEN}\",
-                \"parse_mode\": \"HTML\",
-                \"disable_web_page_preview\": true
-            },
-            \"disableResolveMessage\": false
-        }")
+        --data-raw "${PAYLOAD}")
 
     if echo "${RESPONSE}" | grep -q '"uid"'; then
         success "Contact point created."
     else
         warn "Unexpected response: ${RESPONSE}"
+    fi
+else
+    # Contact point exists — patch it to apply the latest message template.
+    # Extract the UID of the existing contact point.
+    EXISTING_UID=$(echo "${EXISTING}" \
+        | grep -o "\"uid\":\"[^\"]*\"" | head -1 \
+        | cut -d'"' -f4 || true)
+
+    if [[ -n "${EXISTING_UID}" ]]; then
+        info "Updating message template on existing '${CONTACT_POINT_NAME}' (uid: ${EXISTING_UID})..."
+        RESPONSE=$(grafana_api -X PUT \
+            -H "Content-Type: application/json" \
+            "http://localhost:3000/api/v1/provisioning/contact-points/${EXISTING_UID}" \
+            --data-raw "${PAYLOAD}")
+
+        if echo "${RESPONSE}" | grep -qE '"uid"|^$'; then
+            success "Contact point updated."
+        else
+            warn "Unexpected response while updating: ${RESPONSE}"
+        fi
+    else
+        warn "Could not extract UID for '${CONTACT_POINT_NAME}' — skipping message template update."
     fi
 fi
 
