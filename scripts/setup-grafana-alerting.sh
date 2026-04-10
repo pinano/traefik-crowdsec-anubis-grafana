@@ -122,24 +122,29 @@ read -r -d '' TELEGRAM_TEMPLATE << 'GOTEMPLATE' || true
 {{ end }}
 GOTEMPLATE
 
-# Build the JSON payload safely with jq
-PAYLOAD=$(jq -n \
-    --arg name    "${CONTACT_POINT_NAME}" \
-    --arg chatid  "${WATCHDOG_TELEGRAM_RECIPIENT_ID}" \
-    --arg token   "${WATCHDOG_TELEGRAM_BOT_TOKEN}" \
-    --arg message "${TELEGRAM_TEMPLATE}" \
-    '{
-        name: $name,
-        type: "telegram",
-        settings: {
-            chatid:                   $chatid,
-            bottoken:                 $token,
-            parse_mode:               "HTML",
-            disable_web_page_preview: true,
-            message:                  $message
-        },
-        disableResolveMessage: false
-    }')
+# Build the JSON payload safely with python3 (jq may not be installed on the host).
+# python3 is universally available on macOS/Linux and json.dumps() handles all
+# escaping (newlines, quotes, Unicode) correctly.
+PAYLOAD=$(python3 - <<PYEOF
+import json, sys
+
+template = """${TELEGRAM_TEMPLATE}"""
+
+payload = {
+    "name":    "${CONTACT_POINT_NAME}",
+    "type":    "telegram",
+    "settings": {
+        "chatid":                   "${WATCHDOG_TELEGRAM_RECIPIENT_ID}",
+        "bottoken":                 "${WATCHDOG_TELEGRAM_BOT_TOKEN}",
+        "parse_mode":               "HTML",
+        "disable_web_page_preview": True,
+        "message":                  template,
+    },
+    "disableResolveMessage": False,
+}
+print(json.dumps(payload))
+PYEOF
+)
 
 # ─── Create contact point (only if it doesn't exist) ─────────────────────────
 if [[ "${CONTACT_POINT_EXISTS}" == "false" ]]; then
