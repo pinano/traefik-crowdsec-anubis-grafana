@@ -110,7 +110,7 @@ fi
 # We use jq --arg to pass the template as a safe JSON string, avoiding the
 # shell quoting hell caused by Go's {{ if eq .Status "firing" }} syntax.
 read -r -d '' TELEGRAM_TEMPLATE << 'GOTEMPLATE' || true
-{{ if eq .Status "firing" }}🔴{{ else }}✅{{ end }} <b>{{ if eq .Status "firing" }}FIRING{{ else }}RESOLVED{{ end }}</b> — {{ (index .Alerts 0).Labels.rulename }}
+{{ if eq .Status "firing" }}{{ if eq (index .Alerts 0).Labels.severity "warning" }}🟠{{ else }}🔴{{ end }}{{ else }}✅{{ end }} <b>{{ if eq .Status "firing" }}FIRING{{ else }}RESOLVED{{ end }}</b> — {{ (index .Alerts 0).Labels.rulename }}
 
 {{ range .Alerts }}
 <i>{{ .Annotations.description }}</i>
