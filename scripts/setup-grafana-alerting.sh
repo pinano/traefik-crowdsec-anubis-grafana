@@ -78,6 +78,23 @@ if [[ "${GRAFANA_READY}" == "false" ]]; then
 fi
 success "Grafana is up (container: ${GRAFANA_CONTAINER})."
 
+# ─── Pre-flight: verify credentials have admin access ────────────────────────
+info "Verifying admin credentials..."
+AUTH_CHECK=$(grafana_api "http://localhost:3000/api/org" 2>/dev/null)
+if echo "${AUTH_CHECK}" | grep -q '"id"'; then
+    : # OK — /api/org returns the current org details for authenticated users
+else
+    warn "Admin credentials rejected by Grafana (HTTP 401/403)."
+    warn "The GRAFANA_ADMIN_PASSWORD in .env may not match the password stored in Grafana's database."
+    warn ""
+    warn "To fix, reset the Grafana admin password to match .env:"
+    warn "  docker exec ${GRAFANA_CONTAINER} grafana-cli admin reset-admin-password \"\${GRAFANA_ADMIN_PASSWORD}\""
+    warn ""
+    warn "Then run: make grafana-setup-telegram"
+    exit 0  # Non-fatal
+fi
+success "Admin credentials OK."
+
 # ─── Check if Telegram contact point already exists ──────────────────────────
 info "Checking existing contact points..."
 EXISTING=$(grafana_api "http://localhost:3000/api/v1/provisioning/contact-points")
