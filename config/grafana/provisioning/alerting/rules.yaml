@@ -241,7 +241,7 @@ groups:
         annotations:
           summary: "High HTTP 5xx error rate on Traefik"
           description: "More than 5% of requests are returning 5xx errors."
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         isPaused: false
 
@@ -284,7 +284,7 @@ groups:
         annotations:
           summary: "Traefik configuration reload failed"
           description: "Traefik has failed configuration reload(s) in the last 5 minutes. Check dynamic config files for syntax errors."
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         isPaused: false
 
@@ -338,7 +338,7 @@ groups:
         annotations:
           summary: "High memory usage on host"
           description: "Host memory usage is above 90% for more than 5 minutes."
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         isPaused: false
 
@@ -383,7 +383,7 @@ groups:
         annotations:
           summary: "Critical memory usage on host — OOM risk"
           description: "Host memory usage exceeds 97%. OOM killer may trigger."
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         isPaused: false
 
@@ -427,7 +427,7 @@ groups:
         annotations:
           summary: "High CPU load on host"
           description: "CPU usage has been above 85% for more than 10 minutes."
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         isPaused: false
 
@@ -474,7 +474,7 @@ groups:
         annotations:
           summary: "Low disk space on root filesystem"
           description: "Less than 15% disk space remaining on /."
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         isPaused: false
 
@@ -521,7 +521,7 @@ groups:
         annotations:
           summary: "Critical disk space on root filesystem"
           description: "Less than 5% disk space remaining on /. Immediate action required."
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         isPaused: false
 
@@ -573,7 +573,7 @@ groups:
         annotations:
           summary: "Redis memory usage is high"
           description: "Redis is using more than 85% of its maxmemory limit."
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         isPaused: false
 
@@ -616,6 +616,6 @@ groups:
         annotations:
           summary: "Redis is rejecting connections"
           description: "Redis has rejected connections in the last 5 minutes. May indicate maxclients limit hit."
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         isPaused: false
