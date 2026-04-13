@@ -255,7 +255,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: traefik_config_reloads_failure_total
+              expr: increase(traefik_config_reloads_failure_total[5m])
               instant: true
               refId: A
           - refId: C
@@ -277,13 +277,13 @@ groups:
                   type: query
               refId: C
               type: classic_conditions
-        for: 0s
+        for: 1m
         labels:
           severity: warning
           host: "${DOMAIN}"
         annotations:
           summary: "Traefik configuration reload failed"
-          description: "Traefik has failed configuration reload(s). Check dynamic config files for syntax errors."
+          description: "Traefik has failed configuration reload(s) in the last 5 minutes. Check dynamic config files for syntax errors."
         noDataState: NoData
         execErrState: Error
         isPaused: false

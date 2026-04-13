@@ -121,6 +121,8 @@ def sanitize_name(name):
 def atomic_write_yaml(data, filepath, header=None):
     # Prepare new content in memory
     import io
+    import tempfile
+    
     stream = io.StringIO()
     if header:
         stream.write(f"{header}\n")
@@ -129,24 +131,41 @@ def atomic_write_yaml(data, filepath, header=None):
 
     # Check if file already exists and has identical content
     if os.path.exists(filepath):
-        with open(filepath, 'r') as f:
-            if f.read() == new_content:
-                # No changes, do not touch the file (preserves mtime)
-                return
+        # We read the existing file to avoid unnecessary mtime updates
+        try:
+            with open(filepath, 'r') as f:
+                if f.read() == new_content:
+                    # No changes, do not touch the file (preserves mtime and doesn't trigger inotify)
+                    return
+        except Exception:
+            pass # If reading fails (e.g. corruption), proceed to overwrite
 
-    # If different, perform in-place write
-    mode = 'r+' if os.path.exists(filepath) else 'w+'
-    with open(filepath, mode) as f:
-        f.seek(0)
-        f.write(new_content)
-        f.truncate()
+    # Perform a TRULY atomic write: 
+    # 1. Write to a temporary file in the same directory
+    # 2. Sync to disk (optional but safer)
+    # 3. Use os.replace to swap it instantly (atomic operation on most filesystems)
     
-    # Enforce read permissions for all (0o644) so Traefik (non-root) can read it
+    target_dir = os.path.dirname(filepath)
+    if target_dir:
+        os.makedirs(target_dir, exist_ok=True)
+    
+    # Create temp file in the same directory to ensure it's on the same partition
+    fd, temp_path = tempfile.mkstemp(dir=target_dir or ".", text=True)
     try:
-        os.chmod(filepath, 0o644)
+        with os.fdopen(fd, 'w') as f:
+            f.write(new_content)
+        
+        # Enforce read permissions for all (0o644) so Traefik (non-root) can read it
+        os.chmod(temp_path, 0o644)
+        
+        # Atomic replacement
+        os.replace(temp_path, filepath)
     except Exception as e:
-        # Don't fail the whole script if chmod fails (e.g. read-only mount)
-        pass
+        # Cleanup temp file on failure
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        print(f"    ❌ Error writing to {filepath}: {e}")
+        # We don't raise so the script can continue with other files
 
 # Unifies SSL/TLS configuration for any router
 def apply_tls_config(router_conf, domain, domain_to_cert_def):
