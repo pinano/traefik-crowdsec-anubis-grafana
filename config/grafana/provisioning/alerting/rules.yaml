@@ -28,7 +28,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: up{job="traefik"}
+              expr: up{job="traefik"} or on() vector(0)
               instant: true
               refId: A
           - refId: C
@@ -57,7 +57,7 @@ groups:
         annotations:
           summary: "Traefik is down"
           description: "Traefik has been unreachable for more than 1 minute. All traffic routing is affected."
-        noDataState: Alerting
+        noDataState: OK
         execErrState: Alerting
         isPaused: false
 
@@ -71,7 +71,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: up{job="crowdsec"}
+              expr: up{job="crowdsec"} or on() vector(0)
               instant: true
               refId: A
           - refId: C
@@ -100,7 +100,7 @@ groups:
         annotations:
           summary: "CrowdSec LAPI is down"
           description: "CrowdSec LAPI has been unreachable for more than 1 minute. Security decisions may not be enforced."
-        noDataState: Alerting
+        noDataState: OK
         execErrState: Alerting
         isPaused: false
 
@@ -114,7 +114,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: up{job="redis"}
+              expr: up{job="redis"} or on() vector(0)
               instant: true
               refId: A
           - refId: C
@@ -143,7 +143,7 @@ groups:
         annotations:
           summary: "Redis (Valkey) exporter is down"
           description: "Redis exporter has been unreachable for more than 1 minute. Anubis PoW challenges may be affected."
-        noDataState: Alerting
+        noDataState: OK
         execErrState: Alerting
         isPaused: false
 
@@ -157,7 +157,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: up{job="node_exporter"}
+              expr: up{job="node_exporter"} or on() vector(0)
               instant: true
               refId: A
           - refId: C
@@ -186,7 +186,7 @@ groups:
         annotations:
           summary: "Node exporter is down"
           description: "Host metrics collection via node_exporter has been unavailable for more than 2 minutes."
-        noDataState: Alerting
+        noDataState: OK
         execErrState: Alerting
         isPaused: false
 
@@ -210,9 +210,9 @@ groups:
             datasourceUid: prometheus
             model:
               expr: |
-                sum(rate(traefik_service_requests_total{code=~"5.."}[5m]))
+                (sum(rate(traefik_service_requests_total{code=~"5.."}[5m]))
                 /
-                sum(rate(traefik_service_requests_total[5m]))
+                sum(rate(traefik_service_requests_total[5m]))) or on() vector(0)
               instant: true
               refId: A
           - refId: C
@@ -255,7 +255,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: increase(traefik_config_reloads_failure_total[5m])
+              expr: increase(traefik_config_reloads_failure_total[5m]) or on() vector(0)
               instant: true
               refId: A
           - refId: C
@@ -308,8 +308,8 @@ groups:
             datasourceUid: prometheus
             model:
               expr: |
-                (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)
-                / node_memory_MemTotal_bytes
+                ((node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)
+                / node_memory_MemTotal_bytes) or on() vector(0)
               instant: true
               refId: A
           - refId: C
@@ -353,8 +353,8 @@ groups:
             datasourceUid: prometheus
             model:
               expr: |
-                (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)
-                / node_memory_MemTotal_bytes
+                ((node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)
+                / node_memory_MemTotal_bytes) or on() vector(0)
               instant: true
               refId: A
           - refId: C
@@ -398,7 +398,7 @@ groups:
             datasourceUid: prometheus
             model:
               expr: |
-                100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+                (100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)) or on() vector(0)
               instant: true
               refId: A
           - refId: C
@@ -445,7 +445,7 @@ groups:
                 min(
                   node_filesystem_avail_bytes{mountpoint="/",fstype!="tmpfs"}
                   / node_filesystem_size_bytes{mountpoint="/",fstype!="tmpfs"}
-                )
+                ) or on() vector(0)
               instant: true
               refId: A
           - refId: C
@@ -492,7 +492,7 @@ groups:
                 min(
                   node_filesystem_avail_bytes{mountpoint="/",fstype!="tmpfs"}
                   / node_filesystem_size_bytes{mountpoint="/",fstype!="tmpfs"}
-                )
+                ) or on() vector(0)
               instant: true
               refId: A
           - refId: C
@@ -544,7 +544,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: redis_memory_used_bytes / redis_memory_max_bytes
+              expr: (redis_memory_used_bytes / redis_memory_max_bytes) or on() vector(0)
               instant: true
               refId: A
           - refId: C
@@ -587,7 +587,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: increase(redis_rejected_connections_total[5m])
+              expr: increase(redis_rejected_connections_total[5m]) or on() vector(0)
               instant: true
               refId: A
           - refId: C

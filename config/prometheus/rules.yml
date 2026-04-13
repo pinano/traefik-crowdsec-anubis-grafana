@@ -6,7 +6,7 @@ groups:
     rules:
 
       - alert: TraefikDown
-        expr: up{job="traefik"} == 0
+        expr: (up{job="traefik"} or on() vector(0)) == 0
         for: 1m
         labels:
           severity: critical
@@ -15,7 +15,7 @@ groups:
           description: "Traefik has been unreachable for more than 1 minute. All traffic routing is affected."
 
       - alert: CrowdSecDown
-        expr: up{job="crowdsec"} == 0
+        expr: (up{job="crowdsec"} or on() vector(0)) == 0
         for: 1m
         labels:
           severity: critical
@@ -24,7 +24,7 @@ groups:
           description: "CrowdSec LAPI has been unreachable for more than 1 minute. Security decisions may not be enforced."
 
       - alert: RedisDown
-        expr: up{job="redis"} == 0
+        expr: (up{job="redis"} or on() vector(0)) == 0
         for: 1m
         labels:
           severity: warning
@@ -33,7 +33,7 @@ groups:
           description: "Redis exporter has been unreachable for more than 1 minute. Anubis PoW challenges may be affected."
 
       - alert: NodeExporterDown
-        expr: up{job="node_exporter"} == 0
+        expr: (up{job="node_exporter"} or on() vector(0)) == 0
         for: 2m
         labels:
           severity: warning
@@ -49,9 +49,9 @@ groups:
 
       - alert: HighErrorRate
         expr: |
-          sum(rate(traefik_service_requests_total{code=~"5.."}[5m]))
+          (sum(rate(traefik_service_requests_total{code=~"5.."}[5m]))
           /
-          sum(rate(traefik_service_requests_total[5m])) > 0.05
+          sum(rate(traefik_service_requests_total[5m]))) or on() vector(0) > 0.05
         for: 5m
         labels:
           severity: warning
@@ -60,7 +60,7 @@ groups:
           description: "More than 5% of requests are returning 5xx errors. Current rate: {{ $value | humanizePercentage }}."
 
       - alert: TraefikConfigReloadFailure
-        expr: traefik_config_reloads_failure_total > 0
+        expr: (traefik_config_reloads_failure_total or on() vector(0)) > 0
         for: 0m
         labels:
           severity: warning
@@ -88,8 +88,8 @@ groups:
 
       - alert: HighMemoryUsage
         expr: |
-          (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)
-          / node_memory_MemTotal_bytes > 0.90
+          ((node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)
+          / node_memory_MemTotal_bytes) or on() vector(0) > 0.90
         for: 5m
         labels:
           severity: warning
@@ -99,8 +99,8 @@ groups:
 
       - alert: CriticalMemoryUsage
         expr: |
-          (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)
-          / node_memory_MemTotal_bytes > 0.97
+          ((node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)
+          / node_memory_MemTotal_bytes) or on() vector(0) > 0.97
         for: 2m
         labels:
           severity: critical
@@ -110,7 +110,7 @@ groups:
 
       - alert: HighCPULoad
         expr: |
-          100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+          (100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)) or on() vector(0) > 85
         for: 10m
         labels:
           severity: warning
@@ -120,8 +120,8 @@ groups:
 
       - alert: DiskSpaceLow
         expr: |
-          (node_filesystem_avail_bytes{mountpoint="/",fstype!="tmpfs"}
-          / node_filesystem_size_bytes{mountpoint="/",fstype!="tmpfs"}) < 0.15
+          ((node_filesystem_avail_bytes{mountpoint="/",fstype!="tmpfs"}
+          / node_filesystem_size_bytes{mountpoint="/",fstype!="tmpfs"})) or on() vector(0) < 0.15
         for: 5m
         labels:
           severity: warning
@@ -147,7 +147,7 @@ groups:
     rules:
 
       - alert: RedisHighMemoryUsage
-        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.85
+        expr: (redis_memory_used_bytes / redis_memory_max_bytes) or on() vector(0) > 0.85
         for: 5m
         labels:
           severity: warning
@@ -156,7 +156,7 @@ groups:
           description: "Redis is using more than 85% of its maxmemory limit. Current: {{ $value | humanizePercentage }}."
 
       - alert: RedisRejectedConnections
-        expr: increase(redis_rejected_connections_total[5m]) > 0
+        expr: (increase(redis_rejected_connections_total[5m]) or on() vector(0)) > 0
         for: 0m
         labels:
           severity: warning
