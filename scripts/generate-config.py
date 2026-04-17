@@ -44,6 +44,22 @@ APACHE_HOST_IP   = os.getenv('APACHE_HOST_IP',   '172.17.0.1').strip()
 APACHE_HOST_PORT = os.getenv('APACHE_HOST_PORT',  '8080').strip()
 APACHE_SVC_NAME  = f'apache-host-{APACHE_HOST_PORT}'  # Traefik service name, derived from port
 
+# CrowdSec Whitelist IPs (CIDR list)
+CROWDSEC_WHITELIST_IPS_STR = os.getenv('CROWDSEC_WHITELIST_IPS', '').strip()
+DEFAULT_TRUSTED_IPS = ['127.0.0.1/32', '172.16.0.0/12', '10.0.0.0/8', '192.168.0.0/16']
+TRUSTED_IPS = list(DEFAULT_TRUSTED_IPS)
+
+if CROWDSEC_WHITELIST_IPS_STR:
+    for entry in CROWDSEC_WHITELIST_IPS_STR.split(','):
+        entry = entry.strip().strip('"').strip("'")
+        if not entry: continue
+        # Normalize to CIDR if it's a single IP
+        if '/' not in entry:
+            entry = f"{entry}/32"
+        if entry not in TRUSTED_IPS:
+            TRUSTED_IPS.append(entry)
+
+
 # Robust stripping of surrounding quotes
 if (BLOCKED_PATHS_STR.startswith('"') and BLOCKED_PATHS_STR.endswith('"')) or \
    (BLOCKED_PATHS_STR.startswith("'") and BLOCKED_PATHS_STR.endswith("'")):
@@ -537,24 +553,14 @@ def generate_configs():
                     'redisCacheHost': 'redis:6379',
                     'redisCachePassword': REDIS_PASSWORD,
                     'redisCacheDatabase': "0",
-                    # Trust internal IP headers from Docker network
-                    'forwardedHeadersTrustedIPs': [
-                        '127.0.0.1/32',
-                        '172.16.0.0/12',
-                        '10.0.0.0/8',
-                        '192.168.0.0/16'
-                    ],
+                    'forwardedHeadersTrustedIPs': TRUSTED_IPS,
                     # Immediate Whitelist (Client IP)
-                    # These IPs bypass LAPI stream checks entirely (no blocklist lookup),
-                    # but they do NOT bypass AppSec inspection — that requires the separate
-                    # 'crowdsecAppsecTrustedIPs' parameter, which we intentionally omit
-                    # so AppSec inspects all traffic regardless of source.
-                    'clientTrustedIPs': [
-                        '127.0.0.1/32',
-                        '172.16.0.0/12',
-                        '10.0.0.0/8',
-                        '192.168.0.0/16'
-                    ]
+                    # These IPs bypass LAPI stream checks entirely (no blocklist lookup).
+                    'clientTrustedIPs': TRUSTED_IPS,
+                    # AppSec Whitelist (L7)
+                    # These IPs bypass AppSec inspection entirely.
+                    'crowdsecAppsecTrustedIPs': TRUSTED_IPS
+
                 }
             }
         }
