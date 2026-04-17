@@ -1,0 +1,2 @@
+# Folder for custom CrowdSec scenarios.
+# Files here will be detected by CrowdSec if the directory is mounted to /etc/crowdsec/scenarios/

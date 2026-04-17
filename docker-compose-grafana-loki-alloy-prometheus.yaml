@@ -15,7 +15,13 @@ services:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
       - GF_AUTH_DISABLE_LOGIN_FORM=false
+      - GF_UNIFIED_ALERTING_ENABLED=true
+      - GF_ALERTING_ENABLED=false
       - TZ=${TZ}
+      - DOMAIN=${DOMAIN}
+      # Telegram credentials — shared with Watchdog, used by Grafana Alerting provisioning
+      - GRAFANA_TELEGRAM_BOT_TOKEN=${WATCHDOG_TELEGRAM_BOT_TOKEN}
+      - GRAFANA_TELEGRAM_CHAT_ID=${WATCHDOG_TELEGRAM_RECIPIENT_ID}
     volumes:
       - grafana_data:/var/lib/grafana
       - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
@@ -92,7 +98,7 @@ services:
       # Host mounts for prometheus.exporter.unix (Node Exporter equivalent)
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
-      - /:/host/root:ro,rslave
+      - /:/host/root:ro
     # Alloy needs the 'run' argument and also to point at the config file
     command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
     networks:
@@ -117,12 +123,15 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--storage.tsdb.retention.time=${PROMETHEUS_RETENTION_DAYS:-15}d'
+      - '--storage.tsdb.wal-compression'
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
       - '--web.enable-remote-write-receiver'
+      - '--web.enable-lifecycle'
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./config/prometheus/rules.yml:/etc/prometheus/rules.yml:ro
       - prometheus_data:/prometheus
     networks:
       - traefik
@@ -132,6 +141,11 @@ services:
           memory: ${PROMETHEUS_MEM_LIMIT:-512M}
         reservations:
           memory: 128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   grafana_data:

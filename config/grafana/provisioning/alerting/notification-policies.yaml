@@ -1,0 +1,12 @@
+apiVersion: 1
+
+# Notification policies are NOT provisioned via this file.
+#
+# They are created together with the contact point via:
+#   make grafana-setup-telegram
+#
+# This avoids a chicken-and-egg problem: if this file references a receiver
+# ("Telegram") that hasn't been created yet, Grafana would fail to start.
+# Once created via API, the policy persists in Grafana's DB across restarts.
+
+policies: []

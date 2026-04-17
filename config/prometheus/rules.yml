@@ -1,0 +1,165 @@
+groups:
+  # ============================================
+  # INFRASTRUCTURE AVAILABILITY
+  # ============================================
+  - name: infrastructure_availability
+    rules:
+
+      - alert: TraefikDown
+        expr: (up{job="traefik"} or on() vector(0)) == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Traefik is down"
+          description: "Traefik has been unreachable for more than 1 minute. All traffic routing is affected."
+
+      - alert: CrowdSecDown
+        expr: (up{job="crowdsec"} or on() vector(0)) == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CrowdSec LAPI is down"
+          description: "CrowdSec LAPI has been unreachable for more than 1 minute. Security decisions may not be enforced."
+
+      - alert: RedisDown
+        expr: (up{job="redis"} or on() vector(0)) == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis (Valkey) exporter is down"
+          description: "Redis exporter has been unreachable for more than 1 minute. Anubis PoW challenges may be affected."
+
+      - alert: NodeExporterDown
+        expr: (up{job="node_exporter"} or on() vector(0)) == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Node exporter is down"
+          description: "Host metrics collection via node_exporter has been unavailable for more than 2 minutes."
+
+  # ============================================
+  # TRAEFIK HTTP TRAFFIC
+  # ============================================
+  - name: traefik_http
+    rules:
+
+      - alert: HighErrorRate
+        expr: |
+          (sum(rate(traefik_service_requests_total{code=~"5.."}[5m]))
+          /
+          sum(rate(traefik_service_requests_total[5m]))) or on() vector(0) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High HTTP 5xx error rate on Traefik"
+          description: "More than 5% of requests are returning 5xx errors. Current rate: {{ $value | humanizePercentage }}."
+
+      - alert: TraefikConfigReloadFailure
+        expr: (traefik_config_reloads_failure_total or on() vector(0)) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Traefik configuration reload failed"
+          description: "Traefik has {{ $value }} failed configuration reload(s). Check dynamic config files for syntax errors."
+
+      - alert: HighLatencyP50
+        expr: |
+          histogram_quantile(0.50,
+            sum(rate(traefik_service_request_duration_seconds_bucket[5m])) by (le, service)
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High P50 latency on service {{ $labels.service }}"
+          description: "Median response time exceeds 2s on {{ $labels.service }}. Current P50: {{ $value | humanizeDuration }}."
+
+  # ============================================
+  # HOST RESOURCES (Node Exporter)
+  # ============================================
+  - name: host_resources
+    rules:
+
+      - alert: HighMemoryUsage
+        expr: |
+          ((node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)
+          / node_memory_MemTotal_bytes) or on() vector(0) > 0.90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on host"
+          description: "Host memory usage is above 90% for more than 5 minutes. Current: {{ $value | humanizePercentage }}."
+
+      - alert: CriticalMemoryUsage
+        expr: |
+          ((node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)
+          / node_memory_MemTotal_bytes) or on() vector(0) > 0.97
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical memory usage on host — OOM risk"
+          description: "Host memory usage exceeds 97%. OOM killer may trigger. Current: {{ $value | humanizePercentage }}."
+
+      - alert: HighCPULoad
+        expr: |
+          (100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)) or on() vector(0) > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU load on host"
+          description: "CPU usage has been above 85% for more than 10 minutes. Current: {{ $value | humanize }}%."
+
+      - alert: DiskSpaceLow
+        expr: |
+          ((node_filesystem_avail_bytes{mountpoint="/",fstype!="tmpfs"}
+          / node_filesystem_size_bytes{mountpoint="/",fstype!="tmpfs"})) or on() vector(0) < 0.15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low disk space on root filesystem"
+          description: "Less than 15% disk space remaining on /. Available: {{ $value | humanizePercentage }}."
+
+      - alert: DiskSpaceCritical
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/",fstype!="tmpfs"}
+          / node_filesystem_size_bytes{mountpoint="/",fstype!="tmpfs"}) < 0.05
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical disk space on root filesystem"
+          description: "Less than 5% disk space remaining on /. Immediate action required."
+
+  # ============================================
+  # REDIS
+  # ============================================
+  - name: redis_health
+    rules:
+
+      - alert: RedisHighMemoryUsage
+        expr: (redis_memory_used_bytes / redis_memory_max_bytes) or on() vector(0) > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis memory usage is high"
+          description: "Redis is using more than 85% of its maxmemory limit. Current: {{ $value | humanizePercentage }}."
+
+      - alert: RedisRejectedConnections
+        expr: (increase(redis_rejected_connections_total[5m]) or on() vector(0)) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis is rejecting connections"
+          description: "Redis has rejected {{ $value }} connections in the last 5 minutes. May indicate maxclients limit hit."

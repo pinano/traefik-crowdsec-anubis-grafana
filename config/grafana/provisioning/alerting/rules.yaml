@@ -1,0 +1,621 @@
+apiVersion: 1
+
+# Grafana Managed Alert Rules
+# These rules are evaluated by Grafana directly against the Prometheus datasource.
+# They mirror the recording rules in config/prometheus/rules.yml.
+#
+# IMPORTANT: relativeTimeRange is mandatory for all data queries (from/to in seconds).
+# Expression nodes (__expr__) also need it set to {from: 0, to: 0}.
+
+groups:
+
+  # ============================================
+  # INFRASTRUCTURE AVAILABILITY
+  # ============================================
+  - orgId: 1
+    name: Infrastructure Availability
+    folder: Stack Alerts
+    interval: 1m
+    rules:
+
+      - uid: alert-traefik-down
+        title: TraefikDown
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: up{job="traefik"} or on() vector(0)
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              conditions:
+                - evaluator:
+                    params: [0]
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+                  type: query
+              refId: C
+              type: classic_conditions
+        for: 1m
+        labels:
+          severity: critical
+          host: "${DOMAIN}"
+        annotations:
+          summary: "Traefik is down"
+          description: "Traefik has been unreachable for more than 1 minute. All traffic routing is affected."
+        noDataState: OK
+        execErrState: Alerting
+        isPaused: false
+
+      - uid: alert-crowdsec-down
+        title: CrowdSecDown
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: up{job="crowdsec"} or on() vector(0)
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              conditions:
+                - evaluator:
+                    params: [0]
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+                  type: query
+              refId: C
+              type: classic_conditions
+        for: 1m
+        labels:
+          severity: critical
+          host: "${DOMAIN}"
+        annotations:
+          summary: "CrowdSec LAPI is down"
+          description: "CrowdSec LAPI has been unreachable for more than 1 minute. Security decisions may not be enforced."
+        noDataState: OK
+        execErrState: Alerting
+        isPaused: false
+
+      - uid: alert-redis-down
+        title: RedisDown
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: up{job="redis"} or on() vector(0)
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              conditions:
+                - evaluator:
+                    params: [0]
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+                  type: query
+              refId: C
+              type: classic_conditions
+        for: 1m
+        labels:
+          severity: warning
+          host: "${DOMAIN}"
+        annotations:
+          summary: "Redis (Valkey) exporter is down"
+          description: "Redis exporter has been unreachable for more than 1 minute. Anubis PoW challenges may be affected."
+        noDataState: OK
+        execErrState: Alerting
+        isPaused: false
+
+      - uid: alert-node-exporter-down
+        title: NodeExporterDown
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 180
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: up{job="node_exporter"} or on() vector(0)
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              conditions:
+                - evaluator:
+                    params: [0]
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+                  type: query
+              refId: C
+              type: classic_conditions
+        for: 2m
+        labels:
+          severity: warning
+          host: "${DOMAIN}"
+        annotations:
+          summary: "Node exporter is down"
+          description: "Host metrics collection via node_exporter has been unavailable for more than 2 minutes."
+        noDataState: OK
+        execErrState: Alerting
+        isPaused: false
+
+  # ============================================
+  # TRAEFIK HTTP TRAFFIC
+  # ============================================
+  - orgId: 1
+    name: Traefik HTTP
+    folder: Stack Alerts
+    interval: 1m
+    rules:
+
+      - uid: alert-traefik-high-error-rate
+        title: HighErrorRate
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                (sum(rate(traefik_service_requests_total{code=~"5.."}[5m]))
+                /
+                sum(rate(traefik_service_requests_total[5m]))) or on() vector(0)
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              conditions:
+                - evaluator:
+                    params: [0.05]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+                  type: query
+              refId: C
+              type: classic_conditions
+        for: 5m
+        labels:
+          severity: warning
+          host: "${DOMAIN}"
+        annotations:
+          summary: "High HTTP 5xx error rate on Traefik"
+          description: "More than 5% of requests are returning 5xx errors."
+        noDataState: OK
+        execErrState: Error
+        isPaused: false
+
+      - uid: alert-traefik-config-reload-failure
+        title: TraefikConfigReloadFailure
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: increase(traefik_config_reloads_failure_total[5m]) or on() vector(0)
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              conditions:
+                - evaluator:
+                    params: [0]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+                  type: query
+              refId: C
+              type: classic_conditions
+        for: 1m
+        labels:
+          severity: warning
+          host: "${DOMAIN}"
+        annotations:
+          summary: "Traefik configuration reload failed"
+          description: "Traefik has failed configuration reload(s) in the last 5 minutes. Check dynamic config files for syntax errors."
+        noDataState: OK
+        execErrState: Error
+        isPaused: false
+
+  # ============================================
+  # HOST RESOURCES (Node Exporter)
+  # ============================================
+  - orgId: 1
+    name: Host Resources
+    folder: Stack Alerts
+    interval: 1m
+    rules:
+
+      - uid: alert-high-memory
+        title: HighMemoryUsage
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                ((node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)
+                / node_memory_MemTotal_bytes) or on() vector(0)
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              conditions:
+                - evaluator:
+                    params: [0.90]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+                  type: query
+              refId: C
+              type: classic_conditions
+        for: 5m
+        labels:
+          severity: warning
+          host: "${DOMAIN}"
+        annotations:
+          summary: "High memory usage on host"
+          description: "Host memory usage is above 90% for more than 5 minutes."
+        noDataState: OK
+        execErrState: Error
+        isPaused: false
+
+      - uid: alert-critical-memory
+        title: CriticalMemoryUsage
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                ((node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)
+                / node_memory_MemTotal_bytes) or on() vector(0)
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              conditions:
+                - evaluator:
+                    params: [0.97]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+                  type: query
+              refId: C
+              type: classic_conditions
+        for: 2m
+        labels:
+          severity: critical
+          host: "${DOMAIN}"
+        annotations:
+          summary: "Critical memory usage on host — OOM risk"
+          description: "Host memory usage exceeds 97%. OOM killer may trigger."
+        noDataState: OK
+        execErrState: Error
+        isPaused: false
+
+      - uid: alert-high-cpu
+        title: HighCPULoad
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                (100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)) or on() vector(0)
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              conditions:
+                - evaluator:
+                    params: [85]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+                  type: query
+              refId: C
+              type: classic_conditions
+        for: 10m
+        labels:
+          severity: warning
+          host: "${DOMAIN}"
+        annotations:
+          summary: "High CPU load on host"
+          description: "CPU usage has been above 85% for more than 10 minutes."
+        noDataState: OK
+        execErrState: Error
+        isPaused: false
+
+      - uid: alert-disk-low
+        title: DiskSpaceLow
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                min(
+                  node_filesystem_avail_bytes{mountpoint="/",fstype!="tmpfs"}
+                  / node_filesystem_size_bytes{mountpoint="/",fstype!="tmpfs"}
+                ) or on() vector(0)
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              conditions:
+                - evaluator:
+                    params: [0.15]
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+                  type: query
+              refId: C
+              type: classic_conditions
+        for: 5m
+        labels:
+          severity: warning
+          host: "${DOMAIN}"
+        annotations:
+          summary: "Low disk space on root filesystem"
+          description: "Less than 15% disk space remaining on /."
+        noDataState: OK
+        execErrState: Error
+        isPaused: false
+
+      - uid: alert-disk-critical
+        title: DiskSpaceCritical
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                min(
+                  node_filesystem_avail_bytes{mountpoint="/",fstype!="tmpfs"}
+                  / node_filesystem_size_bytes{mountpoint="/",fstype!="tmpfs"}
+                ) or on() vector(0)
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              conditions:
+                - evaluator:
+                    params: [0.05]
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+                  type: query
+              refId: C
+              type: classic_conditions
+        for: 2m
+        labels:
+          severity: critical
+          host: "${DOMAIN}"
+        annotations:
+          summary: "Critical disk space on root filesystem"
+          description: "Less than 5% disk space remaining on /. Immediate action required."
+        noDataState: OK
+        execErrState: Error
+        isPaused: false
+
+  # ============================================
+  # REDIS
+  # ============================================
+  - orgId: 1
+    name: Redis Health
+    folder: Stack Alerts
+    interval: 1m
+    rules:
+
+      - uid: alert-redis-high-memory
+        title: RedisHighMemoryUsage
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: (redis_memory_used_bytes / redis_memory_max_bytes) or on() vector(0)
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              conditions:
+                - evaluator:
+                    params: [0.85]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+                  type: query
+              refId: C
+              type: classic_conditions
+        for: 5m
+        labels:
+          severity: warning
+          host: "${DOMAIN}"
+        annotations:
+          summary: "Redis memory usage is high"
+          description: "Redis is using more than 85% of its maxmemory limit."
+        noDataState: OK
+        execErrState: Error
+        isPaused: false
+
+      - uid: alert-redis-rejected-connections
+        title: RedisRejectedConnections
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: increase(redis_rejected_connections_total[5m]) or on() vector(0)
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              conditions:
+                - evaluator:
+                    params: [0]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+                  type: query
+              refId: C
+              type: classic_conditions
+        for: 0s
+        labels:
+          severity: warning
+          host: "${DOMAIN}"
+        annotations:
+          summary: "Redis is rejecting connections"
+          description: "Redis has rejected connections in the last 5 minutes. May indicate maxclients limit hit."
+        noDataState: OK
+        execErrState: Error
+        isPaused: false

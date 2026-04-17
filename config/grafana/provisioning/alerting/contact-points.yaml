@@ -1,0 +1,17 @@
+apiVersion: 1
+
+# Contact points are NOT provisioned via this file.
+#
+# Reason: Grafana 12.x applies type inference when substituting env vars in
+# YAML settings — numeric-looking values (e.g. Telegram chat IDs) get promoted
+# to integers, which breaks the chatid field (type string). There is no YAML-level
+# workaround that survives Grafana's post-parse substitution.
+#
+# Solution: Use the Grafana Provisioning API to create the contact point with
+# explicit JSON typing. Run once after stack startup:
+#
+#   make grafana-setup-telegram
+#
+# The contact point is stored in Grafana's DB and persists across restarts.
+
+contactPoints: []
