@@ -288,6 +288,52 @@ groups:
         execErrState: Error
         isPaused: false
 
+      - uid: alert-traefik-high-latency-p50
+        title: HighLatencyP50
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                histogram_quantile(0.50,
+                  sum(rate(traefik_service_request_duration_seconds_bucket[5m])) by (le, service)
+                ) or on() vector(0)
+              instant: true
+              refId: A
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              conditions:
+                - evaluator:
+                    params: [2]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [A]
+                  reducer:
+                    type: last
+                  type: query
+              refId: C
+              type: classic_conditions
+        for: 5m
+        labels:
+          severity: warning
+          host: "${DOMAIN}"
+        annotations:
+          summary: "High P50 latency on Traefik service"
+          description: "Median response time (P50) exceeds 2s on one or more services. Check backend performance or timeout settings."
+        noDataState: OK
+        execErrState: Error
+        isPaused: false
+
   # ============================================
   # HOST RESOURCES (Node Exporter)
   # ============================================

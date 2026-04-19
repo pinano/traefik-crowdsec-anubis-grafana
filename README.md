@@ -948,7 +948,7 @@ Grafana Alerting sends Telegram notifications for infrastructure and performance
 
 #### Pre-configured Alert Rules
 
-13 rules in 4 groups, provisioned from `config/grafana/provisioning/alerting/rules.yaml`:
+14 rules in 4 groups, provisioned from `config/grafana/provisioning/alerting/rules.yaml`:
 
 | Group | Alert | Condition | Duration | Severity |
 |-------|-------|-----------|----------|----------|
@@ -957,6 +957,7 @@ Grafana Alerting sends Telegram notifications for infrastructure and performance
 | Infrastructure | `RedisDown` | `up{job="redis"} == 0` | 1m | 🟡 warning |
 | Infrastructure | `NodeExporterDown` | `up{job="node_exporter"} == 0` | 2m | 🟡 warning |
 | Traefik HTTP | `HighErrorRate` | > 5% 5xx requests over 5m | 5m | 🟡 warning |
+| Traefik HTTP | `HighLatencyP50` | P50 latency > 2s on any service | 5m | 🟡 warning |
 | Traefik HTTP | `TraefikConfigReloadFailure` | Any failed reload event | 1m | 🟡 warning |
 | Host Resources | `HighMemoryUsage` | RAM > 90% | 5m | 🟡 warning |
 | Host Resources | `CriticalMemoryUsage` | RAM > 97% | 2m | 🔴 critical |
