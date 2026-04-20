@@ -751,7 +751,8 @@ if [[ "$CROWDSEC_ENABLE" == "true" ]]; then
     CS_STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$CROWDSEC_ID" 2>/dev/null || echo "none")
 
     if [ "$CS_STATUS" == "healthy" ]; then
-        echo "   🛡️ CrowdSec is already operational. Skipping boot."
+        echo "   🛡️ CrowdSec is already operational. Applying any config changes..."
+        $COMPOSE_CMD $COMPOSE_FILES up -d crowdsec
     else
         echo "   🛡 Booting CrowdSec + Redis..."
         $COMPOSE_CMD $COMPOSE_FILES up -d crowdsec redis
