@@ -59,7 +59,7 @@ services:
   #  CROWDSEC
   # ===========================
   crowdsec:
-    image: crowdsecurity/crowdsec:v1.7.6
+    image: crowdsecurity/crowdsec:v1.7.7
     restart: unless-stopped
     profiles:
       - crowdsec

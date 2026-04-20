@@ -320,7 +320,7 @@ EOF
     done
     export CROWDSEC_COLLECTIONS
 
-    echo "   🛡️ AppSec (WAF) is ENABLED. Collections: appsec-virtual-patching, appsec-generic-rules."
+    echo "   🛡️ AppSec (WAF) is ENABLED. Collections: appsec-virtual-patching, appsec-generic-rules, appsec-sql-injection, appsec-remote-code-execution."
 else
     echo "   ℹ️ AppSec (WAF) is DISABLED. Skipping AppSec acquis block."
 fi
