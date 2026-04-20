@@ -1,0 +1,24 @@
+name: crowdsecurity/appsec-default
+
+# In-band rules: evaluated synchronously per request.
+# A match here results in an immediate block before the request reaches the backend.
+inband_rules:
+  - crowdsecurity/vpatch-*
+  - crowdsecurity/appsec-generic-rules
+
+# Out-of-band rules: evaluated asynchronously after the request is forwarded.
+# A match generates a CrowdSec alert and a ban decision for future requests.
+outofband_rules:
+  - crowdsecurity/appsec-generic-rules
+
+# Default action when an in-band rule matches. 'ban' blocks the request immediately.
+default_remediation: ban
+
+# Default action when no rules match. 'allow' lets clean requests through.
+default_pass_action: allow
+
+# HTTP status code sent to the remediation component (Traefik plugin) on block.
+blocked_http_code: 403
+
+# HTTP status code sent to the remediation component on allow.
+passed_http_code: 200

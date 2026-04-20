@@ -1,11 +1,18 @@
 # =============================================================================
-# CrowdSec Profiles - Aggressive Ban Configuration
-# =============================================================================
-# This file overrides the default profiles to apply longer ban durations
-# and implements a "repeat offender" escalation policy.
-#
-# Profile order matters: first matching profile wins.
-# =============================================================================
+# Profile 0: AppSec (WAF) Alerts (48h ban)
+# -----------------------------------------------------------------------------
+# Detections from the WAF engine result in an immediate 48h ban.
+# WAF alerts have very high confidence.
+
+name: appsec_ban
+filters:
+ - Alert.Remediation == true && Alert.GetScope() == "Ip" && Alert.GetScenario() contains "appsec"
+decisions:
+ - type: ban
+   duration: 48h
+on_success: break
+
+---
 
 # -----------------------------------------------------------------------------
 # Profile 1: Repeat Offenders (7-day ban)
