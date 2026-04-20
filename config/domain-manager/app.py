@@ -6,6 +6,7 @@ import secrets
 import re
 import socket
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, Response
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -803,135 +804,174 @@ def api_services():
 
 # ... (omitted helper funcs) ...
 
-@app.route('/dm-api/check-domain', methods=['POST'])
-@limiter.exempt
-@login_required 
-def check_domain():
-    # ... (function body same as before, just route changed)
-    data = request.json
-    domain_to_check = data.get('domain', '').strip()
-    redirection_to_check = data.get('redirection', '').strip()
-    service_to_check = data.get('service_name', '').strip()
-    anubis_subdomain = data.get('anubis_subdomain', '').strip()
-    
-    status_response = {
-        'status': 'match', # Pessimistic default, starts match, changes on error
+def _resolve_expected_ip():
+    """Resolve the host IP once. Returns (expected_ip, error_response_or_None)."""
+    host_domain = f"{DASHBOARD_SUBDOMAIN}.{os.environ.get('DOMAIN')}"
+    expected_ip = resolve_domain(host_domain)
+    if not expected_ip:
+        if TRAEFIK_ACME_ENV_TYPE == 'local':
+            if check_host_file(host_domain):
+                return '127.0.0.1', None
+            return None, {'status': 'error', 'message': f'Could not resolve host domain ({host_domain}) locally or in /etc/hosts'}
+        return None, {'status': 'error', 'message': f'Could not resolve host domain ({host_domain})'}
+    return expected_ip, None
+
+
+def _check_single_domain(entry, expected_ip, services):
+    """
+    Core single-domain validation logic.
+    Extracted so it can be called from both the single and batch endpoints,
+    and run concurrently inside a ThreadPoolExecutor.
+
+    :param entry:       dict with keys: domain, redirection, service_name, anubis_subdomain
+    :param expected_ip: pre-resolved host IP (from _resolve_expected_ip)
+    :param services:    pre-fetched list of available services (from get_external_services)
+    :returns:           status_response dict (same shape as /dm-api/check-domain)
+    """
+    domain_to_check     = entry.get('domain', '').strip()
+    redirection_to_check = entry.get('redirection', '').strip()
+    service_to_check    = entry.get('service_name', '').strip()
+    anubis_subdomain    = entry.get('anubis_subdomain', '').strip()
+
+    result = {
+        'status': 'match',
         'domain': {'status': 'match'},
         'redirection': {'status': 'skipped'},
         'service': {'status': 'found'},
-        'anubis': {'status': 'skipped'}
+        'anubis': {'status': 'skipped'},
     }
-    
-    # 0. Global Host IP
-    # We resolve the full dashboard domain using the configurable subdomain
-    host_domain = f"{DASHBOARD_SUBDOMAIN}.{os.environ.get('DOMAIN')}"
-    expected_ip = resolve_domain(host_domain)
-    
-    # In local development, the container might not be able to resolve the host domain
-    # (e.g. dev.local defined in host /etc/hosts but not in container DNS).
-    # If we are in local mode, we relax this check but verify against /etc/hosts via mount
-    if not expected_ip:
-        # Use module-level TRAEFIK_ACME_ENV_TYPE (consistent default)
-        if TRAEFIK_ACME_ENV_TYPE == 'local':
-             if check_host_file(host_domain):
-                 expected_ip = '127.0.0.1' # Dummy fallback for comparison logic
-             else:
-                 status_response['status'] = 'error'
-                 status_response['domain'] = {'status': 'error', 'message': f'Could not resolve host domain ({host_domain}) locally or in /etc/hosts'}
-                 return jsonify(status_response)
-        else:
-            status_response['status'] = 'error'
-            status_response['domain'] = {'status': 'error', 'message': f'Could not resolve host domain ({host_domain})'}
-            return jsonify(status_response)
-    
+
     # 1. Domain Check
     if not domain_to_check:
-         status_response['domain'] = {'status': 'error', 'message': 'Empty domain'}
-         status_response['status'] = 'mismatch'
+        result['domain'] = {'status': 'error', 'message': 'Empty domain'}
+        result['status'] = 'mismatch'
     else:
         actual_ip = resolve_domain(domain_to_check)
         if not actual_ip:
-             if TRAEFIK_ACME_ENV_TYPE == 'local' and check_host_file(domain_to_check):
-                 actual_ip = expected_ip
-             else:
-                 status_response['domain'] = {'status': 'error', 'message': 'Resolution failed'}
-                 status_response['status'] = 'mismatch'
+            if TRAEFIK_ACME_ENV_TYPE == 'local' and check_host_file(domain_to_check):
+                actual_ip = expected_ip
+            else:
+                result['domain'] = {'status': 'error', 'message': 'Resolution failed'}
+                result['status'] = 'mismatch'
         elif actual_ip != expected_ip:
-             status_response['domain'] = {
-                 'status': 'mismatch', 
-                 'expected': expected_ip, 
-                 'actual': actual_ip
-             }
-             status_response['status'] = 'mismatch'
-        else:
-            status_response['domain']['status'] = 'match'
+            result['domain'] = {'status': 'mismatch', 'expected': expected_ip, 'actual': actual_ip}
+            result['status'] = 'mismatch'
 
     # 2. Redirection Check
     if redirection_to_check:
         redir_ip = resolve_domain(redirection_to_check)
         if not redir_ip:
-             if TRAEFIK_ACME_ENV_TYPE == 'local' and check_host_file(redirection_to_check):
-                 redir_ip = expected_ip
-             else:
-                 status_response['redirection'] = {'status': 'error', 'message': 'Resolution failed'}
-                 status_response['status'] = 'mismatch'
+            if TRAEFIK_ACME_ENV_TYPE == 'local' and check_host_file(redirection_to_check):
+                redir_ip = expected_ip
+            else:
+                result['redirection'] = {'status': 'error', 'message': 'Resolution failed'}
+                result['status'] = 'mismatch'
         elif redir_ip != expected_ip:
-             status_response['redirection'] = {
-                 'status': 'mismatch',
-                 'expected': expected_ip,
-                 'actual': redir_ip
-             }
-             status_response['status'] = 'mismatch'
+            result['redirection'] = {'status': 'mismatch', 'expected': expected_ip, 'actual': redir_ip}
+            result['status'] = 'mismatch'
         else:
-             status_response['redirection']['status'] = 'match'
-    
+            result['redirection']['status'] = 'match'
+
     # 2.5. Anubis Check
     if anubis_subdomain and domain_to_check:
-        # Get root domain from domain_to_check using tldextract
         root_domain = get_root_domain(domain_to_check)
         if root_domain:
             anubis_full_domain = f"{anubis_subdomain}.{root_domain}"
             anubis_ip = resolve_domain(anubis_full_domain)
-            
             if not anubis_ip:
-                # For Anubis, we generally expect the subdomain to be resolvable if the root is.
-                # However, if root is local, Anubis subdomain might also be in /etc/hosts
                 if TRAEFIK_ACME_ENV_TYPE == 'local' and check_host_file(anubis_full_domain):
                     anubis_ip = expected_ip
                 else:
-                    status_response['anubis'] = {'status': 'error', 'message': f'Resolution failed for {anubis_full_domain}'}
-                    status_response['status'] = 'mismatch'
+                    result['anubis'] = {'status': 'error', 'message': f'Resolution failed for {anubis_full_domain}'}
+                    result['status'] = 'mismatch'
             elif anubis_ip != expected_ip:
-                status_response['anubis'] = {
-                    'status': 'mismatch',
-                    'expected': expected_ip,
-                    'actual': anubis_ip
-                }
-                status_response['status'] = 'mismatch'
+                result['anubis'] = {'status': 'mismatch', 'expected': expected_ip, 'actual': anubis_ip}
+                result['status'] = 'mismatch'
             else:
-                status_response['anubis']['status'] = 'match'
+                result['anubis']['status'] = 'match'
         else:
-             status_response['anubis'] = {'status': 'error', 'message': 'Invalid domain for Anubis check'}
-             status_response['status'] = 'mismatch'
-    
+            result['anubis'] = {'status': 'error', 'message': 'Invalid domain for Anubis check'}
+            result['status'] = 'mismatch'
+
     # 3. Service Check
     if service_to_check:
-        try:
-             services = get_external_services()
-             if service_to_check not in services:
-                 # Check if the service name might be slightly different or internal?
-                 # Assuming exact match required based on api_services
-                 status_response['service'] = {'status': 'missing'}
-                 status_response['status'] = 'mismatch'
-             else:
-                 status_response['service']['status'] = 'found'
-        except Exception:  # noqa: broad exception for service check
-             status_response['service'] = {'status': 'error'}
-             # Don't fail the whole row just for internal error if possible? 
-             # But request asks to check existence.
-             status_response['status'] = 'mismatch'
+        if service_to_check not in services:
+            result['service'] = {'status': 'missing'}
+            result['status'] = 'mismatch'
 
-    return jsonify(status_response)
+    return result
+
+
+@app.route('/dm-api/check-domain', methods=['POST'])
+@limiter.exempt
+@login_required
+def check_domain():
+    """Single-domain validation. Kept for backward compatibility."""
+    entry = request.json
+    expected_ip, err = _resolve_expected_ip()
+    if err:
+        return jsonify({'status': 'error', 'domain': err,
+                        'redirection': {'status': 'skipped'},
+                        'service': {'status': 'found'},
+                        'anubis': {'status': 'skipped'}})
+    services = get_external_services()
+    return jsonify(_check_single_domain(entry, expected_ip, services))
+
+
+@app.route('/dm-api/check-domains-batch', methods=['POST'])
+@limiter.exempt
+@login_required
+def check_domains_batch():
+    """
+    Batch validation endpoint — resolves host IP and services ONCE, then
+    checks all domains in parallel using a ThreadPoolExecutor.
+
+    Accepts: JSON list of domain entry objects
+             [{ domain, redirection, service_name, anubis_subdomain }, …]
+    Returns: JSON list of result objects in the same order as the input,
+             each with the same shape as /dm-api/check-domain.
+    """
+    entries = request.json
+    if not isinstance(entries, list):
+        return jsonify({'error': 'Expected a JSON array of domain entries'}), 400
+
+    # --- One-time setup (shared across all domain checks) ---
+    expected_ip, err = _resolve_expected_ip()
+    if err:
+        # Propagate the host-resolution error to every entry
+        error_result = {'status': 'error', 'domain': err,
+                        'redirection': {'status': 'skipped'},
+                        'service': {'status': 'found'},
+                        'anubis': {'status': 'skipped'}}
+        return jsonify([error_result] * len(entries))
+
+    services = get_external_services()  # docker ps + TCP probe — done ONCE
+
+    # --- Parallel DNS resolution ---
+    # We preserve input order by using a dict keyed on index.
+    results = [None] * len(entries)
+
+    max_workers = min(30, len(entries)) if entries else 1
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_idx = {
+            executor.submit(_check_single_domain, entry, expected_ip, services): idx
+            for idx, entry in enumerate(entries)
+        }
+        for future in as_completed(future_to_idx):
+            idx = future_to_idx[future]
+            try:
+                results[idx] = future.result()
+            except Exception as exc:
+                log.error(f"Batch check error for index {idx}: {exc}")
+                results[idx] = {
+                    'status': 'error',
+                    'domain': {'status': 'error', 'message': str(exc)},
+                    'redirection': {'status': 'skipped'},
+                    'service': {'status': 'found'},
+                    'anubis': {'status': 'skipped'},
+                }
+
+    return jsonify(results)
 
 @app.route('/dm-api/apply-config-stream')
 @login_required

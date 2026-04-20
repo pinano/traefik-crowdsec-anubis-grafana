@@ -597,192 +597,180 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Concurrency Control for validation requests
-        const MAX_CONCURRENCY = 10;
-        const queue = [];
-        let activeCount = 0;
+        const rowsToValidate = rows.filter(row => {
+            const domainInput = row.querySelector('input[data-key="domain"]');
+            const serviceInput = row.querySelector('input[data-key="service_name"]');
+            const redirectionInput = row.querySelector('input[data-key="redirection"]');
+            const anubisInput = row.querySelector('input[data-key="anubis_subdomain"]');
+            return (domainInput && domainInput.value.trim() !== '') ||
+                (serviceInput && serviceInput.value.trim() !== '') ||
+                (redirectionInput && redirectionInput.value.trim() !== '') ||
+                (anubisInput && anubisInput.value.trim() !== '');
+        });
 
-        return new Promise((resolve) => {
-            const processQueue = () => {
-                if (queue.length === 0 && activeCount === 0) {
-                    resolve({ isValid: allValid, errors: globalErrors });
-                    return;
-                }
+        if (rowsToValidate.length === 0) {
+            return { isValid: true, errors: [] };
+        }
 
-                while (activeCount < MAX_CONCURRENCY && queue.length > 0) {
-                    const task = queue.shift();
-                    activeCount++;
-                    task().finally(() => {
-                        activeCount--;
-                        processQueue();
-                    });
-                }
-            };
+        // 2. Local checks (duplicates, mandatory fields) + show spinners
+        const rowMeta = [];  // [{row, domain, redirection, serviceName, anubisSubdomain, domainId, rowLabel, localError}]
 
-            const enqueue = (task) => {
-                queue.push(task);
-                processQueue();
-            };
+        rowsToValidate.forEach((row, index) => {
+            const domainInput = row.querySelector('input[data-key="domain"]');
+            const redirectionInput = row.querySelector('input[data-key="redirection"]');
+            const serviceInput = row.querySelector('input[data-key="service_name"]');
+            const statusCell = row.querySelector('.check-status-cell');
 
-            const rowsToValidate = rows.filter(row => {
-                const domainInput = row.querySelector('input[data-key="domain"]');
-                const serviceInput = row.querySelector('input[data-key="service_name"]');
-                const redirectionInput = row.querySelector('input[data-key="redirection"]');
-                const anubisInput = row.querySelector('input[data-key="anubis_subdomain"]');
+            const domain = domainInput ? domainInput.value.trim().toLowerCase() : '';
+            const redirection = redirectionInput ? redirectionInput.value.trim() : '';
+            const serviceName = serviceInput ? serviceInput.value.trim() : '';
+            const anubisSubdomain = row.querySelector('input[data-key="anubis_subdomain"]')?.value.trim() || '';
 
-                // A row is "active" if it has any human-intent data
-                return (domainInput && domainInput.value.trim() !== '') ||
-                    (serviceInput && serviceInput.value.trim() !== '') ||
-                    (redirectionInput && redirectionInput.value.trim() !== '') ||
-                    (anubisInput && anubisInput.value.trim() !== '');
-            });
+            const rowLabel = domain || `Row ${index + 1}`;
+            const domainId = row.dataset.id;
+            const domainObj = allDomains.find(d => d._id === domainId);
 
-            if (rowsToValidate.length === 0) {
-                resolve({ isValid: true, errors: [] });
-                return;
+            // Show loading spinner
+            if (statusCell) {
+                statusCell.innerHTML = '<i data-lucide="loader-2" class="animate-spin" style="width: 1rem; height: 1rem; color: #666;"></i>';
+                if (window.lucide) lucide.createIcons({ root: statusCell });
+            }
+            if (domainObj) domainObj._status = 'loading';
+
+            // Clear previous errors
+            row.classList.remove('row-error');
+            row.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
+
+            // Basic mandatory + duplicate check
+            let localErrors = [];
+            if (!domain) {
+                localErrors.push(`${rowLabel}: Domain is required`);
+                globalErrors.push(`${rowLabel} (Domain): Required`);
+                if (domainInput) domainInput.classList.add('input-error');
+            } else if (domainCounts[domain] > 1) {
+                localErrors.push(`${rowLabel}: Duplicate domain detected`);
+                globalErrors.push(`${rowLabel} (Domain): Duplicate detected`);
+                if (domainInput) domainInput.classList.add('input-error');
             }
 
-            rowsToValidate.forEach((row, index) => {
-                const domainInput = row.querySelector('input[data-key="domain"]');
-                const redirectionInput = row.querySelector('input[data-key="redirection"]');
-                const serviceInput = row.querySelector('input[data-key="service_name"]');
-                const statusCell = row.querySelector('.check-status-cell');
+            if (!serviceName) {
+                localErrors.push(`${rowLabel}: Service is required`);
+                globalErrors.push(`${rowLabel} (Service): Required`);
+                if (serviceInput) serviceInput.classList.add('input-error');
+            }
 
-                const domain = domainInput ? domainInput.value.trim().toLowerCase() : '';
-                const redirection = redirectionInput ? redirectionInput.value.trim() : '';
-                const serviceName = serviceInput ? serviceInput.value.trim() : '';
-                const anubisSubdomain = row.querySelector('input[data-key="anubis_subdomain"]')?.value.trim() || '';
-
-                const rowLabel = domain || `Row ${index + 1}`;
-                const domainId = row.dataset.id;
-                const domainObj = allDomains.find(d => d._id === domainId);
-
-                // Show loading spinner
+            if (localErrors.length > 0) {
                 if (statusCell) {
-                    statusCell.innerHTML = '<i data-lucide="loader-2" class="animate-spin" style="width: 1rem; height: 1rem; color: #666;"></i>';
+                    statusCell.innerHTML = `<i data-lucide="x-circle" style="color: #7f1d1d; width: 1.2rem; height: 1.2rem;" title="${localErrors.join('\n')}"></i>`;
                     if (window.lucide) lucide.createIcons({ root: statusCell });
                 }
-                if (domainObj) domainObj._status = 'loading';
+                row.classList.add('row-error');
+                if (domainObj) { domainObj._status = 'invalid'; domainObj._validation_errors = localErrors; }
+                allValid = false;
+            }
 
-                // Clear previous errors
-                row.classList.remove('row-error');
-                row.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
-
-                // Basic mandatory check and Duplicate check
-                let localErrors = [];
-                if (!domain) {
-                    const msg = `${rowLabel}: Domain is required`;
-                    localErrors.push(msg);
-                    globalErrors.push(`${rowLabel} (Domain): Required`);
-                    if (domainInput) domainInput.classList.add('input-error');
-                } else if (domainCounts[domain] > 1) {
-                    const msg = `${rowLabel}: Duplicate domain detected`;
-                    localErrors.push(msg);
-                    globalErrors.push(`${rowLabel} (Domain): Duplicate detected`);
-                    if (domainInput) domainInput.classList.add('input-error');
-                }
-
-                if (!serviceName) {
-                    const msg = `${rowLabel}: Service is required`;
-                    localErrors.push(msg);
-                    globalErrors.push(`${rowLabel} (Service): Required`);
-                    if (serviceInput) serviceInput.classList.add('input-error');
-                }
-
-                if (localErrors.length > 0) {
-                    if (statusCell) {
-                        statusCell.innerHTML = `<i data-lucide="x-circle" style="color: #7f1d1d; width: 1.2rem; height: 1.2rem;" title="${localErrors.join('\n')}"></i>`;
-                        if (window.lucide) lucide.createIcons({ root: statusCell });
-                    }
-                    row.classList.add('row-error');
-                    if (domainObj) {
-                        domainObj._status = 'invalid';
-                        domainObj._validation_errors = localErrors;
-                    }
-                    allValid = false;
-                    return; // Next row, don't enqueue task
-                }
-
-                const task = async () => {
-                    try {
-                        const response = await fetch('/dm-api/check-domain', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRFToken': csrfToken
-                            },
-                            body: JSON.stringify({
-                                domain: domain,
-                                redirection: redirection,
-                                service_name: serviceName,
-                                anubis_subdomain: anubisSubdomain
-                            })
-                        });
-
-                        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-                        const data = await response.json();
-                        let tooltip = [];
-                        let isError = false;
-
-                        if (data.domain.status === 'mismatch' || data.domain.status === 'error') {
-                            const msg = data.domain.message || `Domain IP Mismatch`;
-                            tooltip.push(msg);
-                            globalErrors.push(`${rowLabel} (Domain): ${msg}`);
-                            domainInput.classList.add('input-error');
-                            isError = true;
-                        }
-
-                        if (data.redirection.status === 'mismatch' || data.redirection.status === 'error') {
-                            const msg = data.redirection.message || `Redirection IP Mismatch`;
-                            tooltip.push(msg);
-                            globalErrors.push(`${rowLabel} (Redirection): ${msg}`);
-                            if (redirectionInput) redirectionInput.classList.add('input-error');
-                            isError = true;
-                        }
-
-                        if (data.service.status === 'missing' || data.service.status === 'error') {
-                            const msg = `Service validation failed`;
-                            tooltip.push(msg);
-                            globalErrors.push(`${rowLabel} (Service): ${msg}`);
-                            if (serviceInput) serviceInput.classList.add('input-error');
-                            isError = true;
-                        }
-
-                        if (data.anubis.status === 'mismatch' || data.anubis.status === 'error') {
-                            const msg = data.anubis.message || `Anubis DNS Mismatch`;
-                            tooltip.push(msg);
-                            globalErrors.push(`${rowLabel} (Anubis): ${msg}`);
-                            const anubisInput = row.querySelector('input[data-key="anubis_subdomain"]');
-                            if (anubisInput) anubisInput.classList.add('input-error');
-                            isError = true;
-                        }
-
-                        if (isError || data.status === 'mismatch') {
-                            statusCell.innerHTML = `<i data-lucide="x-circle" style="color: #7f1d1d; width: 1.2rem; height: 1.2rem;" title="${tooltip.join('\n')}"></i>`;
-                            row.classList.add('row-error');
-                            if (domainObj) {
-                                domainObj._status = 'invalid';
-                                domainObj._validation_errors = tooltip;
-                            }
-                            allValid = false;
-                        } else {
-                            statusCell.innerHTML = '<i data-lucide="check-circle" style="color: #22c55e; width: 1.2rem; height: 1.2rem;"></i>';
-                            if (domainObj) domainObj._status = 'valid';
-                        }
-                        if (window.lucide) lucide.createIcons({ root: statusCell });
-                    } catch (err) {
-                        console.error("Check failed for " + domain, err);
-                        statusCell.innerHTML = '<i data-lucide="help-circle" style="color: #6b7280; width: 1.2rem; height: 1.2rem;" title="Check failed"></i>';
-                        if (window.lucide) lucide.createIcons({ root: statusCell });
-                        globalErrors.push(`${rowLabel}: Resolution check failed (${err.message})`);
-                        allValid = false;
-                    }
-                };
-                enqueue(task);
-            });
+            rowMeta.push({ row, domain, redirection, serviceName, anubisSubdomain, domainId, rowLabel, domainObj, localErrors });
         });
+
+        // 3. Single batch request for all rows that passed local checks
+        const batchEntries = rowMeta
+            .filter(m => m.localErrors.length === 0)
+            .map(m => ({ domain: m.domain, redirection: m.redirection, service_name: m.serviceName, anubis_subdomain: m.anubisSubdomain }));
+
+        if (batchEntries.length === 0) {
+            return { isValid: allValid, errors: globalErrors };
+        }
+
+        let batchResults;
+        try {
+            const response = await fetch('/dm-api/check-domains-batch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify(batchEntries)
+            });
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            batchResults = await response.json();
+        } catch (err) {
+            console.error('Batch validation failed', err);
+            // Graceful degradation: mark all pending rows as failed
+            rowMeta.filter(m => m.localErrors.length === 0).forEach(m => {
+                const statusCell = m.row.querySelector('.check-status-cell');
+                if (statusCell) {
+                    statusCell.innerHTML = '<i data-lucide="help-circle" style="color: #6b7280; width: 1.2rem; height: 1.2rem;" title="Check failed"></i>';
+                    if (window.lucide) lucide.createIcons({ root: statusCell });
+                }
+                globalErrors.push(`${m.rowLabel}: Batch resolution check failed (${err.message})`);
+            });
+            allValid = false;
+            return { isValid: allValid, errors: globalErrors };
+        }
+
+        // 4. Apply batch results back to each row (same order as batchEntries)
+        let batchIdx = 0;
+        rowMeta.forEach(m => {
+            if (m.localErrors.length > 0) return;  // already handled above
+
+            const data = batchResults[batchIdx++];
+            const row = m.row;
+            const statusCell = row.querySelector('.check-status-cell');
+            const domainInput = row.querySelector('input[data-key="domain"]');
+            const redirectionInput = row.querySelector('input[data-key="redirection"]');
+            const serviceInput = row.querySelector('input[data-key="service_name"]');
+
+            let tooltip = [];
+            let isError = false;
+
+            if (data.domain.status === 'mismatch' || data.domain.status === 'error') {
+                const msg = data.domain.message || `Domain IP Mismatch`;
+                tooltip.push(msg);
+                globalErrors.push(`${m.rowLabel} (Domain): ${msg}`);
+                if (domainInput) domainInput.classList.add('input-error');
+                isError = true;
+            }
+
+            if (data.redirection.status === 'mismatch' || data.redirection.status === 'error') {
+                const msg = data.redirection.message || `Redirection IP Mismatch`;
+                tooltip.push(msg);
+                globalErrors.push(`${m.rowLabel} (Redirection): ${msg}`);
+                if (redirectionInput) redirectionInput.classList.add('input-error');
+                isError = true;
+            }
+
+            if (data.service.status === 'missing' || data.service.status === 'error') {
+                tooltip.push('Service validation failed');
+                globalErrors.push(`${m.rowLabel} (Service): Service validation failed`);
+                if (serviceInput) serviceInput.classList.add('input-error');
+                isError = true;
+            }
+
+            if (data.anubis.status === 'mismatch' || data.anubis.status === 'error') {
+                const msg = data.anubis.message || `Anubis DNS Mismatch`;
+                tooltip.push(msg);
+                globalErrors.push(`${m.rowLabel} (Anubis): ${msg}`);
+                const anubisInput = row.querySelector('input[data-key="anubis_subdomain"]');
+                if (anubisInput) anubisInput.classList.add('input-error');
+                isError = true;
+            }
+
+            if (isError || data.status === 'mismatch') {
+                if (statusCell) {
+                    statusCell.innerHTML = `<i data-lucide="x-circle" style="color: #7f1d1d; width: 1.2rem; height: 1.2rem;" title="${tooltip.join('\n')}"></i>`;
+                }
+                row.classList.add('row-error');
+                if (m.domainObj) { m.domainObj._status = 'invalid'; m.domainObj._validation_errors = tooltip; }
+                allValid = false;
+            } else {
+                if (statusCell) {
+                    statusCell.innerHTML = '<i data-lucide="check-circle" style="color: #22c55e; width: 1.2rem; height: 1.2rem;"></i>';
+                }
+                if (m.domainObj) m.domainObj._status = 'valid';
+            }
+            if (statusCell && window.lucide) lucide.createIcons({ root: statusCell });
+        });
+
+        return { isValid: allValid, errors: globalErrors };
     }
+
 
     function determinePostSaveAction(oldDataStr, newDataStr) {
         if (!oldDataStr || !newDataStr) return 'restart'; // Failsafe
