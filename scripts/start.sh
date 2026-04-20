@@ -753,6 +753,24 @@ if [[ "$CROWDSEC_ENABLE" == "true" ]]; then
     if [ "$CS_STATUS" == "healthy" ]; then
         echo "   🛡️ CrowdSec is already operational. Applying any config changes..."
         $COMPOSE_CMD $COMPOSE_FILES up -d crowdsec
+        sleep 1 # Allow time for recreation if compose detected a change
+
+        # Refresh ID — container may have been recreated due to config changes
+        CROWDSEC_ID=$(docker ps -aq --filter label=com.docker.compose.project=$PROJECT_NAME --filter label=com.docker.compose.service=crowdsec | head -n 1)
+
+        # Wait for healthy in case of recreation
+        timeout=60
+        while [ -z "$CROWDSEC_ID" ] || [ "$(docker inspect --format='{{.State.Health.Status}}' $CROWDSEC_ID 2>/dev/null)" != "healthy" ]; do
+            sleep 2
+            echo -n "."
+            ((timeout-=2))
+            if [ $timeout -le 0 ]; then
+                echo ""
+                echo "   ❌ Timeout waiting for CrowdSec to become healthy after config update."
+                exit 1
+            fi
+            CROWDSEC_ID=$(docker ps -aq --filter label=com.docker.compose.project=$PROJECT_NAME --filter label=com.docker.compose.service=crowdsec | head -n 1)
+        done
     else
         echo "   🛡 Booting CrowdSec + Redis..."
         $COMPOSE_CMD $COMPOSE_FILES up -d crowdsec redis
