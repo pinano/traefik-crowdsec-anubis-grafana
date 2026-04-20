@@ -62,7 +62,7 @@ check_service = \
 
 # Helper: Extract arguments for logs and shell commands
 # This allows using "make logs redis" instead of "make logs s=redis"
-SUPPORTED_COMMANDS := logs shell restart crowdsec-unban
+SUPPORTED_COMMANDS := logs shell restart crowdsec-unban crowdsec-ban cscli-ban
 SUPPORTS_ARGS := $(filter $(firstword $(MAKECMDGOALS)),$(SUPPORTED_COMMANDS))
 ifneq "$(SUPPORTS_ARGS)" ""
   # The remaining arguments are the service names
