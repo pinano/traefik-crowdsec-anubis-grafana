@@ -41,6 +41,9 @@ PROJECT_NAME := $(shell grep '^PROJECT_NAME=' .env 2>/dev/null | cut -d= -f2 || 
 export TRAEFIK_CONFIG_HASH ?= ""
 export TRAEFIK_CERT_RESOLVER ?= ""
 
+# Default tail for logs (can be overridden with tail=N)
+tail ?= all
+
 # Extract TRAEFIK_ACME_ENV_TYPE from .env
 TRAEFIK_ACME_ENV_TYPE := $(shell grep '^TRAEFIK_ACME_ENV_TYPE=' .env 2>/dev/null | cut -d= -f2)
 
@@ -135,17 +138,17 @@ sync: ## Synchronize .env with .env.dist (Add missing, remove extras)
 	@$(PYTHON) scripts/validate-env.py --sync
 
 .PHONY: logs
-logs: ## Follow logs for all containers or a specific service (usage: make logs [service])
+logs: ## Follow logs (usage: make logs [service] [tail=N])
 ifneq ($(strip $(SERVICE_ARGS)),)
-	@echo "Following logs for service: $(SERVICE_ARGS)..."
-	@-$(DOCKER_COMPOSE) logs -f $(SERVICE_ARGS)
+	@echo "Following logs for service: $(SERVICE_ARGS) (tail=$(tail))..."
+	@-$(DOCKER_COMPOSE) logs -f --tail=$(tail) $(SERVICE_ARGS)
 else ifdef s
-	@echo "Following logs for service: $(s)..."
-	@-$(DOCKER_COMPOSE) logs -f $(s)
+	@echo "Following logs for service: $(s) (tail=$(tail))..."
+	@-$(DOCKER_COMPOSE) logs -f --tail=$(tail) $(s)
 else
-	@echo "Following logs for ALL services... (Use 'make services' to see list)"
+	@echo "Following logs for ALL services (tail=$(tail))... (Use 'make services' to see list)"
 	@sleep 2
-	@-$(DOCKER_COMPOSE) logs -f
+	@-$(DOCKER_COMPOSE) logs -f --tail=$(tail)
 endif
 
 .PHONY: shell
