@@ -41,6 +41,15 @@ services:
       - "traefik.http.routers.domain-manager.entrypoints=websecure"
       - "traefik.http.routers.domain-manager.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-}"
       - "traefik.http.services.domain-manager.loadbalancer.server.port=5000"
+      # --- Middleware chain for the domain-manager router ---
+      # Intentionally excludes crowdsec-check: the admin panel must remain accessible
+      # even if the admin IP is temporarily banned (e.g. during aggressive validation
+      # sessions). Protection is provided by Flask auth + CSRF + the rate limiter below.
+      - "traefik.http.routers.domain-manager.middlewares=security-headers@file,dashboard-ratelimit,global-compress@file"
+      # Dashboard rate limiter: 600 req/min / burst 1200. Survives batch domain validation
+      # (which is a single POST but can be called rapidly via UI buttons).
+      - "traefik.http.middlewares.dashboard-ratelimit.rateLimit.average=600"
+      - "traefik.http.middlewares.dashboard-ratelimit.rateLimit.burst=1200"
       # --- SSO Middlewares Definition (to be used by other services) ---
       # 1. Forward Auth: checks /auth-check
       - "traefik.http.middlewares.dashboard-auth.forwardauth.address=http://domain-manager:5000/auth-check"
