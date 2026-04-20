@@ -7,7 +7,7 @@
 # scanning or attacking — ban it for 24h.
 # =============================================================================
 
-type: leakybucket
+type: leaky
 name: custom/traefik-flood-429
 description: "IP flooding Traefik and repeatedly hitting rate limits (429)"
 filter: "evt.Parsed.http_status == '429'"
