@@ -312,7 +312,7 @@ name: traefikAppSec
 EOF
 
     # Inject AppSec collections into COLLECTIONS if not already present
-    APPSEC_COLLECTIONS="crowdsecurity/appsec-virtual-patching crowdsecurity/appsec-generic-rules crowdsecurity/appsec-sql-injection crowdsecurity/appsec-remote-code-execution"
+    APPSEC_COLLECTIONS="crowdsecurity/appsec-virtual-patching crowdsecurity/appsec-generic-rules openappsec/openappsec-sql-injection crowdsecurity/appsec-remote-code-execution"
     for col in $APPSEC_COLLECTIONS; do
         if [[ "$CROWDSEC_COLLECTIONS" != *"$col"* ]]; then
             CROWDSEC_COLLECTIONS="$CROWDSEC_COLLECTIONS $col"
@@ -320,7 +320,7 @@ EOF
     done
     export CROWDSEC_COLLECTIONS
 
-    echo "   🛡️ AppSec (WAF) is ENABLED. Collections: appsec-virtual-patching, appsec-generic-rules, appsec-sql-injection, appsec-remote-code-execution."
+    echo "   🛡️ AppSec (WAF) is ENABLED. Collections: appsec-virtual-patching, appsec-generic-rules, openappsec/openappsec-sql-injection, appsec-remote-code-execution."
 else
     echo "   ℹ️ AppSec (WAF) is DISABLED. Skipping AppSec acquis block."
 fi
