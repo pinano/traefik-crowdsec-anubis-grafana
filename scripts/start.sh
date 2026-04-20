@@ -312,7 +312,7 @@ name: traefikAppSec
 EOF
 
     # Inject AppSec collections into COLLECTIONS if not already present
-    APPSEC_COLLECTIONS="crowdsecurity/appsec-virtual-patching crowdsecurity/appsec-generic-rules"
+    APPSEC_COLLECTIONS="crowdsecurity/appsec-virtual-patching crowdsecurity/appsec-generic-rules crowdsecurity/appsec-sql-injection crowdsecurity/appsec-remote-code-execution"
     for col in $APPSEC_COLLECTIONS; do
         if [[ "$CROWDSEC_COLLECTIONS" != *"$col"* ]]; then
             CROWDSEC_COLLECTIONS="$CROWDSEC_COLLECTIONS $col"
