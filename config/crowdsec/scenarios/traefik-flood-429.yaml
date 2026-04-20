@@ -10,7 +10,7 @@
 type: leaky
 name: custom/traefik-flood-429
 description: "IP flooding Traefik and repeatedly hitting rate limits (429)"
-filter: "evt.Parsed.http_status == '429'"
+filter: "evt.Meta.log_type == 'http_access-log' && evt.Meta.http_status == '429'"
 groupby: evt.Meta.source_ip
 capacity: 30
 leakspeed: "10s"
