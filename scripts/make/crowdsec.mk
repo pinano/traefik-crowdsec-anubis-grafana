@@ -35,8 +35,6 @@ crowdsec-ban: ## Ban an IP address manually (usage: make crowdsec-ban 1.2.3.4)
 		$(call check_service,crowdsec,cscli decisions add --ip $$ip --reason 'manual ban'); \
 	done
 
-.PHONY: cscli-ban
-cscli-ban: crowdsec-ban ## Alias for crowdsec-ban (usage: make cscli-ban 1.2.3.4)
 
 .PHONY: crowdsec-appsec
 crowdsec-appsec: ## Show AppSec WAF status: loaded configs, rules, and metrics
