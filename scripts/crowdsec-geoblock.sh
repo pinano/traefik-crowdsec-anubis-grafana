@@ -106,22 +106,22 @@ for RAW_COUNTRY in "${COUNTRIES[@]}"; do
         DURATION="8760h"  # 1 year
 
         info "Applying bans (reason: ${REASON}, duration: ${DURATION})..."
+
+        # Build a shell script with all cscli commands and run it in one docker exec
+        # (avoids per-CIDR exec overhead — e.g. 1500+ execs for some countries)
+        TMPSCRIPT=$(mktemp /tmp/geoblock_ban_XXXXXX.sh)
+        echo '#!/bin/sh' > "$TMPSCRIPT"
         while IFS= read -r CIDR; do
             [[ -z "$CIDR" || "$CIDR" == \#* ]] && continue
-            if $CSCLI decisions add \
-                    --range "$CIDR" \
-                    --reason "$REASON" \
-                    --duration "$DURATION" \
-                    --type ban \
-                    > /dev/null 2>&1; then
-                (( OK++ )) || true
-            else
-                warn "Failed to ban range ${CIDR}"
-                (( FAIL++ )) || true
-            fi
+            echo "cscli decisions add --range '${CIDR}' --reason '${REASON}' --duration '${DURATION}' --type ban" >> "$TMPSCRIPT"
+            (( OK++ )) || true
         done < /tmp/geoblock_ranges.txt
 
-        success "Banned ${OK} ranges for ${COUNTRY}."
+        docker exec -i "${CROWDSEC_ID}" sh < "$TMPSCRIPT" > /dev/null 2>&1 \
+            || { warn "Some ban commands may have failed inside the container."; }
+        rm -f "$TMPSCRIPT"
+
+        success "Sent ${OK} ban commands for ${COUNTRY}."
         [[ "$FAIL" -gt 0 ]] && warn "${FAIL} ranges failed."
 
     else
@@ -135,20 +135,20 @@ for RAW_COUNTRY in "${COUNTRIES[@]}"; do
             success "Removed all bans with reason '${REASON}' for ${COUNTRY}."
             (( OK++ )) || true
         else
-            # Fallback: delete range-by-range (catches edge cases)
+            # Fallback: delete range-by-range in one docker exec
             warn "Bulk delete by reason failed or matched nothing — trying per-range fallback..."
+            TMPSCRIPT=$(mktemp /tmp/geoblock_unban_XXXXXX.sh)
+            echo '#!/bin/sh' > "$TMPSCRIPT"
             while IFS= read -r CIDR; do
                 [[ -z "$CIDR" || "$CIDR" == \#* ]] && continue
-                if $CSCLI decisions delete \
-                        --range "$CIDR" \
-                        > /dev/null 2>&1; then
-                    (( OK++ )) || true
-                else
-                    (( FAIL++ )) || true
-                fi
+                echo "cscli decisions delete --range '${CIDR}'" >> "$TMPSCRIPT"
+                (( OK++ )) || true
             done < /tmp/geoblock_ranges.txt
-            success "Removed bans: ${OK} ranges for ${COUNTRY}."
-            [[ "$FAIL" -gt 0 ]] && warn "${FAIL} ranges had no active decision (already unbanned?)."
+            docker exec -i "${CROWDSEC_ID}" sh < "$TMPSCRIPT" > /dev/null 2>&1 \
+                || warn "Some unban commands may have failed inside the container."
+            rm -f "$TMPSCRIPT"
+            success "Sent unban for ${OK} ranges for ${COUNTRY}."
+            warn "Ranges with no active decision are silently ignored."
         fi
     fi
 
