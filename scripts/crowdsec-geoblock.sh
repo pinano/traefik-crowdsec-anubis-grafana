@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # =============================================================================
-# geoblock.sh — Ban or unban all IP ranges for one or more countries via CrowdSec
+# crowdsec-geoblock.sh — Ban or unban all IP ranges for one or more countries via CrowdSec
 #
 # Usage:
-#   ./scripts/geoblock.sh ban   CN RU KP        # Ban China, Russia, North Korea
-#   ./scripts/geoblock.sh unban CN              # Unban China
+#   ./scripts/crowdsec-geoblock.sh ban   CN RU KP        # Ban China, Russia, North Korea
+#   ./scripts/crowdsec-geoblock.sh unban CN              # Unban China
 #
 # Country codes must be ISO 3166-1 alpha-2 (two letters, case-insensitive).
 # IP ranges sourced from https://www.ipdeny.com/ipblocks/data/aggregated/
@@ -47,13 +47,14 @@ if [[ "$ACTION" != "ban" && "$ACTION" != "unban" ]]; then
 fi
 
 # -----------------------------------------------------------------------------
-# Check CrowdSec is running
+# Locate the CrowdSec container (independent of project name / compose files)
 # -----------------------------------------------------------------------------
-if ! docker compose ps crowdsec 2>/dev/null | grep -q "running\|Up"; then
+CROWDSEC_ID=$(docker ps --filter "name=crowdsec" --filter "status=running" --format "{{.ID}}" | head -1)
+if [ -z "$CROWDSEC_ID" ]; then
     die "CrowdSec container is not running. Start the stack first."
 fi
 
-CSCLI="docker compose exec crowdsec cscli"
+CSCLI="docker exec ${CROWDSEC_ID} cscli"
 
 # -----------------------------------------------------------------------------
 # Process each country
