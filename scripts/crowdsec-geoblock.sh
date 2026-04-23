@@ -28,6 +28,24 @@ warn()    { echo -e "${YELLOW}[WARN]${RESET}  $*"; }
 error()   { echo -e "${RED}[ERROR]${RESET} $*" >&2; }
 die()     { error "$*"; exit 1; }
 
+# progress_bar CURRENT TOTAL LABEL
+# Prints an in-place progress bar to stderr. Call with CURRENT==TOTAL for the
+# final "done" line (which adds a newline so subsequent output is clean).
+progress_bar() {
+    local current=$1 total=$2 label="$3"
+    local width=40
+    local filled=$(( current * width / total ))
+    local empty=$(( width - filled ))
+    local bar
+    bar="$(printf '%0.s█' $(seq 1 $filled 2>/dev/null))$(printf '%0.s░' $(seq 1 $empty 2>/dev/null))"
+    local pct=$(( current * 100 / total ))
+    if [[ $current -ge $total ]]; then
+        printf "\r  ${GREEN}${bar}${RESET} %3d%%  %d/%d %s\n" "$pct" "$current" "$total" "$label" >&2
+    else
+        printf "\r  ${CYAN}${bar}${RESET} %3d%%  %d/%d %s" "$pct" "$current" "$total" "$label" >&2
+    fi
+}
+
 # -----------------------------------------------------------------------------
 # Validate arguments
 # -----------------------------------------------------------------------------
@@ -117,8 +135,15 @@ for RAW_COUNTRY in "${COUNTRIES[@]}"; do
             (( OK++ )) || true
         done < /tmp/geoblock_ranges.txt
 
-        docker exec -i "${CROWDSEC_ID}" sh < "$TMPSCRIPT" > /dev/null 2>&1 \
-            || { warn "Some ban commands may have failed inside the container."; }
+        # Stream docker exec output line-by-line to drive the progress bar.
+        # cscli prints one line per range ("time=... level=info msg=Decision..."),
+        # so each line ≈ one processed range.
+        DONE=0
+        progress_bar 0 "$OK" "banning ranges..."
+        while IFS= read -r _line; do
+            (( DONE++ )) || true
+            progress_bar "$DONE" "$OK" "banning ranges..."
+        done < <(docker exec -i "${CROWDSEC_ID}" sh < "$TMPSCRIPT" 2>&1)
         rm -f "$TMPSCRIPT"
 
         success "Sent ${OK} ban commands for ${COUNTRY}."
@@ -144,8 +169,12 @@ for RAW_COUNTRY in "${COUNTRIES[@]}"; do
                 echo "cscli decisions delete --range '${CIDR}'" >> "$TMPSCRIPT"
                 (( OK++ )) || true
             done < /tmp/geoblock_ranges.txt
-            docker exec -i "${CROWDSEC_ID}" sh < "$TMPSCRIPT" > /dev/null 2>&1 \
-                || warn "Some unban commands may have failed inside the container."
+            DONE=0
+            progress_bar 0 "$OK" "unbanning ranges..."
+            while IFS= read -r _line; do
+                (( DONE++ )) || true
+                progress_bar "$DONE" "$OK" "unbanning ranges..."
+            done < <(docker exec -i "${CROWDSEC_ID}" sh < "$TMPSCRIPT" 2>&1)
             rm -f "$TMPSCRIPT"
             success "Sent unban for ${OK} ranges for ${COUNTRY}."
             warn "Ranges with no active decision are silently ignored."
